@@ -5,3 +5,4 @@ export * from './engine';
 export * from './localOps';
 export * from './transport';
 export * from './runner';
+export * from './catalog';

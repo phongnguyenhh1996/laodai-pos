@@ -9,3 +9,4 @@ export * from './reconcile';
 export * from './debt';
 export * from './text';
 export * from './time';
+export * from './catalog';

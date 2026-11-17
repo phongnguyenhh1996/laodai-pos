@@ -27,6 +27,7 @@ export interface Point {
   active: boolean;
   /** Mặc định Tại chỗ / Mang về khi tạo đơn ở điểm này. */
   default_dine_type: DineType;
+  sort: number;
 }
 
 export interface TabletProfile {
@@ -42,6 +43,7 @@ export interface Staff {
   id: string;
   name: string;
   active: boolean;
+  sort: number;
 }
 
 export interface Product {

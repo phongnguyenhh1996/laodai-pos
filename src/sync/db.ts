@@ -68,6 +68,8 @@ export const META = {
   deviceSeq: 'deviceSeq',
   activation: 'activation',
   shift: 'shift',
+  /** Danh mục tải từ server (xem catalog.ts): dùng được khi offline. */
+  catalog: 'catalog',
 } as const;
 
 export interface Activation {

@@ -1,9 +1,12 @@
 import { defineConfig } from 'cypress';
-import { resetDb, tabletClient } from './tests/support/db';
+import { resetDb, sql, tabletClient } from './tests/support/db';
 import { ENV } from './tests/support/env';
-import { TabletSim, item } from './tests/support/ops';
+import { TabletSim, item, push, type TestItem } from './tests/support/ops';
 import { SEED } from './tests/support/seed-ids';
 import { telegramClear, telegramMessages, waitForMessage } from './tests/support/telegram';
+
+// Trạng thái kịch bản G32 giữa các task (tablet giả lập phía server).
+let g32: { sim: TabletSim; orderId: string; line: TestItem } | null = null;
 
 export default defineConfig({
   e2e: {
@@ -40,6 +43,43 @@ export default defineConfig({
           await sim.pay(paid.id, paid.total);
           await sim.del(deleted.id);
           return { open: open.id, paid: paid.id, deleted: deleted.id };
+        },
+        /** G32: tablet A có một đơn đang mở (1 Xôi gà, giá lúc tạo 25.000). */
+        'g32:openOrder': async () => {
+          const sim = new TabletSim(await tabletClient(SEED.tablets.A), SEED.tablets.A);
+          await sim.openShift('Lan');
+          const line = item('xoiGa');
+          const o = await sim.createOrder([line]);
+          if (o.result.status !== 'ok') throw new Error(`tạo đơn: ${JSON.stringify(o.result)}`);
+          g32 = { sim, orderId: o.id, line };
+          return o.id;
+        },
+        /** G32 sau khi chủ đổi giá: đơn đang mở giữ giá cũ, đơn mới phải dùng giá mới. */
+        'g32:afterPriceChange': async (newPrice: number) => {
+          if (!g32) throw new Error('chưa chạy g32:openOrder');
+          const { sim, orderId, line } = g32;
+          const [snap] = await sql<{ unit_price_snap: number }>(
+            'select unit_price_snap from order_items where order_id = $1 and removed_at is null',
+            [orderId],
+          );
+          const editOld = await sim.update(orderId, [{ ...line, qty: 2 }]);
+          const [edited] = await sql<{ total: number }>('select total from orders where id = $1', [orderId]);
+          const late = sim.createOrderOp([item('xoiGa')]);
+          late.op.performed_at = new Date().toISOString();
+          const newWithOldPrice = await push(sim.c, late.op);
+          const newWithNewPrice = await sim.createOrder([{ ...item('xoiGa'), unit_price_snap: newPrice }]);
+          return {
+            openSnap: snap.unit_price_snap,
+            editOld: editOld.status,
+            editedTotal: edited.total,
+            newWithOldPrice: newWithOldPrice.status,
+            newWithNewPrice: newWithNewPrice.result.status,
+          };
+        },
+        /** Hồ sơ tablet đang lưu trên server. */
+        'db:profilePoints': async (tablet: keyof typeof SEED.tablets) => {
+          const [r] = await sql<{ point_ids: string[] }>('select point_ids from tablet_profiles where id = $1', [SEED.tablets[tablet]]);
+          return r.point_ids;
         },
       });
       return config;

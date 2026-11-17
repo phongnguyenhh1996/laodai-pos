@@ -78,9 +78,10 @@ describe('A. Kích hoạt & phân quyền', () => {
     cy.telegramWaitFor('Vào chế độ chủ trên Tablet A');
 
     cy.clock();
-    cy.get('[data-testid=owner-home]').click(); // thao tác ⇒ đồng hồ không thao tác bắt đầu lại (giờ giả)
+    // Bấm vào dòng chữ trung tính (không phải link) ⇒ chỉ là "thao tác", không điều hướng
+    cy.get('[data-testid=owner-device]').click(); // thao tác ⇒ đồng hồ không thao tác bắt đầu lại (giờ giả)
     cy.tick(OWNER_IDLE_MS - 10_000);
-    cy.get('[data-testid=owner-home]').click(); // còn thao tác ⇒ chưa thoát
+    cy.get('[data-testid=owner-device]').click(); // còn thao tác ⇒ chưa thoát
     cy.tick(OWNER_IDLE_MS - 1_000);
     cy.get('[data-testid=owner-home]').should('be.visible');
     cy.tick(1_000);

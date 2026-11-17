@@ -30,11 +30,13 @@ Tài khoản chủ local (seed): `owner@laodai.test` / `laodai-owner-123`.
 ```
 src/domain/        logic nghiệp vụ thuần (giá, bao bì, tiền thối, mã đơn, hàng đợi, đối soát, sổ nợ)
 src/sync/          offline-first: Dexie, outbox, device_seq, thao tác tablet, engine đồng bộ,
-                   transport RPC `sync_push`, SyncRunner (tự gửi khi có thao tác / có mạng, thử lại backoff)
+                   transport RPC `sync_push`, SyncRunner (tự gửi khi có thao tác / có mạng, thử lại backoff),
+                   danh mục tablet (`catalog.ts`: menu/giá/điểm bán/nhân viên/hồ sơ lưu trên máy, tự làm mới)
 src/lib/sync.ts    bộ đồng bộ của tablet (chạy từ lúc vào màn bán hàng) + chỉ báo `sync-status`
 src/lib/auth.ts    đăng nhập chủ, kích hoạt tablet, chế độ chủ trên tablet (phiên tạm, tự thoát 2 phút)
-src/app|tablet|owner  giao diện (đang dựng theo mục 8)
-supabase/migrations   schema, RLS, RPC `sync_push`, `reconcile_shift`, RPC của chủ, cron tổng kết ngày
+src/app|tablet|owner  giao diện (đang dựng theo mục 8); `owner/settings/` = Cài đặt của chủ
+supabase/migrations   schema, RLS, RPC `sync_push`, `reconcile_shift`, RPC của chủ, cron tổng kết ngày,
+                      ràng buộc danh mục (combo cùng menu, hồ sơ tablet trỏ điểm bán có thật, không đổi menu)
 supabase/functions    `telegram-dispatch`, `activate-tablet`, `_shared/format.ts` (định dạng tin)
 tests/fixtures/reconcile-cases.json  bộ dữ liệu đối soát dùng chung cho test TS và SQL
 tests/db/          test DB (Vitest + Supabase local); `sync-client.test.ts` chạy lớp offline thật lên `sync_push`

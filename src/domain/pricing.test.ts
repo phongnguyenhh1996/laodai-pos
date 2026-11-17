@@ -34,6 +34,18 @@ describe('pricing', () => {
     expect(item.name_snap).toBe('Xôi gà');
   });
 
+  it('chủ đổi giá (danh mục mới): đơn đang mở giữ giá cũ, đơn mới dùng giá mới, kể cả combo', () => {
+    const openItem = buildComboItem('i1', COMBO_XOI_FULL, PRODUCTS, TOPPINGS);
+    const newProducts = PRODUCTS.map((p) => (p.id === XOI_GA.id ? { ...p, price: 28_000 } : p));
+    const newToppings = TOPPINGS.map((t) => (t.id === TRUNG.id ? { ...t, price: 7_000 } : t));
+    const newItem = buildComboItem('i2', COMBO_XOI_FULL, newProducts, newToppings);
+    expect(lineTotal(openItem)).toBe(25_000 + 6_000 + 8_000);
+    expect(lineTotal(newItem)).toBe(28_000 + 7_000 + 8_000);
+    expect(comboPrice(COMBO_XOI_FULL, newProducts, newToppings)).toBe(lineTotal(newItem));
+    // Sửa số lượng đơn cũ sau khi đổi giá vẫn giữ giá chụp
+    expect(lineTotal(setItemQty(openItem, 2))).toBe(2 * (25_000 + 6_000 + 8_000));
+  });
+
   it('món / topping ngừng bán không xuất hiện trong lưới chọn', () => {
     expect(selectableProducts(PRODUCTS, XOI_MENU).map((p) => p.id)).toEqual(['xoi-ga', 'xoi-xeo']);
     expect(selectableProducts(PRODUCTS, COM_MENU).map((p) => p.id)).toEqual(['com-ga']);
