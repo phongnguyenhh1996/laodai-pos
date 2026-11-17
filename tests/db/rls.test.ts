@@ -141,6 +141,14 @@ describe('vai trò tablet KHÔNG được', () => {
     const a = await tabA.rpc('owner_adjust_shift', { p_shift: simA.shiftId, p_kind: 'cash', p_qty: 1 });
     expect(a.error).not.toBeNull();
   });
+
+  it('tự kích hoạt hồ sơ khác hay giả "vào chế độ chủ"', async () => {
+    const act = await tabA.rpc('activate_tablet_profile', { p_profile: SEED.tablets.B });
+    expect(act.error).not.toBeNull();
+    const om = await tabA.rpc('owner_mode_entered', { p_profile: SEED.tablets.A });
+    expect(om.error).not.toBeNull();
+    expect(await sql(`select 1 from audit_log where action in ('tablet_login', 'owner_mode')`)).toEqual([]);
+  });
 });
 
 describe('vai trò tablet ĐƯỢC', () => {

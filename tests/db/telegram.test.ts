@@ -79,6 +79,39 @@ describe('Telegram qua Edge Function', () => {
     expect(res.status).toBe(403);
   });
 
+  it('kích hoạt tablet: không có token / token anon bị từ chối', async () => {
+    for (const headers of [{}, { Authorization: `Bearer ${ENV.anonKey}` }] as Record<string, string>[]) {
+      const res = await fetch(`${ENV.url}/functions/v1/activate-tablet`, {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json', apikey: ENV.anonKey },
+        body: JSON.stringify({ tablet_profile_id: SEED.tablets.A }),
+      });
+      expect(res.status).toBe(403);
+    }
+    expect(await sql(`select 1 from audit_log where action = 'tablet_login'`)).toEqual([]);
+  });
+
+  it('kích hoạt lại: device_seq tiếp tục từ số lớn nhất server đã thấy', async () => {
+    const sim = new TabletSim(await tabletClient(SEED.tablets.A), SEED.tablets.A);
+    await sim.openShift('Lan');
+    await sim.createOrder([item('xoiGa')]);
+    await sim.createOrder([item('xoiGa')]);
+    const owner = await ownerClient();
+    const { data, error } = await owner.functions.invoke('activate-tablet', { body: { tablet_profile_id: SEED.tablets.A } });
+    expect(error).toBeNull();
+    expect(data.last_device_seq).toBe(2);
+  });
+
+  it('vào chế độ chủ trên tablet: ghi nhật ký + báo "Vào chế độ chủ trên Tablet A"', async () => {
+    const owner = await ownerClient();
+    const { error } = await owner.rpc('owner_mode_entered', { p_profile: SEED.tablets.A });
+    expect(error).toBeNull();
+    const log = await sql(`select actor_kind, tablet_profile_id from audit_log where action = 'owner_mode'`);
+    expect(log).toEqual([{ actor_kind: 'owner', tablet_profile_id: SEED.tablets.A }]);
+    const m = await waitForMessage((x) => x.text.includes('Vào chế độ chủ'));
+    expect(m.text).toMatch(/👑 Vào chế độ chủ trên Tablet A – \d\d:\d\d/);
+  });
+
   it('tổng kết ngày gọi thẳng endpoint: Telegram nhận đủ doanh thu theo điểm', async () => {
     const sim = new TabletSim(await tabletClient(SEED.tablets.A), SEED.tablets.A);
     await sim.openShift('Lan');

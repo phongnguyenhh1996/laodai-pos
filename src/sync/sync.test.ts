@@ -42,7 +42,7 @@ class MockServer implements SyncTransport {
 }
 
 async function activate(d = db) {
-  await setMeta(d, META.activation, { tablet_profile_id: 'tab-a', tablet_name: 'Tablet A', activated_at: new Date().toISOString() });
+  await setMeta(d, META.activation, { tablet_profile_id: 'tab-a', tablet_name: 'Tablet A', activated_at: new Date().toISOString(), owner_email: '' });
 }
 
 const draft = (qty = 1) => ({ point_id: 'xoi-a', dine_type: 'takeaway' as const, items: [buildItem(`it${++n}`, XOI_GA, [TRUNG], qty)] });

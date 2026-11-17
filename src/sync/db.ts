@@ -74,6 +74,8 @@ export interface Activation {
   tablet_profile_id: string;
   tablet_name: string;
   activated_at: string;
+  /** Email chủ đã kích hoạt máy: chế độ chủ trên tablet chỉ cần nhập lại mật khẩu. */
+  owner_email: string;
 }
 
 export type LocalShift = Pick<

@@ -1,13 +1,9 @@
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useActivation } from './useActivation';
+import { Splash } from './ui';
 import { ActivateScreen } from '@/tablet/ActivateScreen';
-import { OwnerHome } from '@/owner/OwnerHome';
+import { OwnerGate } from '@/owner/OwnerGate';
 import { TabletHome } from '@/tablet/TabletHome';
-
-function Splash() {
-  return <div data-testid="splash" className="flex h-full items-center justify-center text-stone-400">Đang tải…</div>;
-}
-
 /** Màn hình bán hàng chỉ dành cho tablet đã kích hoạt; mọi đường dẫn khác chuyển về kích hoạt. */
 function TabletGate() {
   const act = useActivation();
@@ -19,10 +15,10 @@ function TabletGate() {
 
 export function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <Routes>
         <Route path="/activate" element={<ActivateScreen />} />
-        <Route path="/owner/*" element={<OwnerHome />} />
+        <Route path="/owner/*" element={<OwnerGate />} />
         <Route path="*" element={<TabletGate />} />
       </Routes>
     </BrowserRouter>

@@ -30,7 +30,8 @@ Tài khoản chủ local (seed): `owner@laodai.test` / `laodai-owner-123`.
 ```
 src/domain/        logic nghiệp vụ thuần (giá, bao bì, tiền thối, mã đơn, hàng đợi, đối soát, sổ nợ)
 src/sync/          offline-first: Dexie, outbox, device_seq, thao tác tablet, engine đồng bộ
-src/app|tablet|owner  giao diện (đang dựng)
+src/lib/auth.ts    đăng nhập chủ, kích hoạt tablet, chế độ chủ trên tablet (phiên tạm, tự thoát 2 phút)
+src/app|tablet|owner  giao diện (đang dựng theo mục 8)
 supabase/migrations   schema, RLS, RPC `sync_push`, `reconcile_shift`, RPC của chủ, cron tổng kết ngày
 supabase/functions    `telegram-dispatch`, `activate-tablet`, `_shared/format.ts` (định dạng tin)
 tests/fixtures/reconcile-cases.json  bộ dữ liệu đối soát dùng chung cho test TS và SQL
