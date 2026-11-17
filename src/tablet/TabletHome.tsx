@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
+import { ensureSyncStarted, syncRunner } from '@/lib/sync';
+import { SyncBadge } from '@/app/SyncBadge';
 import type { Activation } from '@/sync/db';
 
 interface StaffRow {
@@ -12,6 +14,9 @@ interface StaffRow {
 export function TabletHome({ activation }: { activation: Activation }) {
   const [staff, setStaff] = useState<StaffRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Đồng bộ chạy suốt vòng đời app từ lúc vào màn bán hàng (kể cả khi chuyển sang chế độ chủ): không dừng khi rời màn.
+  useEffect(() => ensureSyncStarted(), []);
 
   useEffect(() => {
     let alive = true;
@@ -33,9 +38,12 @@ export function TabletHome({ activation }: { activation: Activation }) {
   return (
     <main data-testid="tablet-home" className="mx-auto flex h-full max-w-3xl flex-col gap-6 p-6">
       <header className="flex items-center justify-between gap-4">
-        <h1 className="text-2xl font-semibold" data-testid="tablet-name">
-          {activation.tablet_name}
-        </h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-semibold" data-testid="tablet-name">
+            {activation.tablet_name}
+          </h1>
+          <SyncBadge runner={syncRunner} />
+        </div>
         <Link to="/owner" className="btn flex items-center border border-stone-300 bg-white" data-testid="open-owner-mode">
           Chế độ chủ
         </Link>

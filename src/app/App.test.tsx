@@ -5,6 +5,7 @@ import '@testing-library/jest-dom/vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { App } from './App';
 import { localDb } from '@/lib/localdb';
+import { syncRunner } from '@/lib/sync';
 import { supabase } from '@/lib/supabase';
 import { AuthError, enterOwnerModeOnTablet, exitOwnerMode } from '@/lib/auth';
 import { OWNER_IDLE_MS } from '@/owner/OwnerGate';
@@ -60,6 +61,9 @@ describe('cổng tablet', () => {
     go('/');
     expect(await screen.findByTestId('tablet-home')).toHaveTextContent('Tablet A');
     expect(await screen.findByTestId('staff-s1')).toHaveTextContent('Lan');
+    // Bộ đồng bộ chạy từ lúc vào màn bán hàng, có chỉ báo trạng thái
+    expect(screen.getByTestId('sync-status')).toHaveAttribute('data-state', 'synced');
+    expect(syncRunner.isStarted).toBe(true);
   });
 
   it('có hồ sơ kích hoạt nhưng không có phiên tablet (chép IndexedDB sang máy khác): về màn kích hoạt', async () => {
