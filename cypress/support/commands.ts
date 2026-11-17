@@ -1,10 +1,11 @@
 /// <reference types="cypress" />
 import { SEED } from '../../tests/support/seed-ids';
 
-// Lệnh tùy biến theo mục 10.4. Các lệnh cần UI của bước sau (openShift, goOffline...)
+// Lệnh tùy biến theo mục 10.4. Các lệnh cần UI của bước sau (goOffline...)
 // được bổ sung ở bước tương ứng của mục 8.
 
 type TabletKey = keyof typeof SEED.tablets;
+type StaffKey = keyof typeof SEED.staff;
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -24,6 +25,10 @@ declare global {
       loginOwner(): Chainable<null>;
       /** Token phiên chính đang lưu trên máy (tablet: phiên vai trò `tablet`). */
       storedAccessToken(): Chainable<string>;
+      /** Trên màn mở ca của tablet: chọn tên → Mở ca ⇒ hàng đợi. */
+      openShift(staff: StaffKey): Chainable<null>;
+      /** Chờ outbox của tablet gửi hết lên server (chỉ báo "Đã đồng bộ"). */
+      waitSynced(): Chainable<null>;
     }
   }
 }
@@ -84,5 +89,18 @@ Cypress.Commands.add('storedAccessToken', () =>
     return JSON.parse(raw!).access_token as string;
   }),
 );
+
+Cypress.Commands.add('openShift', (staff: StaffKey) => {
+  cy.get(`[data-testid=staff-${SEED.staff[staff]}]`).click();
+  cy.get('[data-testid=open-shift]').click();
+  cy.get('[data-testid=queue-screen]').should('be.visible');
+  cy.get('[data-testid=shift-staff]').should('contain.text', staff);
+  return cy.wrap(null, { log: false });
+});
+
+Cypress.Commands.add('waitSynced', () => {
+  cy.get('[data-testid=sync-status]', { timeout: 20_000 }).should('have.attr', 'data-state', 'synced').and('have.attr', 'data-pending', '0');
+  return cy.wrap(null, { log: false });
+});
 
 export {};

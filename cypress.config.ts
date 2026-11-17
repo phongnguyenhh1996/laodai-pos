@@ -76,6 +76,42 @@ export default defineConfig({
             newWithNewPrice: newWithNewPrice.result.status,
           };
         },
+        /** Các ca của tablet trên server (cũ trước), kèm tên nhân viên. */
+        'db:shifts': (tablet: keyof typeof SEED.tablets) =>
+          sql(
+            `select s.id, st.name as staff_name, s.status, s.open_boxes, s.open_plates, s.open_float,
+                    s.close_boxes_left, s.close_plates_left, s.close_cash_counted
+               from shifts s join staff st on st.id = s.staff_id
+              where s.tablet_profile_id = $1 order by s.opened_at`,
+            [SEED.tablets[tablet]],
+          ),
+        /** Số mặc định đầu ca của hồ sơ tablet. */
+        'db:profileDefaults': async (tablet: keyof typeof SEED.tablets) => {
+          const [r] = await sql('select default_boxes, default_plates, default_float from tablet_profiles where id = $1', [SEED.tablets[tablet]]);
+          return r;
+        },
+        /** Đơn của tablet trên server (theo device_seq), kèm dòng đơn còn hiệu lực. */
+        'db:orders': (tablet: keyof typeof SEED.tablets) =>
+          sql(
+            `select o.id, o.device_seq, o.code, o.point_id, o.dine_type, o.status, o.total, o.label,
+                    o.payment_method, o.cash_given, o.opened_shift_id, o.paid_shift_id,
+                    o.served_at is not null as served, o.delete_reason,
+                    coalesce((select json_agg(json_build_object('product_id', i.product_id, 'qty', i.qty,
+                                'unit_price_snap', i.unit_price_snap, 'toppings', i.toppings_snap) order by i.sort)
+                                from order_items i where i.order_id = o.id and i.removed_at is null), '[]') as items
+               from orders o where o.tablet_profile_id = $1 order by o.device_seq`,
+            [SEED.tablets[tablet]],
+          ),
+        /** Đóng ca đang mở của tablet bằng tablet giả lập phía server (khi máy thật đã bị xóa để giả lập điện thoại chủ). */
+        'sim:closeShift': async ({ tablet, boxes, plates, cash }: { tablet: keyof typeof SEED.tablets; boxes: number; plates: number; cash: number }) => {
+          const [s] = await sql<{ id: string }>("select id from shifts where tablet_profile_id = $1 and status = 'open'", [SEED.tablets[tablet]]);
+          if (!s) throw new Error('không có ca đang mở');
+          const sim = new TabletSim(await tabletClient(SEED.tablets[tablet]), SEED.tablets[tablet]);
+          sim.shiftId = s.id;
+          const r = await sim.closeShift(boxes, plates, cash);
+          if (r.status !== 'ok') throw new Error(`đóng ca: ${JSON.stringify(r)}`);
+          return s.id;
+        },
         /** Hồ sơ tablet đang lưu trên server. */
         'db:profilePoints': async (tablet: keyof typeof SEED.tablets) => {
           const [r] = await sql<{ point_ids: string[] }>('select point_ids from tablet_profiles where id = $1', [SEED.tablets[tablet]]);

@@ -6,7 +6,7 @@ import { LaodaiDB, META, setMeta, type OutboxEntry } from './db';
 import { currentDeviceSeq, seedDeviceSeq } from './deviceSeq';
 import { SyncEngine, flushOutbox, type PushResult, type SyncTransport } from './engine';
 import {
-  LocalOpError, closeShift, createOrder, deleteOrder, openShift, payOrder, recordDebtPayment,
+  LocalOpError, closeShift, createOrder, currentShift, deleteOrder, getOpenOrder, openShift, payOrder, recordDebtPayment,
   serveOrder, updateOrder, visibleOrders,
 } from './localOps';
 import { pendingCount, pendingOps } from './outbox';
@@ -291,5 +291,21 @@ describe('thao tác tablet', () => {
     const shift = (await db.meta.get(META.shift))!.value as { id: string };
     expect(op).toMatchObject({ kind: 'debt_payment', entity_id: id });
     expect(op.payload).toMatchObject({ amount: 50_000, method: 'cash', shift_id: shift.id });
+  });
+
+  it('đọc: ca hiện tại; đơn đang mở theo id — đơn đã thanh toán / đã xóa coi như không có', async () => {
+    expect(await currentShift(db)).toMatchObject({ staff_id: 'lan', staff_name: 'Lan', open_boxes: 200, open_float: 500_000 });
+    const a = await createOrder(db, draft(), clock);
+    const b = await createOrder(db, draft(), clock);
+    const c = await createOrder(db, draft(), clock);
+    await serveOrder(db, b.id, clock);
+    await payOrder(db, a.id, { method: 'transfer' }, clock);
+    await deleteOrder(db, c.id, 'mistake', clock);
+    expect(await getOpenOrder(db, a.id)).toBeUndefined();
+    expect(await getOpenOrder(db, c.id)).toBeUndefined();
+    expect(await getOpenOrder(db, 'khong-co')).toBeUndefined();
+    expect((await getOpenOrder(db, b.id))?.status).toBe('served');
+    await closeShift(db, { boxes_left: 0, plates_left: 0, cash_counted: 0 }, clock);
+    expect(await currentShift(db)).toBeNull();
   });
 });

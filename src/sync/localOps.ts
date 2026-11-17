@@ -288,3 +288,17 @@ export async function recordDebtPayment(
 export async function visibleOrders(db: LaodaiDB): Promise<Order[]> {
   return db.orders.where('status').anyOf('open', 'served').toArray();
 }
+
+/**
+ * Một đơn đang mở theo id (màn sửa đơn / thanh toán). Đơn đã thanh toán / đã xóa (còn nằm chờ sync)
+ * trả `undefined` như không tồn tại: không có màn nào xem lại được đơn đã thanh toán.
+ */
+export async function getOpenOrder(db: LaodaiDB, orderId: string): Promise<Order | undefined> {
+  const o = await db.orders.get(orderId);
+  return o && OPEN_STATUSES.has(o.status) ? o : undefined;
+}
+
+/** Ca đang mở trên tablet (null nếu chưa mở ca). */
+export async function currentShift(db: LaodaiDB): Promise<LocalShift | null> {
+  return (await getMeta<LocalShift>(db, META.shift)) ?? null;
+}

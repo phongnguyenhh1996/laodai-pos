@@ -8,49 +8,16 @@ import { localDb } from '@/lib/localdb';
 import { catalogRefresher, syncRunner } from '@/lib/sync';
 import { AuthError, enterOwnerModeOnTablet, exitOwnerMode } from '@/lib/auth';
 import { OWNER_IDLE_MS } from '@/owner/OwnerGate';
-import { META, setMeta, type Activation } from '@/sync/db';
-import type { Catalog } from '@/sync/catalog';
-import { COMBOS, COMBO_XOI_FULL, COM_GA, COM_MENU, PRODUCTS, TOPPINGS, XOI_GA, XOI_MENU } from '@/domain/fixtures';
+import { META, setMeta } from '@/sync/db';
+import { COMBO_XOI_FULL, COM_GA, PRODUCTS, XOI_GA } from '@/domain/fixtures';
 import { storeSession } from '@/test-utils/auth';
+import { ACT, CATALOG, activateDevice, clearLocalDb, stubCatalog } from '@/test-utils/tablet';
 
 vi.mock('@/lib/auth', async (orig) => ({
   ...(await orig<typeof import('@/lib/auth')>()),
   enterOwnerModeOnTablet: vi.fn(),
   exitOwnerMode: vi.fn(),
 }));
-
-const ACT: Activation = { tablet_profile_id: 'tab-a', tablet_name: 'Tablet A', activated_at: '', owner_email: 'owner@x.vn' };
-
-const CATALOG: Catalog = {
-  fetched_at: '2026-11-17T00:00:00.000Z',
-  profile: { id: 'tab-a', name: 'Tablet A', point_ids: ['xoi-a', 'com'], default_boxes: 200, default_plates: 60, default_float: 500_000 },
-  menus: [{ id: XOI_MENU, name: 'Xôi' }, { id: COM_MENU, name: 'Cơm gà' }],
-  points: [
-    { id: 'xoi-a', name: 'Xôi A', menu_id: XOI_MENU, active: true, default_dine_type: 'takeaway', sort: 1 },
-    { id: 'xoi-b', name: 'Xôi B', menu_id: XOI_MENU, active: true, default_dine_type: 'takeaway', sort: 2 },
-    { id: 'com', name: 'Cơm gà', menu_id: COM_MENU, active: true, default_dine_type: 'dinein', sort: 3 },
-  ],
-  products: PRODUCTS,
-  toppings: TOPPINGS,
-  combos: COMBOS,
-  staff: [
-    { id: 's1', name: 'Lan', active: true, sort: 1 },
-    { id: 's9', name: 'Nghỉ việc', active: false, sort: 2 },
-  ],
-  config: { wait_yellow_min: 5, wait_red_min: 10, timezone: 'Asia/Ho_Chi_Minh' },
-};
-
-/** Không gọi server: danh mục được đặt sẵn trong IndexedDB như sau một lần đồng bộ. */
-function stubCatalog() {
-  vi.spyOn(catalogRefresher, 'start').mockImplementation(() => undefined);
-  vi.spyOn(catalogRefresher, 'refresh').mockResolvedValue(false);
-}
-
-async function activateDevice(session: Parameters<typeof storeSession>[0] | null = { role: 'tablet', tablet_profile_id: 'tab-a' }) {
-  await setMeta(localDb, META.activation, ACT);
-  await setMeta(localDb, META.catalog, CATALOG);
-  if (session) storeSession(session);
-}
 
 function go(path: string) {
   window.history.pushState({}, '', path);
@@ -62,7 +29,7 @@ beforeEach(stubCatalog);
 afterEach(async () => {
   vi.useRealTimers();
   vi.clearAllMocks();
-  await localDb.meta.clear();
+  await clearLocalDb();
   localStorage.clear();
   window.history.pushState({}, '', '/');
 });
@@ -89,6 +56,11 @@ describe('cổng tablet', () => {
     go('/');
     expect(await screen.findByTestId('staff-s1')).toBeInTheDocument();
     expect(screen.queryByTestId('staff-s9')).not.toBeInTheDocument();
+    // Bảng chọn món nằm trong màn tạo đơn (sau khi mở ca)
+    fireEvent.click(screen.getByTestId('staff-s1'));
+    fireEvent.click(screen.getByTestId('open-shift'));
+    fireEvent.click(await screen.findByTestId('new-order'));
+    await screen.findByTestId('menu-board');
     // Hồ sơ A: Xôi A + Cơm gà, không có Xôi B
     expect(screen.getByTestId('point-tab-xoi-a')).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByTestId('point-tab-com')).toBeInTheDocument();
@@ -118,6 +90,9 @@ describe('cổng tablet', () => {
     await activateDevice();
     await setMeta(localDb, META.catalog, { ...CATALOG, profile: { ...CATALOG.profile, point_ids: [] } });
     go('/');
+    fireEvent.click(await screen.findByTestId('staff-s1'));
+    fireEvent.click(screen.getByTestId('open-shift'));
+    fireEvent.click(await screen.findByTestId('new-order'));
     expect(await screen.findByTestId('menu-no-points')).toBeInTheDocument();
   });
 
