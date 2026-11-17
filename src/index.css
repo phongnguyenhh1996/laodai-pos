@@ -1,0 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root { height: 100%; }
+body { @apply bg-stone-50 text-stone-900 antialiased; -webkit-tap-highlight-color: transparent; }
+.btn { @apply min-h-tap min-w-tap rounded-xl px-4 text-lg font-semibold active:scale-[0.98] disabled:opacity-40; }

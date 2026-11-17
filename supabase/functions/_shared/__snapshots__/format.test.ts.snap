@@ -1,0 +1,88 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`định dạng Telegram > daily_summary 1`] = `
+"📊 Tổng kết ngày 18/11/2026
+Doanh thu: 3.350.000 (TM 2.100.000 · CK 1.150.000 · Nợ 100.000)
+• Xôi A: 1.200.000
+• Xôi B: 1.000.000
+• Cơm gà: 1.150.000
+Thu nợ: 50.000
+Xóa: 3 đơn (1 đã ra món)
+Ca:
+• Lan – Tablet A: TM −20.000 · Hộp +6 · Dĩa 0
+• Mai – Tablet B: đang mở · Hộp ? · Dĩa 0
+Đơn còn mở: 1
+⚠️ Lỗ hổng số đơn chưa giải quyết: 1
+🔗 https://pos.laodai.vn/owner/reports?date=2026-11-18"
+`;
+
+exports[`định dạng Telegram > debt_paid 1`] = `
+"💵 Thu nợ 50.000 (TM) – Dũng (giáo viên)
+Lan – Tablet A
+Dư nợ còn: 70.000
+🔗 https://pos.laodai.vn/owner/debts/c1"
+`;
+
+exports[`định dạng Telegram > debt_recorded 1`] = `
+"📒 Ghi nợ 35.000 – Dũng (giáo viên)
+Đơn 7KQ – Lan – Tablet A
+Dư nợ: 120.000
+🔗 https://pos.laodai.vn/owner/debts/c1"
+`;
+
+exports[`định dạng Telegram > order_deleted 1`] = `
+"🗑 Xóa đơn 3F5 – Lan – Tablet A
+Lý do: Khách bỏ về
+Trạng thái lúc xóa: ⚠️ ĐÃ RA MÓN
+• 2× Xôi gà (+Trứng) — 62.000
+Tổng: 62.000
+🔗 https://pos.laodai.vn/owner/orders/o1"
+`;
+
+exports[`định dạng Telegram > owner_edit 1`] = `
+"✏️ Chủ sửa đơn 3F5 (đã thanh toán) – Tablet A
+Trước: 62.000 · TM
+• 2× Xôi gà (+Trứng) — 62.000
+Sau: 62.000 · CK
+• 2× Xôi gà (+Trứng) — 62.000
+Ca đã đóng → đã tính lại: tiền mặt −20.000 → +42.000
+🔗 https://pos.laodai.vn/owner/orders/o1"
+`;
+
+exports[`định dạng Telegram > owner_mode 1`] = `
+"👑 Vào chế độ chủ trên Tablet A – 05:42
+🔗 https://pos.laodai.vn/owner/log?action=owner_mode"
+`;
+
+exports[`định dạng Telegram > seq_gap 1`] = `
+"⚠️ Tablet A: thiếu đơn số 3 (nhận được số 4)
+Có thể dữ liệu trên tablet đã bị xóa trước khi đồng bộ.
+⏱ Thực hiện: 05:42 · Đồng bộ: 07:10 (offline)
+🔗 https://pos.laodai.vn/owner/log?action=seq_gap"
+`;
+
+exports[`định dạng Telegram > shift_close 1`] = `
+"🔴 Đóng ca – Lan – Tablet A (05:42–10:15)
+Doanh thu: 2.350.000 (TM 1.600.000 · CK 650.000 · Nợ 100.000)
+Tiền mặt: đếm 2.080.000 / kỳ vọng 2.100.000 → −20.000
+Hộp: dùng 118 / theo đơn 112 → +6
+Dĩa: dùng 0 / theo đơn 0
+Xóa: 2 đơn (1 đã ra món) · Đơn còn mở: 1
+Bao bì của đơn bị xóa sau khi ra món: 3F5 (2 hộp)
+🔗 https://pos.laodai.vn/owner/shifts/s1"
+`;
+
+exports[`định dạng Telegram > shift_open 1`] = `
+"🟢 Lan mở ca – Tablet A – 05:42
+🔗 https://pos.laodai.vn/owner/shifts/s1"
+`;
+
+exports[`định dạng Telegram > sync_rejected 1`] = `
+"⛔ Tablet B gửi thao tác bị từ chối (create_order): tổng tiền không khớp giá menu
+🔗 https://pos.laodai.vn/owner/log?action=sync_rejected"
+`;
+
+exports[`định dạng Telegram > tablet_login 1`] = `
+"🔐 Tablet A vừa được đăng nhập – 05:42
+🔗 https://pos.laodai.vn/owner/log?action=tablet_login"
+`;

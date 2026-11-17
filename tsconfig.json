@@ -1,0 +1,6 @@
+{
+  "files": [],
+  "references": [{ "path": "./tsconfig.app.json" }, { "path": "./tsconfig.node.json" }],
+  "//": "compilerOptions dưới đây chỉ dành cho ts-node khi Cypress nạp cypress.config.ts (package type=module)",
+  "compilerOptions": { "module": "ESNext", "moduleResolution": "node", "target": "ES2022", "esModuleInterop": true, "skipLibCheck": true }
+}

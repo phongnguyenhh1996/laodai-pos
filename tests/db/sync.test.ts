@@ -1,0 +1,191 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { ownerClient, resetDb, sql, tabletClient } from '../support/db';
+import { TabletSim, item, op, push, tick } from '../support/ops';
+import { SEED } from '../support/seed-ids';
+
+let tab: SupabaseClient;
+let sim: TabletSim;
+
+beforeEach(async () => {
+  await resetDb();
+  tab = await tabletClient(SEED.tablets.A);
+  sim = new TabletSim(tab, SEED.tablets.A);
+  await sim.openShift('Lan');
+});
+
+describe('sync_push', () => {
+  it('gửi lại cùng một op hai lần thì chỉ có một bản ghi', async () => {
+    const o = sim.createOrderOp([item('xoiGa')]);
+    expect(await push(tab, o.op)).toEqual({ status: 'ok' });
+    expect(await push(tab, o.op)).toEqual({ status: 'duplicate' });
+    const p = op('pay_order', o.id, { order_id: o.id, paid_shift_id: sim.shiftId, method: 'transfer', total: o.total });
+    expect(await push(tab, p)).toEqual({ status: 'ok' });
+    expect(await push(tab, p)).toEqual({ status: 'duplicate' });
+    expect(await sql('select id from orders where id = $1', [o.id])).toHaveLength(1);
+    expect(await sql('select id from order_items where order_id = $1', [o.id])).toHaveLength(1);
+    expect(await sql(`select id from audit_log where entity_id = $1 and action = 'order_pay'`, [o.id])).toHaveLength(1);
+  });
+
+  it('gửi song song cùng một op vẫn chỉ một bản ghi', async () => {
+    const o = sim.createOrderOp([item('xoiGa')]);
+    const rs = await Promise.all([push(tab, o.op), push(tab, o.op), push(tab, o.op)]);
+    expect(rs.map((r) => r.status).sort()).toEqual(['duplicate', 'duplicate', 'ok']);
+    expect(await sql('select id from orders where id = $1', [o.id])).toHaveLength(1);
+  });
+
+  it('mỗi thay đổi trên đơn sinh đúng một dòng audit_log có before và after', async () => {
+    const o = await sim.createOrder([item('xoiGa', [], 2)]);
+    const itemsBefore = (await sql('select id from order_items where order_id = $1', [o.id])).map((r) => r.id);
+    const kept = { ...item('xoiGa', [], 1), id: itemsBefore[0] };
+    await sim.update(o.id, [kept]);
+    await sim.serve(o.id);
+    await sim.del(o.id, 'customer_left');
+    const logs = await sql(`select action, before, after from audit_log where entity_id = $1 order by at, synced_at`, [o.id]);
+    expect(logs.map((l) => l.action)).toEqual(['order_create', 'order_update', 'order_serve', 'order_delete']);
+    expect(logs[0].before).toBeNull();
+    for (const l of logs.slice(1)) {
+      expect(l.before).not.toBeNull();
+      expect(l.after).not.toBeNull();
+    }
+    expect(logs[1].before.items[0].qty).toBe(2);
+    expect(logs[1].after.items[0].qty).toBe(1);
+    expect(logs[3].after.status).toBe('deleted');
+  });
+
+  it('phát hiện lỗ hổng: device_seq 1, 2, 4 ⇒ cảnh báo thiếu 3; số 3 đến muộn ⇒ đã giải quyết', async () => {
+    const o1 = sim.createOrderOp([item('xoiGa')]);
+    const o2 = sim.createOrderOp([item('xoiGa')]);
+    const o3 = sim.createOrderOp([item('xoiGa')]);
+    const o4 = sim.createOrderOp([item('xoiGa')]);
+    for (const o of [o1, o2, o4]) expect(await push(tab, o.op)).toEqual({ status: 'ok' });
+    let gaps = await sql('select missing_seq, resolved_at from seq_gaps');
+    expect(gaps).toEqual([{ missing_seq: 3, resolved_at: null }]);
+    const notes = await sql(`select payload from notifications where kind = 'seq_gap'`);
+    expect(notes).toHaveLength(1);
+    expect(notes[0].payload).toMatchObject({ tablet_name: 'Tablet A', missing: [3], received: 4 });
+
+    expect(await push(tab, o3.op)).toEqual({ status: 'ok' });
+    gaps = await sql('select missing_seq, resolved_at from seq_gaps');
+    expect(gaps[0].resolved_at).not.toBeNull();
+    // Không báo lại lần nữa
+    expect(await sql(`select 1 from notifications where kind = 'seq_gap'`)).toHaveLength(1);
+  });
+
+  it('mỗi tablet chỉ có một ca mở: mở ca thứ hai bị từ chối', async () => {
+    const r = await sim.openShift('Mai');
+    expect(r).toEqual({ status: 'rejected', reason: 'shift_already_open' });
+    expect(await sql(`select 1 from shifts where status = 'open' and tablet_profile_id = $1`, [SEED.tablets.A])).toHaveLength(1);
+    // Tablet B vẫn mở ca được
+    const simB = new TabletSim(await tabletClient(SEED.tablets.B), SEED.tablets.B);
+    expect(await simB.openShift('Mai')).toEqual({ status: 'ok' });
+  });
+
+  it('ca nhận số mặc định của hồ sơ tablet; mở ca báo Telegram', async () => {
+    const [s] = await sql('select open_boxes, open_plates, open_float, staff_id from shifts where id = $1', [sim.shiftId]);
+    expect(s).toEqual({ open_boxes: 200, open_plates: 60, open_float: 500000, staff_id: SEED.staff.Lan });
+    const [n] = await sql(`select payload from notifications where kind = 'shift_open'`);
+    expect(n.payload).toMatchObject({ staff_name: 'Lan', tablet_name: 'Tablet A' });
+  });
+
+  it('từ chối nghiệp vụ: ghi nhật ký + báo chủ, không chặn hàng đợi', async () => {
+    const o = sim.createOrderOp([item('xoiGa')], { point_id: SEED.points.xoiB });
+    expect(await push(tab, o.op)).toEqual({ status: 'rejected', reason: 'point_not_allowed' });
+    const [log] = await sql(`select action, reason from audit_log where action = 'sync_rejected'`);
+    expect(log).toEqual({ action: 'sync_rejected', reason: 'point_not_allowed' });
+    expect(await sql(`select 1 from notifications where kind = 'sync_rejected'`)).toHaveLength(1);
+    // dữ liệu rác cũng bị từ chối thay vì làm lỗi RPC
+    const junk = op('pay_order', o.id, { order_id: 'not-a-uuid' });
+    expect((await push(tab, junk)).status).toBe('rejected');
+    const future = op('serve_order', o.id, { order_id: o.id }, new Date(Date.now() + 3600_000).toISOString());
+    expect(await push(tab, future)).toEqual({ status: 'rejected', reason: 'performed_at_in_future' });
+  });
+
+  it('kiểm giá: món ngừng bán, topping khác menu, giá topping sai đều bị từ chối', async () => {
+    const owner = await ownerClient();
+    await owner.from('products').update({ active: false }).eq('id', SEED.products.xoiPate);
+    expect((await sim.createOrder([item('xoiPate')])).result).toEqual({ status: 'rejected', reason: 'product_inactive' });
+    expect((await sim.createOrder([item('xoiGa', ['canh'])])).result).toEqual({ status: 'rejected', reason: 'bad_topping' });
+    const t = item('xoiGa', ['trung']);
+    t.toppings_snap[0].price = 1;
+    expect((await sim.createOrder([t])).result).toEqual({ status: 'rejected', reason: 'price_mismatch' });
+    expect((await sim.createOrder([item('xoiGa', [], 0)])).result).toEqual({ status: 'rejected', reason: 'bad_qty' });
+  });
+
+  it('đổi giá: dòng cũ giữ giá chụp, dòng mới dùng giá mới; đơn tạo offline trước khi đổi giá vẫn nhận', async () => {
+    const owner = await ownerClient();
+    const before = tick(0);
+    const o = await sim.createOrder([item('xoiGa')]);
+    const [old] = await sql('select id from order_items where order_id = $1', [o.id]);
+    await owner.from('products').update({ price: 30000 }).eq('id', SEED.products.xoiGa);
+
+    // Sửa đơn (giữ dòng cũ giá 25k + thêm dòng mới giá 30k)
+    const keep = { ...item('xoiGa', [], 2), id: old.id };
+    const fresh = { ...item('xoiGa'), unit_price_snap: 30000 };
+    expect(await sim.update(o.id, [keep, fresh])).toEqual({ status: 'ok' });
+    const [row] = await sql('select total from orders where id = $1', [o.id]);
+    expect(row.total).toBe(25000 * 2 + 30000);
+    // Dòng cũ mà đổi giá ⇒ từ chối
+    expect(await sim.update(o.id, [{ ...keep, unit_price_snap: 30000 }, fresh])).toEqual({ status: 'rejected', reason: 'price_mismatch' });
+    // Đơn mới với giá cũ (thời điểm thực hiện = sau khi đổi) ⇒ từ chối
+    const late = sim.createOrderOp([item('xoiGa')]);
+    late.op.performed_at = new Date().toISOString();
+    expect(await push(tab, late.op)).toEqual({ status: 'rejected', reason: 'price_mismatch' });
+    // Đơn tạo lúc offline TRƯỚC khi đổi giá, sync sau ⇒ nhận
+    const offline = sim.createOrderOp([item('xoiGa')]);
+    offline.op.performed_at = before;
+    expect(await push(tab, offline.op)).toEqual({ status: 'ok' });
+  });
+
+  it('thanh toán: tiền thiếu bị từ chối; ghi nợ tên mới tự tạo khách; báo Telegram', async () => {
+    const o = await sim.createOrder([item('xoiGa')]);
+    expect(await sim.pay(o.id, o.total, 'cash', { cash_given: 1000 })).toEqual({ status: 'rejected', reason: 'cash_short' });
+    const newId = crypto.randomUUID();
+    const r = await sim.pay(o.id, o.total, 'debt', {
+      customer: { id: newId, is_new: true, name: 'Hùng', description: 'xe ôm', phone: '' },
+    });
+    expect(r).toEqual({ status: 'ok' });
+    const [c] = await sql('select name, description, phone from customers where id = $1', [newId]);
+    expect(c).toEqual({ name: 'Hùng', description: 'xe ôm', phone: null });
+    const [n] = await sql(`select payload from notifications where kind = 'debt_recorded'`);
+    expect(n.payload).toMatchObject({ customer_label: 'Hùng (xe ôm)', amount: 25000, balance: 25000, order_code: expect.any(String) });
+  });
+
+  it('đơn mở từ ca trước được thu ở ca sau: tiền tính vào ca thu', async () => {
+    const o = await sim.createOrder([item('xoiGa')]);
+    const first = sim.shiftId;
+    await sim.closeShift(199, 60, 500000);
+    await sim.openShift('Mai');
+    expect(await sim.pay(o.id, o.total)).toEqual({ status: 'ok' });
+    const [row] = await sql('select opened_shift_id, paid_shift_id from orders where id = $1', [o.id]);
+    expect(row).toEqual({ opened_shift_id: first, paid_shift_id: sim.shiftId });
+  });
+
+  it('đóng ca: thông báo kèm đối soát, RPC chỉ trả ok', async () => {
+    const o = await sim.createOrder([item('xoiGa')]);
+    await sim.pay(o.id, o.total);
+    expect(await sim.closeShift(199, 60, 505000)).toEqual({ status: 'ok' });
+    const [n] = await sql(`select payload from notifications where kind = 'shift_close'`);
+    expect(n.payload.reconcile.cash).toEqual({ expected: 525000, counted: 505000, diff: -20000 });
+    expect(n.payload.reconcile.boxes).toEqual({ used: 1, by_orders: 1, diff: 0 });
+  });
+
+  it('thu nợ: lưu vào ca hiện tại, báo Telegram kèm dư nợ còn lại', async () => {
+    const o = await sim.createOrder([item('xoiGa')]);
+    await sim.pay(o.id, o.total, 'debt', { customer: { id: SEED.customers.dungGv, name: 'Dũng' } });
+    expect(await sim.debtPayment(SEED.customers.dungGv, 10000)).toEqual({ status: 'ok' });
+    const [p] = await sql('select shift_id, amount from debt_payments');
+    expect(p).toEqual({ shift_id: sim.shiftId, amount: 10000 });
+    const [n] = await sql(`select payload from notifications where kind = 'debt_paid'`);
+    expect(n.payload).toMatchObject({ customer_label: 'Dũng (giáo viên)', amount: 10000, balance: 15000 });
+  });
+
+  it('xóa đơn: báo Telegram ngay kèm nội dung và trạng thái đã ra món', async () => {
+    const o = await sim.createOrder([item('xoiGa', ['trung'], 2)]);
+    await sim.serve(o.id);
+    await sim.del(o.id, 'customer_left');
+    const [n] = await sql(`select payload from notifications where kind = 'order_deleted'`);
+    expect(n.payload).toMatchObject({ was_served: true, reason: 'customer_left', staff_name: 'Lan' });
+    expect(n.payload.order.items[0]).toMatchObject({ qty: 2, name_snap: 'Xôi gà' });
+  });
+});

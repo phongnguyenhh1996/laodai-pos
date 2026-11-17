@@ -1,0 +1,167 @@
+{
+  "$comment": "Bộ dữ liệu đối soát dùng chung cho src/domain/reconcile.test.ts và tests/db/reconcile.test.ts. Đổi công thức ⇒ sửa file này, cả hai test phải pass.",
+  "products": [
+    { "id": "00000000-0000-4000-8000-0000000000a1", "name": "Xôi", "boxes_takeaway": 1, "boxes_dinein": 1, "plates_dinein": 0 },
+    { "id": "00000000-0000-4000-8000-0000000000a2", "name": "Cơm gà", "boxes_takeaway": 1, "boxes_dinein": 0, "plates_dinein": 1 }
+  ],
+  "toppings": {
+    "trung": { "id": "00000000-0000-4000-8000-0000000000c1", "name": "Trứng", "price": 5000, "extra_box": false },
+    "canh":  { "id": "00000000-0000-4000-8000-0000000000c2", "name": "Canh", "price": 5000, "extra_box": true },
+    "dua":   { "id": "00000000-0000-4000-8000-0000000000c3", "name": "Dưa", "price": 3000, "extra_box": true }
+  },
+  "cases": [
+    {
+      "name": "co-ban",
+      "input": {
+        "shift": { "id": "00000000-0000-4000-8000-0000000000b1", "open_boxes": 100, "open_plates": 30, "open_float": 500000, "close_boxes_left": 135, "close_plates_left": 28, "close_cash_counted": 840000 },
+        "adjustments": [
+          { "shift_id": "00000000-0000-4000-8000-0000000000b1", "kind": "cash", "qty": 200000 },
+          { "shift_id": "00000000-0000-4000-8000-0000000000b1", "kind": "boxes", "qty": 50 },
+          { "shift_id": "00000000-0000-4000-8000-0000000000b0", "kind": "cash", "qty": 999 }
+        ],
+        "orders": [
+          { "id": "00000000-0000-4000-8000-000000000101", "code": "A2Z", "status": "paid", "dine_type": "takeaway", "opened_shift_id": "00000000-0000-4000-8000-0000000000b1", "paid_shift_id": "00000000-0000-4000-8000-0000000000b1", "payment_method": "cash", "total": 30000, "served_at": "2026-11-17T23:00:00Z", "deleted_at": null,
+            "items": [{ "product_id": "00000000-0000-4000-8000-0000000000a1", "qty": 2, "toppings_snap": [] }] },
+          { "id": "00000000-0000-4000-8000-000000000102", "code": "A22", "status": "paid", "dine_type": "takeaway", "opened_shift_id": "00000000-0000-4000-8000-0000000000b1", "paid_shift_id": "00000000-0000-4000-8000-0000000000b1", "payment_method": "transfer", "total": 25000, "served_at": null, "deleted_at": null,
+            "items": [{ "product_id": "00000000-0000-4000-8000-0000000000a1", "qty": 1, "toppings_snap": [{ "id": "00000000-0000-4000-8000-0000000000c1", "name": "Trứng", "price": 5000, "extra_box": false }] }] },
+          { "id": "00000000-0000-4000-8000-000000000103", "code": "A23", "status": "paid", "dine_type": "dinein", "opened_shift_id": "00000000-0000-4000-8000-0000000000b1", "paid_shift_id": "00000000-0000-4000-8000-0000000000b1", "payment_method": "debt", "total": 20000, "served_at": null, "deleted_at": null,
+            "items": [{ "product_id": "00000000-0000-4000-8000-0000000000a1", "qty": 1, "toppings_snap": [] }] },
+          { "id": "00000000-0000-4000-8000-000000000104", "code": "A24", "status": "deleted", "dine_type": "takeaway", "opened_shift_id": "00000000-0000-4000-8000-0000000000b1", "paid_shift_id": null, "payment_method": null, "total": 45000, "served_at": "2026-11-17T23:00:00Z", "deleted_at": "2026-11-17T23:10:00Z",
+            "items": [{ "product_id": "00000000-0000-4000-8000-0000000000a1", "qty": 3, "toppings_snap": [] }] },
+          { "id": "00000000-0000-4000-8000-000000000105", "code": "A25", "status": "deleted", "dine_type": "takeaway", "opened_shift_id": "00000000-0000-4000-8000-0000000000b1", "paid_shift_id": null, "payment_method": null, "total": 15000, "served_at": null, "deleted_at": "2026-11-17T23:20:00Z",
+            "items": [{ "product_id": "00000000-0000-4000-8000-0000000000a1", "qty": 1, "toppings_snap": [] }] },
+          { "id": "00000000-0000-4000-8000-000000000106", "code": "A26", "status": "paid", "dine_type": "takeaway", "opened_shift_id": "00000000-0000-4000-8000-0000000000b1", "paid_shift_id": "00000000-0000-4000-8000-0000000000b2", "payment_method": "cash", "total": 40000, "served_at": null, "deleted_at": null,
+            "items": [{ "product_id": "00000000-0000-4000-8000-0000000000a1", "qty": 2, "toppings_snap": [] }] },
+          { "id": "00000000-0000-4000-8000-000000000107", "code": "A27", "status": "paid", "dine_type": "dinein", "opened_shift_id": "00000000-0000-4000-8000-0000000000b0", "paid_shift_id": "00000000-0000-4000-8000-0000000000b1", "payment_method": "cash", "total": 35000, "served_at": null, "deleted_at": null,
+            "items": [{ "product_id": "00000000-0000-4000-8000-0000000000a2", "qty": 1, "toppings_snap": [] }] },
+          { "id": "00000000-0000-4000-8000-000000000108", "code": "A28", "status": "served", "dine_type": "dinein", "opened_shift_id": "00000000-0000-4000-8000-0000000000b1", "paid_shift_id": null, "payment_method": null, "total": 35000, "served_at": "2026-11-18T00:00:00Z", "deleted_at": null,
+            "items": [{ "product_id": "00000000-0000-4000-8000-0000000000a2", "qty": 1, "toppings_snap": [] }] },
+          { "id": "00000000-0000-4000-8000-000000000109", "code": "A29", "status": "open", "dine_type": "takeaway", "opened_shift_id": "00000000-0000-4000-8000-0000000000b1", "paid_shift_id": null, "payment_method": null, "total": 76000, "served_at": null, "deleted_at": null,
+            "items": [{ "product_id": "00000000-0000-4000-8000-0000000000a2", "qty": 2, "toppings_snap": [
+              { "id": "00000000-0000-4000-8000-0000000000c2", "name": "Canh", "price": 5000, "extra_box": true },
+              { "id": "00000000-0000-4000-8000-0000000000c3", "name": "Dưa", "price": 3000, "extra_box": true }] }] },
+          { "id": "00000000-0000-4000-8000-000000000110", "code": "A2A", "status": "paid", "dine_type": "dinein", "opened_shift_id": "00000000-0000-4000-8000-0000000000b1", "paid_shift_id": "00000000-0000-4000-8000-0000000000b1", "payment_method": "cash", "total": 45000, "served_at": null, "deleted_at": null,
+            "items": [{ "product_id": "00000000-0000-4000-8000-0000000000a2", "qty": 1, "toppings_snap": [{ "id": "00000000-0000-4000-8000-0000000000c2", "name": "Canh", "price": 5000, "extra_box": true }] }] }
+        ],
+        "debt_payments": [
+          { "shift_id": "00000000-0000-4000-8000-0000000000b1", "amount": 50000, "method": "cash" },
+          { "shift_id": "00000000-0000-4000-8000-0000000000b1", "amount": 30000, "method": "transfer" },
+          { "shift_id": "00000000-0000-4000-8000-0000000000b2", "amount": 10000, "method": "cash" }
+        ]
+      },
+      "expected": {
+        "revenue": { "total": 155000, "cash": 110000, "transfer": 25000, "debt": 20000 },
+        "paid_orders": 5,
+        "debt_collected": { "cash": 50000, "transfer": 30000 },
+        "cash": { "expected": 860000, "counted": 840000, "diff": -20000 },
+        "boxes": { "used": 15, "by_orders": 12, "diff": 3 },
+        "plates": { "used": 2, "by_orders": 2, "diff": 0 },
+        "deleted_count": 2,
+        "deleted_after_served": [{ "order_id": "00000000-0000-4000-8000-000000000104", "code": "A24", "boxes": 3, "plates": 0 }],
+        "open_orders": 2
+      }
+    },
+    {
+      "name": "chu-sua-truoc",
+      "input": {
+        "shift": { "id": "00000000-0000-4000-8000-0000000000b1", "open_boxes": 50, "open_plates": 10, "open_float": 300000, "close_boxes_left": 48, "close_plates_left": 10, "close_cash_counted": 330000 },
+        "adjustments": [],
+        "orders": [
+          { "id": "00000000-0000-4000-8000-000000000201", "code": "B2Z", "status": "paid", "dine_type": "takeaway", "opened_shift_id": "00000000-0000-4000-8000-0000000000b1", "paid_shift_id": "00000000-0000-4000-8000-0000000000b1", "payment_method": "cash", "total": 15000, "served_at": null, "deleted_at": null,
+            "items": [{ "product_id": "00000000-0000-4000-8000-0000000000a1", "qty": 1, "toppings_snap": [] }] },
+          { "id": "00000000-0000-4000-8000-000000000202", "code": "B22", "status": "paid", "dine_type": "takeaway", "opened_shift_id": "00000000-0000-4000-8000-0000000000b1", "paid_shift_id": "00000000-0000-4000-8000-0000000000b1", "payment_method": "cash", "total": 15000, "served_at": null, "deleted_at": null,
+            "items": [{ "product_id": "00000000-0000-4000-8000-0000000000a1", "qty": 1, "toppings_snap": [] }] }
+        ],
+        "debt_payments": []
+      },
+      "expected": {
+        "revenue": { "total": 30000, "cash": 30000, "transfer": 0, "debt": 0 },
+        "paid_orders": 2,
+        "debt_collected": { "cash": 0, "transfer": 0 },
+        "cash": { "expected": 330000, "counted": 330000, "diff": 0 },
+        "boxes": { "used": 2, "by_orders": 2, "diff": 0 },
+        "plates": { "used": 0, "by_orders": 0, "diff": 0 },
+        "deleted_count": 0,
+        "deleted_after_served": [],
+        "open_orders": 0
+      }
+    },
+    {
+      "name": "chu-sua-sau-tm-thanh-ck",
+      "input": {
+        "shift": { "id": "00000000-0000-4000-8000-0000000000b1", "open_boxes": 50, "open_plates": 10, "open_float": 300000, "close_boxes_left": 48, "close_plates_left": 10, "close_cash_counted": 330000 },
+        "adjustments": [],
+        "orders": [
+          { "id": "00000000-0000-4000-8000-000000000201", "code": "B2Z", "status": "paid", "dine_type": "takeaway", "opened_shift_id": "00000000-0000-4000-8000-0000000000b1", "paid_shift_id": "00000000-0000-4000-8000-0000000000b1", "payment_method": "cash", "total": 15000, "served_at": null, "deleted_at": null,
+            "items": [{ "product_id": "00000000-0000-4000-8000-0000000000a1", "qty": 1, "toppings_snap": [] }] },
+          { "id": "00000000-0000-4000-8000-000000000202", "code": "B22", "status": "paid", "dine_type": "takeaway", "opened_shift_id": "00000000-0000-4000-8000-0000000000b1", "paid_shift_id": "00000000-0000-4000-8000-0000000000b1", "payment_method": "transfer", "total": 15000, "served_at": null, "deleted_at": null,
+            "items": [{ "product_id": "00000000-0000-4000-8000-0000000000a1", "qty": 1, "toppings_snap": [] }] }
+        ],
+        "debt_payments": []
+      },
+      "expected": {
+        "revenue": { "total": 30000, "cash": 15000, "transfer": 15000, "debt": 0 },
+        "paid_orders": 2,
+        "debt_collected": { "cash": 0, "transfer": 0 },
+        "cash": { "expected": 315000, "counted": 330000, "diff": 15000 },
+        "boxes": { "used": 2, "by_orders": 2, "diff": 0 },
+        "plates": { "used": 0, "by_orders": 0, "diff": 0 },
+        "deleted_count": 0,
+        "deleted_after_served": [],
+        "open_orders": 0
+      }
+    },
+    {
+      "name": "ca-chua-dong",
+      "input": {
+        "shift": { "id": "00000000-0000-4000-8000-0000000000b1", "open_boxes": 40, "open_plates": 0, "open_float": 200000, "close_boxes_left": null, "close_plates_left": null, "close_cash_counted": null },
+        "adjustments": [],
+        "orders": [
+          { "id": "00000000-0000-4000-8000-000000000301", "code": "C2Z", "status": "paid", "dine_type": "takeaway", "opened_shift_id": "00000000-0000-4000-8000-0000000000b1", "paid_shift_id": "00000000-0000-4000-8000-0000000000b1", "payment_method": "cash", "total": 20000, "served_at": null, "deleted_at": null,
+            "items": [{ "product_id": "00000000-0000-4000-8000-0000000000a1", "qty": 1, "toppings_snap": [] }] }
+        ],
+        "debt_payments": []
+      },
+      "expected": {
+        "revenue": { "total": 20000, "cash": 20000, "transfer": 0, "debt": 0 },
+        "paid_orders": 1,
+        "debt_collected": { "cash": 0, "transfer": 0 },
+        "cash": { "expected": 220000, "counted": null, "diff": null },
+        "boxes": { "used": null, "by_orders": 1, "diff": null },
+        "plates": { "used": null, "by_orders": 0, "diff": null },
+        "deleted_count": 0,
+        "deleted_after_served": [],
+        "open_orders": 0
+      }
+    },
+    {
+      "name": "com-them-hop",
+      "input": {
+        "shift": { "id": "00000000-0000-4000-8000-0000000000b1", "open_boxes": 20, "open_plates": 10, "open_float": 0, "close_boxes_left": 10, "close_plates_left": 9, "close_cash_counted": 0 },
+        "adjustments": [],
+        "orders": [
+          { "id": "00000000-0000-4000-8000-000000000401", "code": "D2Z", "status": "paid", "dine_type": "takeaway", "opened_shift_id": "00000000-0000-4000-8000-0000000000b1", "paid_shift_id": "00000000-0000-4000-8000-0000000000b1", "payment_method": "transfer", "total": 76000, "served_at": null, "deleted_at": null,
+            "items": [{ "product_id": "00000000-0000-4000-8000-0000000000a2", "qty": 2, "toppings_snap": [
+              { "id": "00000000-0000-4000-8000-0000000000c2", "name": "Canh", "price": 5000, "extra_box": true },
+              { "id": "00000000-0000-4000-8000-0000000000c3", "name": "Dưa", "price": 3000, "extra_box": true }] }] },
+          { "id": "00000000-0000-4000-8000-000000000402", "code": "D22", "status": "paid", "dine_type": "dinein", "opened_shift_id": "00000000-0000-4000-8000-0000000000b1", "paid_shift_id": "00000000-0000-4000-8000-0000000000b1", "payment_method": "transfer", "total": 35000, "served_at": null, "deleted_at": null,
+            "items": [{ "product_id": "00000000-0000-4000-8000-0000000000a2", "qty": 1, "toppings_snap": [{ "id": "00000000-0000-4000-8000-0000000000c2", "name": "Canh", "price": 5000, "extra_box": true }] }] },
+          { "id": "00000000-0000-4000-8000-000000000403", "code": "D23", "status": "paid", "dine_type": "takeaway", "opened_shift_id": "00000000-0000-4000-8000-0000000000b1", "paid_shift_id": "00000000-0000-4000-8000-0000000000b1", "payment_method": "transfer", "total": 30000, "served_at": null, "deleted_at": null,
+            "items": [{ "product_id": "00000000-0000-4000-8000-0000000000a2", "qty": 1, "toppings_snap": [] }] }
+        ],
+        "debt_payments": []
+      },
+      "expected": {
+        "revenue": { "total": 141000, "cash": 0, "transfer": 141000, "debt": 0 },
+        "paid_orders": 3,
+        "debt_collected": { "cash": 0, "transfer": 0 },
+        "cash": { "expected": 0, "counted": 0, "diff": 0 },
+        "boxes": { "used": 10, "by_orders": 7, "diff": 3 },
+        "plates": { "used": 1, "by_orders": 1, "diff": 0 },
+        "deleted_count": 0,
+        "deleted_after_served": [],
+        "open_orders": 0
+      }
+    }
+  ]
+}

@@ -1,0 +1,59 @@
+import { describe, expect, it } from 'vitest';
+import fixture from '../../tests/fixtures/reconcile-cases.json';
+import { reconcileShift, type ReconcileInput, type ReconcileResult } from './reconcile';
+
+const cases = fixture.cases as unknown as Array<{ name: string; input: Omit<ReconcileInput, 'products'>; expected: ReconcileResult }>;
+const products = fixture.products;
+const run = (name: string) => {
+  const c = cases.find((x) => x.name === name)!;
+  return reconcileShift({ ...c.input, products } as ReconcileInput);
+};
+
+describe('reconcile (bộ dữ liệu dùng chung với SQL)', () => {
+  it.each(cases.map((c) => [c.name, c] as const))('%s', (_n, c) => {
+    expect(reconcileShift({ ...c.input, products } as ReconcileInput)).toEqual(c.expected);
+  });
+});
+
+describe('reconcile: quy tắc', () => {
+  const r = run('co-ban');
+
+  it('tiền mặt kỳ vọng = tiền lẻ + chủ bổ sung + đơn TM theo ca thu + TM thu nợ', () => {
+    expect(r.cash.expected).toBe(500_000 + 200_000 + (30_000 + 35_000 + 45_000) + 50_000);
+  });
+
+  it('không tính CK, nợ, đơn đã xóa, đơn mở ở ca này nhưng thu ở ca khác', () => {
+    expect(r.revenue.cash).toBe(110_000); // không có 40.000 của đơn thu ở ca b2
+    expect(r.revenue.transfer).toBe(25_000);
+    expect(r.revenue.debt).toBe(20_000);
+    expect(r.debt_collected).toEqual({ cash: 50_000, transfer: 30_000 });
+  });
+
+  it('hộp & dĩa theo ca mở đơn, bỏ qua đơn xóa', () => {
+    expect(r.boxes.by_orders).toBe(12);
+    expect(r.plates.by_orders).toBe(2);
+  });
+
+  it('"bao bì của đơn bị xóa sau khi ra món" chỉ gồm đơn có served_at trước lúc xóa', () => {
+    expect(r.deleted_count).toBe(2);
+    expect(r.deleted_after_served.map((d) => d.code)).toEqual(['A24']);
+  });
+
+  it('chủ đổi tiền mặt → chuyển khoản: đối soát tính lại thay đổi đúng', () => {
+    const before = run('chu-sua-truoc');
+    const after = run('chu-sua-sau-tm-thanh-ck');
+    expect(before.cash.diff).toBe(0);
+    expect(after.cash.expected).toBe(before.cash.expected - 15_000);
+    expect(after.cash.diff).toBe(15_000);
+    expect(after.revenue.total).toBe(before.revenue.total);
+  });
+
+  it('đơn xóa có served_at sau deleted_at (dữ liệu lạ) không tính là "xóa sau khi ra món"', () => {
+    const c = cases.find((x) => x.name === 'co-ban')!;
+    const odd = c.input.orders.map((o) =>
+      o.code === 'A24' ? { ...o, served_at: '2026-11-17T23:30:00Z' } : o,
+    );
+    const res = reconcileShift({ ...c.input, orders: odd, products } as ReconcileInput);
+    expect(res.deleted_after_served).toEqual([]);
+  });
+});

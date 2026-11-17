@@ -1,0 +1,11 @@
+node_modules
+dist
+dev-dist
+coverage
+.env
+.env.local
+cypress/videos
+cypress/screenshots
+supabase/.temp
+supabase/.branches
+*.tsbuildinfo
