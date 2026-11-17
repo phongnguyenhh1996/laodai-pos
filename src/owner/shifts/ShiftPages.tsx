@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react';
-import { Route, Routes, useParams } from 'react-router-dom';
+import { Link, Route, Routes, useParams } from 'react-router-dom';
 import { ErrorText, Splash, TextField, errorMessage } from '@/app/ui';
 import { lineSummary } from '@/domain/cart';
 import { parseCountInput, parseMoneyInput } from '@/domain/catalog';
@@ -149,6 +149,12 @@ function ShiftBody({ detail, onChanged }: { detail: ShiftDetail; onChanged: () =
           />
         )}
         <Row label="Đơn còn mở" value={String(r.open_orders)} testId="rep-open-orders" />
+        <p className="flex items-baseline justify-between gap-3">
+          <span className="text-stone-600">Sửa đơn đang mở</span>
+          <Link to={`/owner/log?type=edits&staff=${s.staff_id}`} className="underline" data-testid="rep-edits">
+            {detail.edits} lần
+          </Link>
+        </p>
       </Card>
 
       <Card title="Bổ sung giữa ca">
@@ -182,7 +188,9 @@ function OrderLine({ o }: { o: ShiftOrderRow }) {
     <div data-testid={`shift-order-${o.id}`} data-status={o.status} className="flex flex-col border-t border-stone-100 py-2">
       <p className="flex flex-wrap items-baseline justify-between gap-2">
         <span>
-          <b className="font-mono">{o.code}</b> {o.label ? `· ${o.label} ` : ''}· {hhmm(o.created_at)} ·{' '}
+          <Link to={`/owner/orders/${o.id}`} className="font-mono font-bold underline">
+            {o.code}
+          </Link> {o.label ? `· ${o.label} ` : ''}· {hhmm(o.created_at)} ·{' '}
           <span className={o.status === 'deleted' ? 'text-red-700' : ''}>{STATUS_LABEL[o.status]}</span>
           {o.payment_method && ` · ${METHOD_LABEL[o.payment_method]}`}
         </span>

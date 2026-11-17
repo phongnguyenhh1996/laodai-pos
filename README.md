@@ -28,7 +28,7 @@ Tài khoản chủ local (seed): `owner@laodai.test` / `laodai-owner-123`.
 ## Cấu trúc
 
 ```
-src/domain/        logic nghiệp vụ thuần (giá, giỏ hàng, bao bì, tiền thối, mã đơn, hàng đợi, đối soát, sổ nợ)
+src/domain/        logic nghiệp vụ thuần (giá, giỏ hàng, bao bì, tiền thối, mã đơn, hàng đợi, đối soát, sổ nợ, mô tả nhật ký)
 src/sync/          offline-first: Dexie, outbox, device_seq, thao tác tablet, engine đồng bộ,
                    transport RPC `sync_push`, SyncRunner (tự gửi khi có thao tác / có mạng, thử lại backoff),
                    danh mục tablet (`catalog.ts`: menu/giá/điểm bán/nhân viên/hồ sơ/khách nợ + dư nợ lưu trên máy, tự làm mới),
@@ -38,7 +38,8 @@ src/lib/sync.ts    bộ đồng bộ của tablet (chạy từ lúc vào màn b�
 src/lib/auth.ts    đăng nhập chủ, kích hoạt tablet, chế độ chủ trên tablet (phiên tạm, tự thoát 2 phút)
 src/tablet/        màn bán hàng: mở ca → hàng đợi → tạo / sửa / xóa đơn → thanh toán (TM, CK, ghi nợ) → thu nợ → đóng ca (đếm mù)
 src/app|owner      khung app, chế độ chủ; `owner/settings/` = Cài đặt, `owner/shifts/` = Ca (đối soát, bổ sung giữa ca),
-                   `owner/debts/` = Sổ nợ (dư nợ, lịch sử, chuyển nợ, chủ ghi thu)
+                   `owner/debts/` = Sổ nợ (dư nợ, lịch sử, chuyển nợ, chủ ghi thu),
+                   `owner/log/` = Nhật ký (lọc loại / nhân viên / ngày) + chi tiết đơn (đích link trong tin Telegram)
 supabase/migrations   schema, RLS, RPC `sync_push`, `reconcile_shift`, RPC của chủ, cron tổng kết ngày,
                       ràng buộc danh mục (combo cùng menu, hồ sơ tablet trỏ điểm bán có thật, không đổi menu)
 supabase/functions    `telegram-dispatch`, `activate-tablet`, `_shared/format.ts` (định dạng tin)

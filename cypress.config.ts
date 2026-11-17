@@ -1,5 +1,5 @@
 import { defineConfig } from 'cypress';
-import { resetDb, sql, tabletClient } from './tests/support/db';
+import { resetDb, sql, tabletClient, withPg } from './tests/support/db';
 import { ENV } from './tests/support/env';
 import { TabletSim, item, push, type TestItem } from './tests/support/ops';
 import { SEED } from './tests/support/seed-ids';
@@ -140,6 +140,25 @@ export default defineConfig({
           }
           await sim.closeShift(150, 0, 300_000);
           return ids;
+        },
+        /**
+         * H38: cron thật của Supabase local chạy mỗi phút ⇒ dời giờ tổng kết sang 23:59 để nó không tự gửi giữa test,
+         * và bỏ tin tổng kết nó có thể đã gửi ngay sau khi reset.
+         */
+        'summary:prepare': async () => {
+          await withPg(async (c) => {
+            await c.query(`update settings set daily_summary_time = '23:59'`);
+            await c.query('alter table notifications disable trigger forbid_delete');
+            await c.query(`delete from notifications where kind = 'daily_summary'`);
+            await c.query('alter table notifications enable trigger forbid_delete');
+          });
+          return null;
+        },
+        /** "Tua đồng hồ": gọi thẳng hàm cron với thời điểm hôm nay (giờ VN) lúc `hhmm`. Trả id thông báo hoặc null. */
+        'cron:tick': async (hhmm: string) => {
+          const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date());
+          const [r] = await sql<{ id: string | null }>('select private.daily_summary_tick($1::timestamptz) as id', [`${today}T${hhmm}:00+07:00`]);
+          return r.id;
         },
         /** Hồ sơ tablet đang lưu trên server. */
         'db:profilePoints': async (tablet: keyof typeof SEED.tablets) => {

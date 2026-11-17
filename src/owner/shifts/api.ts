@@ -59,6 +59,8 @@ export interface ShiftDetail {
   reconcile: ReconcileResult;
   adjustments: AdjustmentRow[];
   orders: ShiftOrderRow[];
+  /** Số lần nhân viên sửa đơn đang mở trong ca (từ nhật ký). */
+  edits: number;
 }
 
 const SHIFT_COLUMNS =
@@ -90,7 +92,7 @@ type RawOrder = Omit<ShiftOrderRow, 'items' | 'opened_by' | 'paid_by'> & {
 };
 
 export async function loadShiftDetail(client: SupabaseClient, shiftId: string): Promise<ShiftDetail | null> {
-  const [shiftRes, recRes, adjRes, ordRes] = await Promise.all([
+  const [shiftRes, recRes, adjRes, ordRes, editRes] = await Promise.all([
     client.from('shifts').select(SHIFT_COLUMNS).eq('id', shiftId),
     client.rpc('reconcile_shift', { p_shift: shiftId }),
     client.from('shift_adjustments').select('id,kind,qty,note,at').eq('shift_id', shiftId).order('at'),
@@ -102,6 +104,7 @@ export async function loadShiftDetail(client: SupabaseClient, shiftId: string): 
       )
       .or(`opened_shift_id.eq.${shiftId},paid_shift_id.eq.${shiftId}`)
       .order('created_at'),
+    client.from('audit_log').select('id', { count: 'exact', head: true }).eq('shift_id', shiftId).eq('action', 'order_update'),
   ]);
   if (shiftRes.error) fail('ca', shiftRes.error);
   const raw = (shiftRes.data as unknown as RawShift[] | null)?.[0];
@@ -109,6 +112,7 @@ export async function loadShiftDetail(client: SupabaseClient, shiftId: string): 
   if (recRes.error) fail('đối soát', recRes.error);
   if (adjRes.error) fail('bổ sung giữa ca', adjRes.error);
   if (ordRes.error) fail('đơn của ca', ordRes.error);
+  if (editRes.error) fail('nhật ký', editRes.error);
 
   const shift = toShift(raw);
   const orders = (ordRes.data ?? []) as unknown as RawOrder[];
@@ -128,6 +132,7 @@ export async function loadShiftDetail(client: SupabaseClient, shiftId: string): 
     shift,
     reconcile: recRes.data as ReconcileResult,
     adjustments: (adjRes.data ?? []) as AdjustmentRow[],
+    edits: editRes.count ?? 0,
     orders: orders.map(({ order_items, ...o }) => ({
       ...o,
       items: order_items.filter((i) => !i.removed_at).map(({ name_snap, qty, toppings_snap }) => ({ name_snap, qty, toppings_snap })),

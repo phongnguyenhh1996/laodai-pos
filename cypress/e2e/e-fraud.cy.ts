@@ -1,6 +1,6 @@
 import { SEED } from '../../tests/support/seed-ids';
 
-// E. Kịch bản gian lận (mục 10.4). Bước 2: E27; bước 7: E23, E25; các kịch bản khác ở bước 8–10.
+// E. Kịch bản gian lận (mục 10.4). Bước 2: E27; bước 7: E23, E25; bước 8: E21, E22; E24, E26 ở bước 9–10.
 
 const tid = (id: string) => `[data-testid=${id}]`;
 
@@ -47,6 +47,95 @@ interface Ids {
 describe('E. Kịch bản gian lận', () => {
   beforeEach(() => {
     cy.resetAll();
+  });
+
+  it('E21: ra món, thu tiền rồi xóa đơn ⇒ Telegram có trạng thái "đã ra món"; báo cáo ca liệt kê bao bì của đơn bị xóa sau khi ra món', () => {
+    cy.activateTablet('A');
+    cy.openShift('Lan');
+    cy.get(tid('new-order')).click();
+    cy.get(tid(`menu-combo-${SEED.combos.xoiGaTrung}`)).click();
+    cy.get(tid('order-serve')).click();
+    cy.get('[data-testid^=queue-code-]').invoke('text').then((code) => {
+      cy.get('[data-testid^=queue-open-]').click();
+      cy.get(tid('order-delete')).click();
+      cy.get(tid('delete-reason-customer_left')).click();
+      cy.get(tid('queue-empty')).should('be.visible');
+      cy.waitSynced();
+
+      // Telegram ngay khi xóa: nội dung đơn + trạng thái lúc xóa + link mở thẳng chi tiết đơn
+      cy.telegramWaitFor(`🗑 Xóa đơn ${code}`).then((m) => {
+        expect(m.text).to.contain('Lý do: Khách bỏ về');
+        expect(m.text).to.contain('Trạng thái lúc xóa: ⚠️ ĐÃ RA MÓN');
+        expect(m.text).to.contain('1× Xôi gà (+Trứng) — 31.000');
+        const link = /🔗 (\S+)/.exec(m.text)![1];
+        const path = new URL(link).pathname;
+        expect(path).to.match(/^\/owner\/orders\//);
+
+        closeShift(199, 60, '500.000');
+        cy.telegramWaitFor('Đóng ca – Lan').its('text').should('contain', `Bao bì của đơn bị xóa sau khi ra món: ${code} (1 hộp)`);
+
+        // Chủ mở link trong tin: chi tiết đơn + nhật ký của đơn
+        cy.loginOwner();
+        cy.visit(path);
+        cy.get(tid('order-detail-status')).should('have.text', 'Đã xóa');
+        cy.get(tid('order-detail-times')).should('contain.text', 'Khách bỏ về').and('contain.text', 'Ra món');
+        cy.get('[data-testid=log-row][data-action=order_delete]').should('contain.text', 'Lý do: Khách bỏ về · lúc xóa ⚠️ ĐÃ RA MÓN');
+        cy.get('[data-testid=log-row]').then(($r) => expect([...$r].map((r) => r.dataset.action)).to.deep.eq(['order_delete', 'order_serve', 'order_create']));
+
+        // Báo cáo ca: mục bao bì của đơn bị xóa sau khi ra món
+        cy.task<Array<{ id: string }>>('db:shifts', 'A').then(([shift]) => {
+          cy.visit(`/owner/shifts/${shift.id}`);
+          cy.get(tid('rep-deleted')).should('have.text', '1 (1 đã ra món)');
+          cy.get(tid('rep-deleted-after-served')).should('have.text', `${code} (1 hộp)`);
+        });
+      });
+    });
+  });
+
+  it('E22: bớt món sau khi ra món (2 phần → 1) ⇒ nhật ký có bản trước / sau, báo cáo đếm số lần sửa của nhân viên đó', () => {
+    cy.activateTablet('A');
+    cy.openShift('Lan');
+    cy.get(tid('new-order')).click();
+    cy.get(tid(`menu-combo-${SEED.combos.xoiGaTrung}`)).click();
+    cy.get(tid(`menu-combo-${SEED.combos.xoiGaTrung}`)).click(); // 2 phần
+    cy.get(tid('order-total')).should('have.text', '62.000');
+    cy.get(tid('order-serve')).click();
+    cy.get('[data-testid^=queue-open-]').click();
+    cy.get('[data-testid$=-minus]').click();
+    cy.get(tid('order-total')).should('have.text', '31.000');
+    cy.get(tid('order-save')).click();
+    cy.get(tid('queue-screen')).should('be.visible');
+    cy.waitSynced();
+    // Sửa món chỉ ghi nhật ký, không báo Telegram
+    cy.telegramMessages().then((ms) => expect(ms.map((m) => m.text).join('\n')).not.to.contain('Sửa'));
+
+    cy.task<Array<{ id: string }>>('db:shifts', 'A').then(([shift]) => {
+      cy.loginOwner();
+      cy.visit(`/owner/shifts/${shift.id}`);
+      cy.get(tid('rep-edits')).should('have.text', '1 lần').click();
+      // Nhật ký lọc sẵn: sửa & xóa của Lan
+      cy.location('search').should('contain', 'type=edits').and('contain', `staff=${SEED.staff.Lan}`);
+      cy.get(tid('log-filter-type')).should('have.value', 'edits');
+      cy.get(tid('log-filter-staff')).should('have.value', SEED.staff.Lan);
+      cy.get(tid('log-row')).should('have.length', 1).first().as('row');
+      cy.get('@row').should('have.attr', 'data-action', 'order_update');
+      cy.get('@row').find(tid('log-row-actor')).should('contain.text', 'Lan – Tablet A');
+      cy.get('@row').find(tid('log-row-line')).then(($l) =>
+        expect([...$l].map((l) => l.textContent)).to.deep.eq(['Món: 2× Xôi gà (Trứng) → 1× Xôi gà (Trứng)', 'Tổng: 62.000 → 31.000']),
+      );
+      // Lọc theo nhân viên khác ⇒ không có
+      cy.get(tid('log-filter-staff')).select(SEED.staff.Mai);
+      cy.get(tid('log-empty')).should('be.visible');
+      // Mọi loại của Lan hôm nay: mở ca, tạo, ra món, sửa
+      cy.get(tid('log-filter-staff')).select(SEED.staff.Lan);
+      cy.get(tid('log-filter-type')).select('');
+      cy.get(tid('log-filter-date')).type(new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date()));
+      cy.get(tid('log-row')).then(($r) =>
+        expect([...$r].map((r) => r.dataset.action)).to.deep.eq(['order_update', 'order_serve', 'order_create', 'shift_open']),
+      );
+      cy.get(tid('log-filter-date')).clear().type('2020-01-01');
+      cy.get(tid('log-empty')).should('be.visible');
+    });
   });
 
   it('E23: đếm thiếu tiền: đóng ca nhập ít hơn kỳ vọng 20.000 ⇒ Telegram báo chênh lệch −20.000, nhân viên không thấy', () => {

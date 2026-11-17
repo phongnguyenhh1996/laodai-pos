@@ -14,6 +14,7 @@ import {
   switchPoint,
   type CartDraft,
 } from '@/domain/cart';
+import { DELETE_REASON_LABELS } from '@/domain/audit';
 import { tabletPoints } from '@/domain/catalog';
 import { formatVnd } from '@/domain/money';
 import { lineTotal, selectableToppings } from '@/domain/pricing';
@@ -25,12 +26,7 @@ import { MenuBoard } from './MenuBoard';
 import { Notice, Sheet, useTablet } from './parts';
 import type { QueueFlash } from './QueueScreen';
 
-export const DELETE_REASONS: Array<{ id: DeleteReason; label: string }> = [
-  { id: 'mistake', label: 'Bấm nhầm' },
-  { id: 'customer_left', label: 'Khách bỏ về' },
-  { id: 'customer_changed', label: 'Khách đổi ý' },
-  { id: 'other', label: 'Khác' },
-];
+const DELETE_REASONS = (['mistake', 'customer_left', 'customer_changed', 'other'] as const).map((id) => ({ id, label: DELETE_REASON_LABELS[id] }));
 
 type Dialog = { kind: 'toppings'; product: Product } | { kind: 'delete' } | { kind: 'discard' } | null;
 
