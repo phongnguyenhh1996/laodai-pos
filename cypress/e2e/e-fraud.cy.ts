@@ -1,6 +1,6 @@
 import { SEED } from '../../tests/support/seed-ids';
 
-// E. Kịch bản gian lận (mục 10.4). Bước 2: E27; bước 7: E23, E25; bước 8: E21, E22; E24, E26 ở bước 9–10.
+// E. Kịch bản gian lận (mục 10.4). Bước 2: E27; bước 7: E23, E25; bước 8: E21, E22; bước 9: E24; E26 ở bước 10.
 
 const tid = (id: string) => `[data-testid=${id}]`;
 
@@ -14,6 +14,17 @@ function sell(opts: { combo?: keyof typeof SEED.combos; product?: keyof typeof S
     cy.get(tid('topping-add')).click();
   }
   cy.get(tid('order-pay-exact')).click();
+  cy.get(tid('queue-flash')).should('be.visible');
+}
+
+/** Bán một combo nhưng bấm "Chuyển khoản" (E24: thực ra khách trả tiền mặt). */
+function sellAsTransfer(combo: keyof typeof SEED.combos, point?: keyof typeof SEED.points) {
+  cy.get(tid('new-order')).click();
+  if (point) cy.get(tid(`point-tab-${SEED.points[point]}`)).click();
+  cy.get(tid(`menu-combo-${SEED.combos[combo]}`)).click();
+  cy.get(tid('order-pay')).click();
+  cy.get(tid('pay-method-transfer')).click();
+  cy.get(tid('pay-transfer-confirm')).click();
   cy.get(tid('queue-flash')).should('be.visible');
 }
 
@@ -168,6 +179,39 @@ describe('E. Kịch bản gian lận', () => {
     cy.get(tid('rep-cash-expected')).should('have.text', '559.000');
     cy.get(tid('rep-cash-counted')).should('have.text', '539.000');
     cy.get(tid('rep-cash-diff')).should('have.text', '−20.000').and('have.attr', 'data-alert', 'true');
+  });
+
+  it('E24: ghi chuyển khoản nhưng thực ra nhận tiền mặt ⇒ tổng CK theo ngày / điểm hiển thị đúng để chủ so với app ngân hàng', () => {
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date());
+    cy.activateTablet('A');
+    cy.openShift('Lan');
+    sellAsTransfer('xoiGaTrung'); // 31.000: khách đưa tiền mặt, Lan bấm "chuyển khoản"
+    sell({ combo: 'xoiXeoChaRuoc' }); // 28.000 tiền mặt
+    sellAsTransfer('comGaCanh', 'com'); // 40.000 chuyển khoản thật
+    cy.waitSynced();
+
+    // Chủ: dashboard tách CK theo điểm
+    cy.loginOwner();
+    cy.get(tid('dash-revenue')).should('have.text', '99.000');
+    cy.get(tid('dash-revenue-split')).should('have.text', 'TM 28.000 · CK 71.000 · Nợ 0');
+    cy.get(tid(`dash-point-${SEED.points.xoiA}-transfer`)).should('have.text', 'CK 31.000');
+    cy.get(tid(`dash-point-${SEED.points.com}-transfer`)).should('have.text', 'CK 40.000');
+
+    // Báo cáo: đối chiếu chuyển khoản theo ngày / điểm
+    cy.get(tid('owner-nav-reports')).click();
+    cy.get(tid(`report-bank-day-${today}`)).should('be.visible');
+    cy.get(tid(`report-bank-${today}-${SEED.points.xoiA}`)).should('have.text', '31.000');
+    cy.get(tid(`report-bank-${today}-${SEED.points.com}`)).should('have.text', '40.000');
+    cy.get(tid(`report-bank-${today}-total`)).should('have.text', '71.000');
+    cy.get(tid(`report-bank-${today}-debt`)).should('not.exist');
+    cy.get(tid(`report-staff-${SEED.staff.Lan}-shares`)).should('have.text', 'TM 28% · CK 72% · Nợ 0%');
+
+    // App ngân hàng chỉ có 40.000 ⇒ chủ lọc đơn CK của Xôi A hôm nay: ra đúng đơn bị ghi sai và người thu
+    cy.visit(`/owner/orders?method=transfer&point=${SEED.points.xoiA}`);
+    cy.get(tid('orders-row')).should('have.length', 1).first().as('row');
+    cy.get('@row').find(tid('orders-row-total')).should('have.text', '31.000');
+    cy.get('@row').find(tid('orders-row-who')).should('contain.text', 'Thu: Lan');
+    cy.get(tid('orders-sum')).should('have.text', '31.000');
   });
 
   it('E25: dùng hộp không có đơn: đóng ca khai còn ít hộp hơn số đơn tương ứng ⇒ báo cáo hiện chênh lệch hộp', () => {

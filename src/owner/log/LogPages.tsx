@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { ErrorText, Splash, errorMessage } from '@/app/ui';
 import { ACTION_GROUPS, ACTION_LABELS, DELETE_REASON_LABELS, actionLabel, describeAudit, type AuditEntry } from '@/domain/audit';
 import { lineSummary } from '@/domain/cart';
@@ -196,6 +196,7 @@ const METHOD = { cash: 'Tiền mặt', transfer: 'Chuyển khoản', debt: 'Ghi 
 export function OrderDetailPage() {
   const { orderId = '' } = useParams();
   const { client } = useOwner();
+  const saved = (useLocation().state as { saved?: boolean } | null)?.saved === true;
   const names = useNames();
   const [order, setOrder] = useState<OrderDetail | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
@@ -213,8 +214,13 @@ export function OrderDetailPage() {
 
   const o = order;
   return (
-    <OwnerLayout title={o ? `Đơn ${o.code}` : 'Đơn'} back="/owner/log" testId="order-detail">
+    <OwnerLayout title={o ? `Đơn ${o.code}` : 'Đơn'} back="/owner/orders" testId="order-detail">
       <ErrorText testId="order-detail-error">{error ?? log.error}</ErrorText>
+      {saved && (
+        <p className="rounded-lg bg-green-50 px-4 py-3 text-green-800" data-testid="order-edit-saved">
+          Đã lưu. Ca đã đóng (nếu có) đã được tính lại; Telegram đã được báo.
+        </p>
+      )}
       {o === undefined && !error && <Splash />}
       {o === null && <p className="text-stone-500">Không có đơn này.</p>}
       {o && (
@@ -245,6 +251,21 @@ export function OrderDetailPage() {
             {o.customer_label && ` · ${o.customer_label}`}
             {o.deleted_at && ` · Xóa ${hhmm(o.deleted_at)} – ${DELETE_REASON_LABELS[o.delete_reason as DeleteReason] ?? o.delete_reason}`}
           </p>
+          <p className="flex flex-wrap gap-x-3 text-sm">
+            <Link to={`/owner/shifts/${o.opened_shift_id}`} className="underline" data-testid="order-detail-opened-shift">
+              Ca mở đơn
+            </Link>
+            {o.paid_shift_id && o.paid_shift_id !== o.opened_shift_id && (
+              <Link to={`/owner/shifts/${o.paid_shift_id}`} className="underline" data-testid="order-detail-paid-shift">
+                Ca thu tiền
+              </Link>
+            )}
+          </p>
+          {o.status === 'paid' && (
+            <Link to={`/owner/orders/${o.id}/edit`} className="btn mt-2 flex items-center justify-center border border-amber-700 text-amber-800" data-testid="order-edit">
+              Sửa đơn đã thanh toán
+            </Link>
+          )}
         </section>
       )}
       <h2 className="text-lg font-semibold">Nhật ký của đơn</h2>

@@ -34,6 +34,17 @@ afterEach(async () => {
   window.history.pushState({}, '', '/');
 });
 
+
+/** Client chủ giả: Tổng quan gọi `rpc('owner_dashboard')` (để treo) và đăng ký Realtime. */
+function fakeOwnerClient(): SupabaseClient {
+  const channel = { on: () => channel, subscribe: () => channel };
+  return {
+    rpc: () => new Promise(() => undefined),
+    channel: () => channel,
+    removeChannel: () => Promise.resolve('ok'),
+  } as unknown as SupabaseClient;
+}
+
 describe('cổng tablet', () => {
   it('tablet chưa kích hoạt: đường dẫn bán hàng chuyển về màn kích hoạt', async () => {
     go('/queue');
@@ -146,7 +157,7 @@ describe('chế độ chủ trên tablet', () => {
 
   it('đúng mật khẩu: vào chế độ chủ; 2 phút không thao tác ⇒ tự thoát về bán hàng và thu hồi phiên tạm', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true, toFake: ['setTimeout', 'clearTimeout'] });
-    const fakeOwner = { tag: 'owner' } as unknown as SupabaseClient;
+    const fakeOwner = fakeOwnerClient();
     vi.mocked(enterOwnerModeOnTablet).mockResolvedValue(fakeOwner);
     await activateDevice();
     go('/owner');
@@ -168,7 +179,7 @@ describe('chế độ chủ trên tablet', () => {
   });
 
   it('nút Thoát về bán hàng ngay', async () => {
-    const fakeOwner = {} as SupabaseClient;
+    const fakeOwner = fakeOwnerClient();
     vi.mocked(enterOwnerModeOnTablet).mockResolvedValue(fakeOwner);
     await activateDevice();
     go('/owner');

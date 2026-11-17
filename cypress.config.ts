@@ -8,6 +8,49 @@ import { telegramClear, telegramMessages, waitForMessage } from './tests/support
 // Trạng thái kịch bản G32 giữa các task (tablet giả lập phía server).
 let g32: { sim: TabletSim; orderId: string; line: TestItem } | null = null;
 
+type TabletKey = keyof typeof SEED.tablets;
+type ProductKey = keyof typeof SEED.products;
+type ToppingKey = keyof typeof SEED.toppings;
+
+// Tablet giả lập phía server, giữ qua các task trong một kịch bản (device_seq liên tục). Xóa khi db:reset.
+const sims = new Map<TabletKey, TabletSim>();
+async function simFor(tablet: TabletKey): Promise<TabletSim> {
+  let sim = sims.get(tablet);
+  if (!sim) {
+    sim = new TabletSim(await tabletClient(SEED.tablets[tablet]), SEED.tablets[tablet]);
+    sims.set(tablet, sim);
+  }
+  return sim;
+}
+
+function ok(what: string, r: { status: string }) {
+  if (r.status !== 'ok') throw new Error(`${what}: ${JSON.stringify(r)}`);
+}
+
+interface SellArgs {
+  tablet: TabletKey;
+  product: ProductKey;
+  toppings?: ToppingKey[];
+  qty?: number;
+  point?: keyof typeof SEED.points;
+  /** Không có ⇒ đơn để mở. */
+  method?: 'cash' | 'transfer' | 'debt';
+  customer?: keyof typeof SEED.customers;
+}
+
+/** Tạo (và thu tiền) một đơn trên tablet giả lập. Trả id, mã, tổng. */
+async function simSell(a: SellArgs) {
+  const sim = await simFor(a.tablet);
+  const extra = a.point ? { point_id: SEED.points[a.point], dine_type: a.point === 'com' ? 'dinein' : 'takeaway' } : {};
+  const o = await sim.createOrder([item(a.product, a.toppings ?? [], a.qty ?? 1)], extra);
+  ok('tạo đơn', o.result);
+  if (a.method) {
+    const customer = a.customer ? { customer: { id: SEED.customers[a.customer], name: 'Dũng' } } : {};
+    ok('thanh toán', await sim.pay(o.id, o.total, a.method, customer));
+  }
+  return { id: o.id, total: o.total, code: (o.op.payload.order as { code: string }).code };
+}
+
 export default defineConfig({
   e2e: {
     baseUrl: 'http://localhost:4173',
@@ -24,7 +67,48 @@ export default defineConfig({
       on('task', {
         'db:reset': async () => {
           await resetDb();
+          sims.clear();
           return null;
+        },
+        /** Tablet giả lập mở ca. Trả id ca. */
+        'sim:openShift': async ({ tablet, staff }: { tablet: TabletKey; staff: keyof typeof SEED.staff }) => {
+          const sim = await simFor(tablet);
+          ok('mở ca', await sim.openShift(staff));
+          return sim.shiftId;
+        },
+        'sim:sell': (a: SellArgs) => simSell(a),
+        /** Đóng ca hiện tại của tablet giả lập. Trả id ca. */
+        'sim:close': async ({ tablet, boxes, plates, cash }: { tablet: TabletKey; boxes: number; plates: number; cash: number }) => {
+          const sim = await simFor(tablet);
+          ok('đóng ca', await sim.closeShift(boxes, plates, cash));
+          return sim.shiftId;
+        },
+        /**
+         * G35 / G36: hôm nay
+         * - Lan (Tablet A): TM 25.000, CK 15.000 (sửa 2 → 1 phần trước khi thu), Nợ 20.000; 1 đơn xóa sau khi ra món
+         * - Mai (Tablet B): CK 30.000; 1 đơn sửa 2 lần rồi xóa (bấm nhầm)
+         * - Hùng: không bán
+         */
+        'scenario:staffReport': async () => {
+          const a = await simFor('A');
+          const b = await simFor('B');
+          ok('mở ca A', await a.openShift('Lan'));
+          ok('mở ca B', await b.openShift('Mai'));
+          const cash = await simSell({ tablet: 'A', product: 'xoiGa', method: 'cash' });
+          const tr = await simSell({ tablet: 'A', product: 'xoiXeo', qty: 2 });
+          ok('sửa', await a.update(tr.id, [item('xoiXeo')]));
+          ok('thu CK', await a.pay(tr.id, 15_000, 'transfer'));
+          const debt = await simSell({ tablet: 'A', product: 'xoiPate', method: 'debt', customer: 'dungGv' });
+          const del = await simSell({ tablet: 'A', product: 'xoiGa' });
+          ok('ra món', await a.serve(del.id));
+          ok('xóa', await a.del(del.id, 'customer_left'));
+
+          const bTr = await simSell({ tablet: 'B', product: 'xoiTc', method: 'transfer' });
+          const bDel = await simSell({ tablet: 'B', product: 'xoiXeo', qty: 3 });
+          ok('sửa 1', await b.update(bDel.id, [item('xoiXeo', [], 2)]));
+          ok('sửa 2', await b.update(bDel.id, [item('xoiXeo', [], 1)]));
+          ok('xóa B', await b.del(bDel.id, 'mistake'));
+          return { cash: cash.id, tr: tr.id, debt: debt.id, del: del.id, bTr: bTr.id, bDel: bDel.id };
         },
         'telegram:clear': async () => {
           await telegramClear();

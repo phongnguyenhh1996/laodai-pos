@@ -12,7 +12,9 @@ import { OwnerHome } from './OwnerHome';
 import { SettingsRoutes } from './settings/SettingsPages';
 import { ShiftRoutes } from './shifts/ShiftPages';
 import { DebtRoutes } from './debts/DebtPages';
-import { LogPage, OrderDetailPage } from './log/LogPages';
+import { LogPage } from './log/LogPages';
+import { OrderRoutes } from './orders/OrderPages';
+import { ReportPage } from './reports/ReportPage';
 
 /** Chế độ chủ trên tablet tự thoát sau 2 phút không thao tác (mục 1.2). */
 export const OWNER_IDLE_MS = 2 * 60_000;
@@ -24,7 +26,8 @@ function OwnerRoutes() {
       <Route path="shifts/*" element={<ShiftRoutes />} />
       <Route path="debts/*" element={<DebtRoutes />} />
       <Route path="log" element={<LogPage />} />
-      <Route path="orders/:orderId" element={<OrderDetailPage />} />
+      <Route path="orders/*" element={<OrderRoutes />} />
+      <Route path="reports" element={<ReportPage />} />
       <Route path="*" element={<OwnerHome />} />
     </Routes>
   );
