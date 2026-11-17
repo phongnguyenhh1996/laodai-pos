@@ -1,6 +1,6 @@
 import { NavItem, NavList, OwnerLayout } from './OwnerLayout';
 
-// Bước 6 / 9 sẽ thêm Tổng quan, Đơn, Báo cáo, Sổ nợ, Nhật ký.
+// Bước 9 sẽ thêm Tổng quan, Đơn, Báo cáo; bước 8 thêm Nhật ký.
 export function OwnerHome() {
   return (
     <OwnerLayout title="Chế độ chủ" testId="owner-home">
@@ -11,6 +11,7 @@ export function OwnerHome() {
           title="Ca"
           subtitle="Đối soát từng ca · đơn của ca · bổ sung hộp / dĩa / tiền giữa ca"
         />
+        <NavItem to="/owner/debts" testId="owner-nav-debts" title="Sổ nợ" subtitle="Dư nợ từng khách · lịch sử · chuyển nợ · ghi thu nợ" />
         <NavItem
           to="/owner/settings"
           testId="owner-nav-settings"
@@ -18,7 +19,7 @@ export function OwnerHome() {
           subtitle="Menu, món, topping, combo, giá · nhân viên · điểm bán · hồ sơ tablet"
         />
       </NavList>
-      <p className="text-stone-500">Tổng quan, đơn, báo cáo, sổ nợ và nhật ký sẽ có ở các bước sau.</p>
+      <p className="text-stone-500">Tổng quan, đơn, báo cáo và nhật ký sẽ có ở các bước sau.</p>
     </OwnerLayout>
   );
 }

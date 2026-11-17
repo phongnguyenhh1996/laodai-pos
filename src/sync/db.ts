@@ -70,6 +70,8 @@ export const META = {
   shift: 'shift',
   /** Danh mục tải từ server (xem catalog.ts): dùng được khi offline. */
   catalog: 'catalog',
+  /** Ghi nợ / thu nợ làm trên máy mà danh mục chưa phản ánh (xem debtLocal.ts). */
+  debtJournal: 'debtJournal',
 } as const;
 
 export interface Activation {

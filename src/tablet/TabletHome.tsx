@@ -9,6 +9,7 @@ import { useLive } from '@/app/useLive';
 import { currentShift } from '@/sync';
 import type { Activation } from '@/sync/db';
 import { CloseShiftScreen } from './CloseShiftScreen';
+import { DebtScreen } from './DebtScreen';
 import { OpenShiftScreen } from './OpenShiftScreen';
 import { OrderScreen } from './OrderScreen';
 import { PayScreen } from './PayScreen';
@@ -78,6 +79,7 @@ function TabletRoutes({ hasShift }: { hasShift: boolean }) {
       <Route path="/order/new" element={needShift(<OrderScreen />)} />
       <Route path="/order/:orderId" element={needShift(<OrderScreen />)} />
       <Route path="/order/:orderId/pay" element={needShift(<PayScreen />)} />
+      <Route path="/debt" element={needShift(<DebtScreen />)} />
       {/* Đóng ca tự xử lý lúc không còn ca (ngay sau khi đóng: chỉ hiện "Đã đóng ca"). */}
       <Route path="/shift/close" element={<CloseShiftScreen />} />
       <Route path="*" element={<Navigate to="/" replace />} />

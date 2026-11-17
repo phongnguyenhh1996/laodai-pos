@@ -4,17 +4,19 @@ import { canConfirmCash, changeDue, quickCashOptions } from '@/domain/cash';
 import { itemsSummary } from '@/domain/cart';
 import { parseMoneyInput } from '@/domain/catalog';
 import { formatVnd } from '@/domain/money';
-import type { Order } from '@/domain/types';
+import { customerLabel } from '@/domain/debt';
+import type { Customer, Order } from '@/domain/types';
 import { localDb } from '@/lib/localdb';
 import { Splash, errorMessage } from '@/app/ui';
 import { getOpenOrder, payOrder, type PaymentInput } from '@/sync';
+import { ChosenCustomer, CustomerSuggestions, useDebtBook } from './debt';
 import { Notice } from './parts';
 import type { QueueFlash } from './QueueScreen';
 
-type Method = 'cash' | 'transfer';
+type Method = 'cash' | 'transfer' | 'debt';
 
 /**
- * Thanh toán (mục 4.4): một hình thức cho cả đơn. Tiền tính vào ca đang mở lúc thu.
+ * Thanh toán (mục 4.4): một hình thức cho cả đơn (tiền mặt / chuyển khoản / ghi nợ, không chia, không nợ một phần). Tiền tính vào ca đang mở lúc thu.
  * Thanh toán xong đơn biến mất khỏi tablet, nhân viên không sửa / xem lại được nữa.
  */
 export function PayScreen() {
@@ -24,6 +26,12 @@ export function PayScreen() {
   const [method, setMethod] = useState<Method>('cash');
   const [given, setGiven] = useState<number | null>(null);
   const [manual, setManual] = useState('');
+  // Ghi nợ: chọn khách có sẵn, hoặc gõ tên mới (+ mô tả, SĐT tùy chọn) ⇒ tự tạo khách.
+  const [debtName, setDebtName] = useState('');
+  const [debtDesc, setDebtDesc] = useState('');
+  const [debtPhone, setDebtPhone] = useState('');
+  const [debtCustomer, setDebtCustomer] = useState<Customer | null>(null);
+  const book = useDebtBook();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
@@ -91,11 +99,12 @@ export function PayScreen() {
         </span>
       </div>
 
-      <div className="grid grid-cols-2 gap-3" role="tablist">
+      <div className="grid grid-cols-3 gap-3" role="tablist">
         {(
           [
             ['cash', 'Tiền mặt'],
             ['transfer', 'Chuyển khoản'],
+            ['debt', 'Ghi nợ'],
           ] as const
         ).map(([m, label]) => (
           <button
@@ -154,6 +163,70 @@ export function PayScreen() {
             data-testid="pay-confirm"
           >
             Đã thu tiền
+          </button>
+        </section>
+      ) : method === 'debt' ? (
+        <section className="flex flex-col gap-4" data-testid="pay-debt">
+          {debtCustomer && book ? (
+            <ChosenCustomer book={book} customer={debtCustomer} onClear={() => setDebtCustomer(null)} />
+          ) : (
+            <>
+              <input
+                className="min-h-[64px] rounded-xl border border-stone-300 px-4 text-xl outline-none focus:border-amber-600"
+                placeholder="Tên khách (bắt buộc)"
+                maxLength={60}
+                value={debtName}
+                onChange={(e) => setDebtName(e.target.value)}
+                data-testid="debt-name"
+              />
+              {book && <CustomerSuggestions book={book} query={debtName} onPick={setDebtCustomer} />}
+              {debtName.trim() && (
+                <div className="flex flex-col gap-3 rounded-xl border border-dashed border-stone-300 p-4" data-testid="debt-new">
+                  <p className="text-lg text-stone-600">
+                    Không có trong danh sách ⇒ tạo khách mới <b>{debtName.trim()}</b>
+                  </p>
+                  <input
+                    className="min-h-tap rounded-xl border border-stone-300 px-4 text-lg outline-none focus:border-amber-600"
+                    placeholder="Mô tả (vd. giáo viên, 20 Lê Lợi) – tùy chọn"
+                    maxLength={80}
+                    value={debtDesc}
+                    onChange={(e) => setDebtDesc(e.target.value)}
+                    data-testid="debt-desc"
+                  />
+                  <input
+                    className="min-h-tap rounded-xl border border-stone-300 px-4 text-lg outline-none focus:border-amber-600"
+                    placeholder="Số điện thoại – tùy chọn"
+                    inputMode="tel"
+                    maxLength={20}
+                    value={debtPhone}
+                    onChange={(e) => setDebtPhone(e.target.value)}
+                    data-testid="debt-phone"
+                  />
+                </div>
+              )}
+            </>
+          )}
+          <Notice testId="pay-error" tone="error">
+            {error}
+          </Notice>
+          <button
+            type="button"
+            className="btn min-h-[72px] bg-red-700 text-2xl text-white"
+            disabled={busy || (!debtCustomer && !debtName.trim())}
+            onClick={() =>
+              void confirm(
+                {
+                  method: 'debt',
+                  customer: debtCustomer
+                    ? { id: debtCustomer.id, name: debtCustomer.name }
+                    : { name: debtName, description: debtDesc, phone: debtPhone },
+                },
+                `Đã ghi nợ ${formatVnd(o.total)} – ${debtCustomer ? customerLabel(debtCustomer) : customerLabel({ name: debtName.trim(), description: debtDesc.trim() || null })}`,
+              )
+            }
+            data-testid="pay-debt-confirm"
+          >
+            Ghi nợ {formatVnd(o.total)}
           </button>
         </section>
       ) : (

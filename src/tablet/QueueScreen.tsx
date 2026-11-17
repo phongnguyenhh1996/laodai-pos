@@ -97,6 +97,9 @@ export function QueueScreen() {
           + Đơn mới
         </Link>
         <div className="flex-1" />
+        <Link to="/debt" className="btn flex items-center justify-center border border-stone-300 bg-white" data-testid="open-debt">
+          Thu nợ
+        </Link>
         <Link to="/shift/close" className="btn flex items-center justify-center border border-stone-300 bg-white" data-testid="open-close-shift">
           Đóng ca
         </Link>

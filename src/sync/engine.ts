@@ -1,4 +1,5 @@
 import type { LaodaiDB, OutboxEntry } from './db';
+import { settleDebtJournal } from './debtLocal';
 
 export type PushResult =
   | { status: 'ok' }
@@ -41,8 +42,11 @@ export async function flushOutbox(db: LaodaiDB, transport: SyncTransport, now = 
       break;
     }
 
-    await db.transaction('rw', db.outbox, db.orders, db.rejected, async () => {
+    await db.transaction('rw', db.outbox, db.orders, db.rejected, db.meta, async () => {
       await db.outbox.delete(op.seq!);
+      if (op.kind === 'pay_order' || op.kind === 'debt_payment') {
+        await settleDebtJournal(db, op.op_id, res.status !== 'rejected', now().toISOString());
+      }
       if (res.status === 'rejected') {
         rejected++;
         await db.rejected.put({ ...op, rejected_at: now().toISOString(), reason: res.reason });

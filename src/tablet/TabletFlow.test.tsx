@@ -404,3 +404,83 @@ describe('đóng ca', () => {
     expect(paid).toMatchObject({ opened_shift_id: shifts[0], paid_shift_id: shifts[1] });
   });
 });
+
+describe('ghi nợ & thu nợ', () => {
+  async function payByDebt() {
+    await newOrder();
+    fireEvent.click(screen.getByTestId(`menu-combo-${COMBO_XOI_FULL.id}`)); // 39.000
+    click('order-pay');
+    await screen.findByTestId('pay-screen');
+    click('pay-method-debt');
+  }
+
+  it('D17: gõ "dung" ⇒ gợi ý "Dũng (giáo viên)" (không phân biệt dấu); chọn ⇒ ghi nợ cho khách có sẵn', async () => {
+    await startShift();
+    await payByDebt();
+    expect(tid('pay-debt-confirm')).toBeDisabled(); // tên bắt buộc
+    fireEvent.change(tid('debt-name'), { target: { value: 'dung' } });
+    expect(await screen.findByTestId('customer-suggest-c-gv')).toHaveTextContent('Dũng (giáo viên)');
+    expect(tid('customer-suggest-c-pb')).toHaveTextContent('Dũng (phường B)');
+    expect(screen.queryByTestId('customer-suggest-c-hoa')).not.toBeInTheDocument();
+    // Khớp cả phần mô tả
+    fireEvent.change(tid('debt-name'), { target: { value: 'giao vien' } });
+    expect(screen.queryByTestId('customer-suggest-c-pb')).not.toBeInTheDocument();
+    click('customer-suggest-c-gv');
+    expect(tid('customer-chosen-label')).toHaveTextContent('Dũng (giáo viên)');
+    expect(tid('customer-balance')).toHaveTextContent('0');
+    click('pay-debt-confirm');
+    expect(await screen.findByTestId('queue-flash')).toHaveTextContent('Đã ghi nợ 39.000 – Dũng (giáo viên)');
+    const op = (await pendingOps(localDb)).at(-1)!;
+    expect(op.payload).toMatchObject({ method: 'debt', cash_given: null, customer: { id: 'c-gv', is_new: false } });
+  });
+
+  it('D18: tên mới + mô tả, SĐT để trống ⇒ tự tạo khách; khách mới có ngay trong Thu nợ với dư nợ đúng', async () => {
+    await startShift();
+    await payByDebt();
+    fireEvent.change(tid('debt-name'), { target: { value: ' Hùng ' } });
+    expect(screen.queryByTestId('customer-suggestions')).not.toBeInTheDocument();
+    fireEvent.change(tid('debt-desc'), { target: { value: 'xe ôm' } });
+    click('pay-debt-confirm');
+    expect(await screen.findByTestId('queue-flash')).toHaveTextContent('Hùng (xe ôm)');
+    const c = (await pendingOps(localDb)).at(-1)!.payload.customer as Record<string, unknown>;
+    expect(c).toMatchObject({ is_new: true, name: 'Hùng', description: 'xe ôm', phone: null });
+
+    click('open-debt');
+    fireEvent.change(await screen.findByTestId('debt-search'), { target: { value: 'hung' } });
+    expect(await screen.findByTestId(`customer-suggest-${c.id}`)).toHaveTextContent('nợ 39.000');
+  });
+
+  it('D19: thu nợ 50.000 tiền mặt: dư nợ giảm đúng ngay trên máy; không thu quá dư nợ', async () => {
+    await startShift();
+    click('open-debt');
+    await screen.findByTestId('debt-screen');
+    // Ô tìm trống: hiện sẵn khách đang nợ
+    expect(await screen.findByTestId('customer-suggest-c-pb')).toHaveTextContent('120.000');
+    expect(tid('customer-suggest-c-hoa')).toBeInTheDocument();
+    expect(screen.queryByTestId('customer-suggest-c-gv')).not.toBeInTheDocument(); // không nợ
+    click('customer-suggest-c-pb');
+    expect(tid('customer-balance')).toHaveTextContent('120.000');
+    fireEvent.change(tid('debt-amount'), { target: { value: '200k' } });
+    click('debt-confirm');
+    expect(tid('debt-error')).toHaveTextContent('lớn hơn dư nợ');
+    fireEvent.change(tid('debt-amount'), { target: { value: '50k' } });
+    expect(tid('debt-confirm')).toHaveTextContent('Thu 50.000');
+    click('debt-confirm');
+    expect(await screen.findByTestId('debt-done')).toHaveTextContent('Đã thu nợ 50.000 (tiền mặt) – Dũng (phường B)');
+    await waitFor(() => expect(tid('customer-balance')).toHaveTextContent('70.000'));
+    const op = (await pendingOps(localDb)).at(-1)!;
+    expect(op).toMatchObject({ kind: 'debt_payment' });
+    const shift = (await localDb.meta.get('shift'))!.value as { id: string };
+    expect(op.payload).toMatchObject({ customer_id: 'c-pb', amount: 50_000, method: 'cash', shift_id: shift.id });
+
+    // Trả hết bằng chuyển khoản
+    click('debt-pay-all');
+    expect(tid('debt-amount')).toHaveValue('70000');
+    click('debt-method-transfer');
+    click('debt-confirm');
+    await waitFor(() => expect(tid('customer-balance')).toHaveTextContent(/^0$/));
+    expect(screen.queryByTestId('debt-confirm')).not.toBeInTheDocument(); // hết nợ ⇒ không còn ô thu
+    click('customer-clear');
+    expect(screen.queryByTestId('customer-suggest-c-pb')).not.toBeInTheDocument();
+  });
+});

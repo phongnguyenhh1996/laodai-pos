@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { customerBalance, customerLabel, debtBalances, rootCustomerId, suggestCustomers, totalDebt, transferDebt, type DebtOrder } from './debt';
+import { customerBalance, customerLabel, debtPaymentProblem, debtBalances, rootCustomerId, suggestCustomers, totalDebt, transferDebt, type DebtOrder } from './debt';
 import { foldVietnamese } from './text';
 import type { Customer } from './types';
 
@@ -81,5 +81,15 @@ describe('debt', () => {
 
   it('foldVietnamese', () => {
     expect(foldVietnamese('  ĐÀO   Thị  Dũng ')).toBe('dao thi dung');
+  });
+
+  it('thu nợ: số tiền nguyên dương, không vượt dư nợ', () => {
+    expect(debtPaymentProblem(50_000, 120_000)).toBeNull();
+    expect(debtPaymentProblem(120_000, 120_000)).toBeNull();
+    expect(debtPaymentProblem(120_001, 120_000)).toMatch('lớn hơn dư nợ');
+    expect(debtPaymentProblem(null, 120_000)).toMatch('Nhập số tiền');
+    expect(debtPaymentProblem(0, 120_000)).toMatch('Nhập số tiền');
+    expect(debtPaymentProblem(1.5, 120_000)).toMatch('Nhập số tiền');
+    expect(debtPaymentProblem(10_000, 0)).toMatch('không còn nợ');
   });
 });

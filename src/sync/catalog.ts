@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { Combo, Menu, Point, Product, Staff, TabletProfile, Topping } from '@/domain/types';
-import { META, getMeta, setMeta, type Activation, type LaodaiDB } from './db';
+import type { Combo, Customer, Menu, Money, Point, Product, Staff, TabletProfile, Topping } from '@/domain/types';
+import { META, getMeta, type Activation, type LaodaiDB } from './db';
+import { loadDebtJournal, pruneDebtJournal } from './debtLocal';
 import type { NetworkEnv, Scheduler } from './runner';
 
 /**
@@ -24,9 +25,13 @@ export interface CatalogData {
   combos: Combo[];
   staff: Staff[];
   config: TabletConfig;
+  /** Khách nợ (gợi ý khi ghi nợ / thu nợ) và dư nợ theo khách gốc. */
+  customers: Customer[];
+  balances: Record<string, Money>;
 }
 
 export interface Catalog extends CatalogData {
+  /** Thời điểm BẮT ĐẦU tải: mọi thao tác server nhận trước thời điểm này đã nằm trong danh mục. */
   fetched_at: string;
 }
 
@@ -47,10 +52,15 @@ export async function refreshCatalog(
 ): Promise<Catalog> {
   const act = await getMeta<Activation>(db, META.activation);
   if (!act) throw new CatalogFetchError('Tablet chưa được kích hoạt');
+  const fetched_at = now().toISOString();
   const data = await source(act.tablet_profile_id);
   if (data.profile.id !== act.tablet_profile_id) throw new CatalogFetchError('Hồ sơ tablet không khớp');
-  const catalog: Catalog = { ...data, fetched_at: now().toISOString() };
-  await setMeta(db, META.catalog, catalog);
+  const catalog: Catalog = { ...data, fetched_at };
+  await db.transaction('rw', db.meta, async () => {
+    await db.meta.put({ key: META.catalog, value: catalog });
+    // Khoản nợ đã đồng bộ trước lúc bắt đầu tải đã nằm trong dư nợ mới ⇒ bỏ khỏi nhật ký tại máy.
+    await db.meta.put({ key: META.debtJournal, value: pruneDebtJournal(await loadDebtJournal(db), fetched_at) });
+  });
   return catalog;
 }
 
@@ -61,6 +71,7 @@ const COLUMNS = {
   toppings: 'id,menu_id,name,price,extra_box_takeaway,sort,active',
   combos: 'id,menu_id,name,product_id,topping_ids,sort,active',
   staff: 'id,name,active,sort',
+  customers: 'id,name,description,phone,merged_into_id',
 } as const;
 
 const PROFILE_COLUMNS = 'id,name,point_ids,default_boxes,default_plates,default_float';
@@ -86,7 +97,12 @@ export function createSupabaseCatalogSource(client: SupabaseClient): CatalogSour
       if (!data) throw new CatalogFetchError('Không tải được cấu hình');
       return data as TabletConfig;
     };
-    const [profile, config, menus, points, products, toppings, combos, staff] = await Promise.all([
+    const balancesQuery = async (): Promise<Record<string, Money>> => {
+      const { data, error } = await client.rpc('customer_balances');
+      if (error) throw new CatalogFetchError(`Không tải được dư nợ: ${error.message}`);
+      return Object.fromEntries(((data ?? []) as Array<{ customer_id: string; balance: number }>).map((r) => [r.customer_id, r.balance]));
+    };
+    const [profile, config, menus, points, products, toppings, combos, staff, customers, balances] = await Promise.all([
       profileQuery(),
       configQuery(),
       table<Menu>('menus'),
@@ -95,8 +111,10 @@ export function createSupabaseCatalogSource(client: SupabaseClient): CatalogSour
       table<Topping>('toppings'),
       table<Combo>('combos'),
       table<Staff>('staff'),
+      table<Customer>('customers'),
+      balancesQuery(),
     ]);
-    return { profile, config, menus, points, products, toppings, combos, staff };
+    return { profile, config, menus, points, products, toppings, combos, staff, customers, balances };
   };
 }
 

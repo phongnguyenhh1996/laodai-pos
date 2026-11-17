@@ -112,6 +112,35 @@ export default defineConfig({
           if (r.status !== 'ok') throw new Error(`đóng ca: ${JSON.stringify(r)}`);
           return s.id;
         },
+        /** Khách nợ trên server. */
+        'db:customers': () => sql('select id, name, description, phone, created_by_shift_id from customers order by name, description'),
+        /** Dư nợ theo khách gốc (cùng hàm server dùng cho Telegram / tablet). */
+        'db:balance': async (customerId: string) => {
+          const [r] = await sql<{ b: number }>('select private.customer_balance($1) as b', [customerId]);
+          return r.b;
+        },
+        /** Đối soát ca (hàm SQL). */
+        'db:reconcile': async (shiftId: string) => {
+          const [r] = await sql<{ r: unknown }>('select private.reconcile_shift($1) as r', [shiftId]);
+          return r.r;
+        },
+        /**
+         * Nợ có sẵn: tablet B (giả lập phía server) mở ca, bán các đơn ghi nợ cho khách đã chỉ định rồi đóng ca.
+         * Trả về id các đơn theo thứ tự.
+         */
+        'scenario:debts': async (sales: Array<{ customer: keyof typeof SEED.customers; product: keyof typeof SEED.products }>) => {
+          const sim = new TabletSim(await tabletClient(SEED.tablets.B), SEED.tablets.B);
+          if ((await sim.openShift('Mai')).status !== 'ok') throw new Error('mở ca B');
+          const ids: string[] = [];
+          for (const s of sales) {
+            const o = await sim.createOrder([item(s.product)]);
+            const r = await sim.pay(o.id, o.total, 'debt', { customer: { id: SEED.customers[s.customer], name: 'Dũng' } });
+            if (o.result.status !== 'ok' || r.status !== 'ok') throw new Error(`ghi nợ: ${JSON.stringify([o.result, r])}`);
+            ids.push(o.id);
+          }
+          await sim.closeShift(150, 0, 300_000);
+          return ids;
+        },
         /** Hồ sơ tablet đang lưu trên server. */
         'db:profilePoints': async (tablet: keyof typeof SEED.tablets) => {
           const [r] = await sql<{ point_ids: string[] }>('select point_ids from tablet_profiles where id = $1', [SEED.tablets[tablet]]);

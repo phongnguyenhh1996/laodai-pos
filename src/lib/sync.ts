@@ -1,4 +1,13 @@
-import { CatalogRefresher, SyncRunner, browserNetwork, browserVisibility, createRpcTransport, createSupabaseCatalogSource } from '@/sync';
+import {
+  CatalogRefresher,
+  SyncRunner,
+  browserNetwork,
+  browserVisibility,
+  createRpcTransport,
+  createSupabaseCatalogSource,
+  hasSettledDebt,
+  loadDebtJournal,
+} from '@/sync';
 import { localDb } from './localdb';
 import { supabase } from './supabase';
 
@@ -16,7 +25,24 @@ export const catalogRefresher = new CatalogRefresher(localDb, createSupabaseCata
   visibility: typeof document === 'undefined' ? undefined : browserVisibility(document),
 });
 
+let watchingDebt = false;
+
+/** Ghi nợ / thu nợ vừa lên server ⇒ tải lại danh mục để dư nợ trên máy là số của server. */
+function refreshCatalogAfterDebtSync(): void {
+  if (watchingDebt) return;
+  watchingDebt = true;
+  let lastSynced = syncRunner.getStatus().lastSyncedAt;
+  syncRunner.subscribe((s) => {
+    if (s.lastSyncedAt === lastSynced) return;
+    lastSynced = s.lastSyncedAt;
+    void loadDebtJournal(localDb).then((j) => {
+      if (hasSettledDebt(j)) void catalogRefresher.refresh();
+    });
+  });
+}
+
 export function ensureSyncStarted(): void {
   syncRunner.start();
   catalogRefresher.start();
+  refreshCatalogAfterDebtSync();
 }

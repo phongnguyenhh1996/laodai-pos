@@ -27,6 +27,12 @@ export const CATALOG: Catalog = {
     { id: 's9', name: 'Nghỉ việc', active: false, sort: 3 },
   ],
   config: { wait_yellow_min: 5, wait_red_min: 10, timezone: 'Asia/Ho_Chi_Minh' },
+  customers: [
+    { id: 'c-gv', name: 'Dũng', description: 'giáo viên', phone: null, merged_into_id: null },
+    { id: 'c-pb', name: 'Dũng', description: 'phường B', phone: '0909000111', merged_into_id: null },
+    { id: 'c-hoa', name: 'Cô Hoa', description: '20 Lê Lợi', phone: null, merged_into_id: null },
+  ],
+  balances: { 'c-gv': 0, 'c-pb': 120_000, 'c-hoa': 30_000 },
 };
 
 /** Không gọi server: danh mục được đặt sẵn trong IndexedDB như sau một lần đồng bộ. */

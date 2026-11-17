@@ -103,3 +103,14 @@ export function suggestCustomers(customers: Customer[], query: string, limit = 8
     .slice(0, limit)
     .map((x) => x.c);
 }
+
+/**
+ * Thu nợ: số tiền nguyên dương và không vượt dư nợ hiện có (không để khách thành "nợ âm").
+ * Trả lý do không hợp lệ, hoặc null nếu được.
+ */
+export function debtPaymentProblem(amount: Money | null, balance: Money): string | null {
+  if (balance <= 0) return 'Khách này không còn nợ';
+  if (amount === null || !Number.isInteger(amount) || amount <= 0) return 'Nhập số tiền thu';
+  if (amount > balance) return 'Số tiền lớn hơn dư nợ';
+  return null;
+}

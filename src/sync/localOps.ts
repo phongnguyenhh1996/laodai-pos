@@ -6,6 +6,7 @@ import { businessDate } from '@/domain/time';
 import type { DeleteReason, DineType, Money, Order, OrderItem, TabletProfile } from '@/domain/types';
 import { META, getMeta, type Activation, type LaodaiDB, type LocalShift } from './db';
 import { nextDeviceSeq } from './deviceSeq';
+import { appendDebtJournal } from './debtLocal';
 import { enqueue } from './outbox';
 
 /**
@@ -255,13 +256,24 @@ export async function payOrder(
       cash_given,
       customer_id: (customer?.id as string | undefined) ?? null,
     });
-    await enqueue(
+    const op = await enqueue(
       db,
       'pay_order',
       orderId,
       { order_id: orderId, paid_shift_id: shift.id, paid_at, method: payment.method, cash_given, total: o.total, customer },
       paid_at,
     );
+    if (customer) {
+      const c = customer as { id: string; is_new: boolean; name: string; description: string | null; phone: string | null };
+      await appendDebtJournal(db, {
+        op_id: op.op_id,
+        customer_id: c.id,
+        delta: o.total,
+        new_customer: c.is_new ? { id: c.id, name: c.name, description: c.description, phone: c.phone, merged_into_id: null } : null,
+        at: paid_at,
+        synced_at: null,
+      });
+    }
   });
 }
 
@@ -277,7 +289,8 @@ export async function recordDebtPayment(
     const shift = await requireShift(db);
     const id = uuidv7();
     const at = clock().toISOString();
-    await enqueue(db, 'debt_payment', id, { id, ...input, shift_id: shift.id, at }, at);
+    const op = await enqueue(db, 'debt_payment', id, { id, ...input, shift_id: shift.id, at }, at);
+    await appendDebtJournal(db, { op_id: op.op_id, customer_id: input.customer_id, delta: -input.amount, new_customer: null, at, synced_at: null });
     return id;
   });
 }

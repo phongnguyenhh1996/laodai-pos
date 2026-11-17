@@ -26,6 +26,8 @@ const data = (over: Partial<CatalogData> = {}): CatalogData => ({
   combos: COMBOS,
   staff: [{ id: 's1', name: 'Lan', active: true, sort: 1 }],
   config: { wait_yellow_min: 5, wait_red_min: 10, timezone: 'Asia/Ho_Chi_Minh' },
+  customers: [],
+  balances: {},
   ...over,
 });
 const NOW = () => new Date('2026-11-17T00:00:00.000Z');
@@ -81,7 +83,7 @@ describe('refreshCatalog', () => {
 
 type Result = { data: unknown; error: { message: string } | null };
 
-function fakeClient(tables: Record<string, Result>, rpc: Result) {
+function fakeClient(tables: Record<string, Result>, rpc: Result, balances: Result = { data: [], error: null }) {
   const calls: Array<{ table: string; cols: string; eq?: [string, string] }> = [];
   const client = {
     from(table: string) {
@@ -99,7 +101,7 @@ function fakeClient(tables: Record<string, Result>, rpc: Result) {
         },
       };
     },
-    rpc: vi.fn(async () => rpc),
+    rpc: vi.fn(async (fn: string) => (fn === 'customer_balances' ? balances : rpc)),
   };
   return { client: client as unknown as SupabaseClient, calls };
 }
@@ -139,6 +141,19 @@ describe('createSupabaseCatalogSource', () => {
     }
     await expect(createSupabaseCatalogSource(fakeClient(tables(), fail).client)('tab-a')).rejects.toThrow('boom');
     await expect(createSupabaseCatalogSource(fakeClient(tables(), ok(null)).client)('tab-a')).rejects.toThrow('cấu hình');
+  });
+
+  it('khách nợ + dư nợ theo khách gốc (gợi ý / thu nợ khi offline); lỗi dư nợ ⇒ báo lỗi', async () => {
+    const customers = [{ id: 'c1', name: 'Dũng', description: 'giáo viên', phone: null, merged_into_id: null }];
+    const { client, calls } = fakeClient({ ...tables(), customers: ok(customers) }, ok(d.config), ok([{ customer_id: 'c1', balance: 45_000 }]));
+    const got = await createSupabaseCatalogSource(client)('tab-a');
+    expect(got.customers).toEqual(customers);
+    expect(got.balances).toEqual({ c1: 45_000 });
+    expect(calls.find((c) => c.table === 'customers')?.cols).toBe('id,name,description,phone,merged_into_id');
+    const nul = fakeClient(tables(), ok(d.config), ok(null));
+    expect((await createSupabaseCatalogSource(nul.client)('tab-a')).balances).toEqual({});
+    const bad = fakeClient(tables(), ok(d.config), { data: null, error: { message: 'boom' } });
+    await expect(createSupabaseCatalogSource(bad.client)('tab-a')).rejects.toThrow('dư nợ');
   });
 
   it('bảng trả null ⇒ danh sách rỗng', async () => {

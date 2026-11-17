@@ -11,6 +11,7 @@ import { OwnerContext, type OwnerSession } from './OwnerContext';
 import { OwnerHome } from './OwnerHome';
 import { SettingsRoutes } from './settings/SettingsPages';
 import { ShiftRoutes } from './shifts/ShiftPages';
+import { DebtRoutes } from './debts/DebtPages';
 
 /** Chế độ chủ trên tablet tự thoát sau 2 phút không thao tác (mục 1.2). */
 export const OWNER_IDLE_MS = 2 * 60_000;
@@ -20,6 +21,7 @@ function OwnerRoutes() {
     <Routes>
       <Route path="settings/*" element={<SettingsRoutes />} />
       <Route path="shifts/*" element={<ShiftRoutes />} />
+      <Route path="debts/*" element={<DebtRoutes />} />
       <Route path="*" element={<OwnerHome />} />
     </Routes>
   );
