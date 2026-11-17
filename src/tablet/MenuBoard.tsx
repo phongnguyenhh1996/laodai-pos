@@ -28,7 +28,7 @@ export function MenuBoard({
 
   if (points.length === 0) {
     return (
-      <p data-testid="menu-no-points" className="text-stone-500">
+      <p data-testid="menu-no-points" className="text-ink-subtle">
         Hồ sơ tablet chưa có điểm bán nào. Nhờ chủ chọn điểm bán trong Cài đặt.
       </p>
     );
@@ -38,7 +38,7 @@ export function MenuBoard({
 
   return (
     <section data-testid="menu-board" className="flex flex-col gap-4">
-      <div role="tablist" className="flex gap-2">
+      <div role="tablist" className="flex gap-1.5 rounded-2xl border border-line bg-surface p-1.5 shadow-card">
         {points.map((p) => (
           <button
             key={p.id}
@@ -48,7 +48,7 @@ export function MenuBoard({
             disabled={p.id !== pointId && !canSelectPoint(p)}
             onClick={() => onSelectPoint(p)}
             data-testid={`point-tab-${p.id}`}
-            className={`btn flex-1 border ${p.id === pointId ? 'border-amber-700 bg-amber-700 text-white' : 'border-stone-300 bg-white'}`}
+            className="btn flex-1 text-ink-muted hover:bg-surface-muted aria-selected:bg-brand-strong aria-selected:text-white aria-selected:shadow-xs"
           >
             {p.name}
           </button>
@@ -78,7 +78,7 @@ export function MenuBoard({
 function Grid({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div className="flex flex-col gap-2">
-      <h3 className="text-lg font-medium text-stone-500">{title}</h3>
+      <h3 className="eyebrow">{title}</h3>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">{children}</div>
     </div>
   );
@@ -90,12 +90,14 @@ function Tile({ testId, name, price, onClick, accent }: { testId: string; name: 
       type="button"
       onClick={onClick}
       data-testid={testId}
-      className={`flex min-h-[72px] flex-col items-start justify-center rounded-xl border px-4 py-3 text-left active:scale-[0.98] ${
-        accent ? 'border-amber-300 bg-amber-50' : 'border-stone-200 bg-white'
+      className={`flex min-h-[84px] flex-col items-start justify-between gap-1 rounded-2xl border px-4 py-3 text-left shadow-card transition-colors duration-fast ${
+        accent
+          ? 'border-brand-line bg-brand-soft hover:border-brand active:bg-orange-100'
+          : 'border-line bg-surface hover:border-line-strong active:bg-surface-sunken'
       }`}
     >
-      <span className="text-xl font-semibold">{name}</span>
-      <span className="text-base text-stone-600" data-testid={`${testId}-price`}>
+      <span className="text-xl font-semibold leading-snug">{name}</span>
+      <span className={`num text-base font-semibold ${accent ? 'text-brand-deep' : 'text-ink-muted'}`} data-testid={`${testId}-price`}>
         {formatVnd(price)}
       </span>
     </button>

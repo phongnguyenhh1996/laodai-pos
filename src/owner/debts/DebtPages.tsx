@@ -52,17 +52,17 @@ function DebtList() {
       {!rows && !error && <Splash />}
       {rows && (
         <>
-          <p className="flex items-baseline justify-between rounded-xl bg-white p-4">
-            <span className="text-stone-600">Tổng đang nợ</span>
+          <p className="card flex items-baseline justify-between p-4">
+            <span className="text-ink-muted">Tổng đang nợ</span>
             <b className="text-2xl" data-testid="debt-total">
               {formatVnd(total)}
             </b>
           </p>
-          {owing.length === 0 && <p className="text-stone-500">Không ai đang nợ.</p>}
+          {owing.length === 0 && <p className="text-ink-subtle">Không ai đang nợ.</p>}
           {owing.length > 0 && <CustomerNav rows={owing} />}
           {clear.length > 0 && (
             <>
-              <h2 className="mt-2 text-lg font-semibold text-stone-500">Đã trả hết</h2>
+              <h2 className="mt-2 text-lg font-semibold text-ink-subtle">Đã trả hết</h2>
               <CustomerNav rows={clear} />
             </>
           )}
@@ -96,7 +96,7 @@ function CustomerPage() {
     <OwnerLayout title={data ? customerLabel(data.customer) : 'Khách nợ'} back="/owner/debts" testId="debt-customer">
       <ErrorText testId="debt-error">{error}</ErrorText>
       {data === undefined && !error && <Splash />}
-      {data === null && <p className="text-stone-500">Không có khách này.</p>}
+      {data === null && <p className="text-ink-subtle">Không có khách này.</p>}
       {data && <CustomerBody d={data} onChanged={reload} />}
     </OwnerLayout>
   );
@@ -113,19 +113,19 @@ function CustomerBody({ d, onChanged }: { d: CustomerDebt; onChanged: () => Prom
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="flex items-baseline justify-between rounded-xl bg-white p-4">
-        <span className="text-stone-600">Dư nợ</span>
+      <p className="card flex items-baseline justify-between p-4">
+        <span className="text-ink-muted">Dư nợ</span>
         <b className="text-3xl" data-testid="debt-balance">
           {formatVnd(d.balance)}
         </b>
       </p>
-      {d.customer.phone && <p className="text-stone-600">SĐT: {d.customer.phone}</p>}
+      {d.customer.phone && <p className="text-ink-muted">SĐT: {d.customer.phone}</p>}
 
       <Card title="Lịch sử">
-        {history.length === 0 && <p className="text-stone-500">Chưa có.</p>}
+        {history.length === 0 && <p className="text-ink-subtle">Chưa có.</p>}
         {history.map((h) =>
           h.kind === 'order' ? (
-            <label key={h.key} className="flex items-center gap-3 border-t border-stone-100 py-2" data-testid={`debt-order-${h.o.id}`}>
+            <label key={h.key} className="flex items-center gap-3 border-t border-line py-2" data-testid={`debt-order-${h.o.id}`}>
               <input
                 type="checkbox"
                 className="h-6 w-6"
@@ -135,19 +135,19 @@ function CustomerBody({ d, onChanged }: { d: CustomerDebt; onChanged: () => Prom
               />
               <span className="flex-1">
                 {day(h.o.paid_at)} · Ghi nợ đơn <b className="font-mono">{h.o.code}</b>
-                <span className="block text-sm text-stone-500">
+                <span className="block text-sm text-ink-subtle">
                   {h.o.staff_name} – {h.o.tablet_name}
                 </span>
               </span>
               <b>+{formatVnd(h.o.total)}</b>
             </label>
           ) : (
-            <p key={h.key} className="flex items-center justify-between gap-3 border-t border-stone-100 py-2" data-testid="debt-payment-row">
+            <p key={h.key} className="flex items-center justify-between gap-3 border-t border-line py-2" data-testid="debt-payment-row">
               <span>
                 {day(h.p.at)} · Trả nợ ({h.p.method === 'cash' ? 'TM' : 'CK'})
-                <span className="block text-sm text-stone-500">{h.p.by}</span>
+                <span className="block text-sm text-ink-subtle">{h.p.by}</span>
               </span>
-              <b className="text-emerald-700">−{formatVnd(h.p.amount)}</b>
+              <b className="text-success-strong">−{formatVnd(h.p.amount)}</b>
             </p>
           ),
         )}
@@ -201,18 +201,18 @@ function TransferForm({ d, picked, onDone }: { d: CustomerDebt; picked: string[]
 
   return (
     <Card title="Chuyển nợ sang khách khác">
-      <p className="text-sm text-stone-500">Đánh dấu các đơn ghi nợ ở trên, rồi chọn khách nhận.</p>
+      <p className="text-sm text-ink-subtle">Đánh dấu các đơn ghi nợ ở trên, rồi chọn khách nhận.</p>
       {done && (
-        <p className="rounded-lg bg-emerald-50 px-3 py-2 text-emerald-800" data-testid="transfer-done">
+        <p className="rounded-lg bg-success-soft px-3 py-2 text-success-strong" data-testid="transfer-done">
           {done}
         </p>
       )}
       {target ? (
-        <p className="flex items-center justify-between gap-2 rounded-lg bg-amber-50 p-3" data-testid="transfer-target">
+        <p className="flex items-center justify-between gap-2 rounded-lg bg-warning-soft p-3" data-testid="transfer-target">
           <span>
             Sang <b>{customerLabel(target.customer)}</b> (đang nợ {formatVnd(target.balance)})
           </span>
-          <button type="button" className="btn border border-stone-300 bg-white" onClick={() => setTarget(null)}>
+          <button type="button" className="btn btn-secondary" onClick={() => setTarget(null)}>
             Đổi
           </button>
         </p>
@@ -225,19 +225,19 @@ function TransferForm({ d, picked, onDone }: { d: CustomerDebt; picked: string[]
               <button
                 key={c.id}
                 type="button"
-                className="btn flex items-center justify-between border border-stone-300 bg-white text-left"
+                className="btn flex items-center justify-between btn-secondary text-left"
                 onClick={() => setTarget(row)}
                 data-testid={`transfer-to-${c.id}`}
               >
                 <span>{customerLabel(c)}</span>
-                <span className="text-sm font-normal text-stone-500">nợ {formatVnd(row.balance)}</span>
+                <span className="text-sm font-normal text-ink-subtle">nợ {formatVnd(row.balance)}</span>
               </button>
             );
           })}
         </>
       )}
       <ErrorText testId="transfer-error">{error}</ErrorText>
-      <button type="button" className="btn bg-amber-700 text-white" disabled={busy || !target || picked.length === 0} onClick={() => void submit()} data-testid="transfer-submit">
+      <button type="button" className="btn btn-primary" disabled={busy || !target || picked.length === 0} onClick={() => void submit()} data-testid="transfer-submit">
         {picked.length ? `Chuyển ${picked.length} khoản · ${formatVnd(amount)}` : 'Chưa chọn khoản nợ'}
       </button>
     </Card>
@@ -274,7 +274,7 @@ function PaymentForm({ d, onDone }: { d: CustomerDebt; onDone: () => Promise<voi
 
   return (
     <Card title="Ghi thu nợ (chủ thu)">
-      <p className="text-sm text-stone-500">Khoản chủ tự thu, không tính vào két ca nào.</p>
+      <p className="text-sm text-ink-subtle">Khoản chủ tự thu, không tính vào két ca nào.</p>
       <form className="flex flex-col gap-3" onSubmit={submit} data-testid="owner-debt-form">
         <div className="grid grid-cols-2 gap-2" role="group" aria-label="Hình thức">
           {(['transfer', 'cash'] as const).map((m) => (
@@ -283,7 +283,7 @@ function PaymentForm({ d, onDone }: { d: CustomerDebt; onDone: () => Promise<voi
               type="button"
               aria-pressed={method === m}
               onClick={() => setMethod(m)}
-              className={`btn border ${method === m ? 'border-stone-800 bg-stone-800 text-white' : 'border-stone-300 bg-white'}`}
+              className="btn btn-segment"
               data-testid={`owner-debt-method-${m}`}
             >
               {m === 'cash' ? 'Tiền mặt' : 'Chuyển khoản'}
@@ -292,7 +292,7 @@ function PaymentForm({ d, onDone }: { d: CustomerDebt; onDone: () => Promise<voi
         </div>
         <TextField label="Số tiền" inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value)} data-testid="owner-debt-amount" />
         <ErrorText testId="owner-debt-error">{error}</ErrorText>
-        <button type="submit" className="btn bg-emerald-700 text-white" disabled={busy} data-testid="owner-debt-submit">
+        <button type="submit" className="btn btn-success" disabled={busy} data-testid="owner-debt-submit">
           {parsed ? `Ghi thu ${formatVnd(parsed)}` : 'Ghi thu'}
         </button>
       </form>
@@ -302,7 +302,7 @@ function PaymentForm({ d, onDone }: { d: CustomerDebt; onDone: () => Promise<voi
 
 function Card({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="flex flex-col gap-2 rounded-xl border border-stone-200 bg-white p-4">
+    <section className="flex flex-col gap-2 card p-4">
       <h2 className="text-lg font-semibold">{title}</h2>
       {children}
     </section>

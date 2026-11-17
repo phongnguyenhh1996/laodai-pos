@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, Navigate, Route, Routes } from 'react-router-dom';
+import { LockKeyhole, Store, UserRound } from 'lucide-react';
 import { localDb } from '@/lib/localdb';
 import { catalogRefresher, ensureSyncStarted, syncRunner } from '@/lib/sync';
 import { SyncBadge } from '@/app/SyncBadge';
@@ -41,20 +42,25 @@ export function TabletHome({ activation }: { activation: Activation }) {
   );
 
   return (
-    <div data-testid="tablet-home" className="flex h-full flex-col">
-      <header className="flex items-center justify-between gap-4 border-b border-stone-200 bg-white px-6 py-3">
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-semibold" data-testid="tablet-name">
+    <div data-testid="tablet-home" className="flex h-full flex-col bg-canvas">
+      <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-line bg-surface px-4 py-3 shadow-xs md:px-6">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+          <span aria-hidden className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-strong text-white">
+            <Store className="h-6 w-6" />
+          </span>
+          <h1 className="truncate text-xl font-bold" data-testid="tablet-name">
             {activation.tablet_name}
           </h1>
           {ctx?.shift && (
-            <span className="text-lg text-stone-600" data-testid="shift-staff">
-              · Ca của {ctx.shift.staff_name}
+            <span className="badge gap-1.5 bg-surface-sunken py-1 text-base text-ink-muted" data-testid="shift-staff">
+              <UserRound aria-hidden className="h-4 w-4" />
+              Ca của {ctx.shift.staff_name}
             </span>
           )}
           <SyncBadge runner={syncRunner} />
         </div>
-        <Link to="/owner" className="btn flex items-center border border-stone-300 bg-white" data-testid="open-owner-mode">
+        <Link to="/owner" className="btn btn-secondary shrink-0" data-testid="open-owner-mode">
+          <LockKeyhole aria-hidden className="h-5 w-5" />
           Chế độ chủ
         </Link>
       </header>

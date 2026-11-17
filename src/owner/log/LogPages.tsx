@@ -98,7 +98,7 @@ export function LogPage() {
   }
 
   const isGroup = ACTION_GROUPS.some((g) => g.id === type);
-  const select = 'min-h-tap w-full rounded-xl border border-stone-300 bg-white px-3 text-lg';
+  const select = 'input px-3';
 
   return (
     <OwnerLayout title="Nhật ký" back="/owner" testId="log-page">
@@ -135,19 +135,19 @@ export function LogPage() {
       <ErrorText testId="log-error">{error}</ErrorText>
       {(!rows || !names) && !error && <Splash />}
       {rows && names && rows.length === 0 && (
-        <p className="text-stone-500" data-testid="log-empty">
+        <p className="text-ink-subtle" data-testid="log-empty">
           Không có mục nào.
         </p>
       )}
       {rows && names && rows.length > 0 && (
-        <ol className="flex flex-col divide-y divide-stone-200 overflow-hidden rounded-xl border border-stone-200 bg-white" data-testid="log-list">
+        <ol className="flex flex-col divide-y divide-line overflow-hidden card" data-testid="log-list">
           {rows.map((e) => (
             <LogRow key={e.id} e={e} names={names} />
           ))}
         </ol>
       )}
       {more && (
-        <button type="button" className="btn border border-stone-300 bg-white" onClick={() => void loadMore()} data-testid="log-more">
+        <button type="button" className="btn btn-secondary" onClick={() => void loadMore()} data-testid="log-more">
           Xem thêm
         </button>
       )}
@@ -163,7 +163,7 @@ function LogRow({ e, names }: { e: AuditEntry; names: LogNames }) {
   return (
     <li className="flex flex-col gap-1 px-4 py-3" data-testid="log-row" data-action={e.action} data-entity={e.entity_id ?? ''}>
       <p className="flex flex-wrap items-baseline justify-between gap-x-3">
-        <span className={`font-semibold ${alert ? 'text-red-700' : ''}`} data-testid="log-row-title">
+        <span className={`font-semibold ${alert ? 'text-danger-strong' : ''}`} data-testid="log-row-title">
           {actionLabel(e.action)}
           {code && e.entity === 'order' && (
             <>
@@ -174,9 +174,9 @@ function LogRow({ e, names }: { e: AuditEntry; names: LogNames }) {
             </>
           )}
         </span>
-        <span className="text-sm text-stone-500">{when(e)}</span>
+        <span className="text-sm text-ink-subtle">{when(e)}</span>
       </p>
-      <p className="text-sm text-stone-600" data-testid="log-row-actor">
+      <p className="text-sm text-ink-muted" data-testid="log-row-actor">
         {actor(e, names)}
         {tablet ? ` – ${tablet}` : ''}
       </p>
@@ -217,16 +217,16 @@ export function OrderDetailPage() {
     <OwnerLayout title={o ? `Đơn ${o.code}` : 'Đơn'} back="/owner/orders" testId="order-detail">
       <ErrorText testId="order-detail-error">{error ?? log.error}</ErrorText>
       {saved && (
-        <p className="rounded-lg bg-green-50 px-4 py-3 text-green-800" data-testid="order-edit-saved">
+        <p className="rounded-lg bg-success-soft px-4 py-3 text-success-strong" data-testid="order-edit-saved">
           Đã lưu. Ca đã đóng (nếu có) đã được tính lại; Telegram đã được báo.
         </p>
       )}
       {o === undefined && !error && <Splash />}
-      {o === null && <p className="text-stone-500">Không có đơn này.</p>}
+      {o === null && <p className="text-ink-subtle">Không có đơn này.</p>}
       {o && (
-        <section className="flex flex-col gap-1 rounded-xl border border-stone-200 bg-white p-4" data-testid="order-detail-info" data-status={o.status}>
+        <section className="flex flex-col gap-1 card p-4" data-testid="order-detail-info" data-status={o.status}>
           <p className="flex items-baseline justify-between">
-            <b className={o.status === 'deleted' ? 'text-red-700' : ''} data-testid="order-detail-status">
+            <b className={o.status === 'deleted' ? 'text-danger-strong' : ''} data-testid="order-detail-status">
               {STATUS[o.status]}
               {o.owner_edited && ' · chủ đã sửa'}
             </b>
@@ -234,7 +234,7 @@ export function OrderDetailPage() {
               {formatVnd(o.total)}
             </b>
           </p>
-          <p className="text-stone-600">
+          <p className="text-ink-muted">
             {o.point_name} · {o.tablet_name} · {o.dine_type === 'dinein' ? 'Tại chỗ' : 'Mang về'}
             {o.label ? ` · ${o.label}` : ''}
           </p>
@@ -243,7 +243,7 @@ export function OrderDetailPage() {
               {lineSummary(it)} — {formatVnd((it.unit_price_snap + it.toppings_snap.reduce((s, t) => s + t.price, 0)) * it.qty)}
             </p>
           ))}
-          <p className="text-sm text-stone-600" data-testid="order-detail-times">
+          <p className="text-sm text-ink-muted" data-testid="order-detail-times">
             Tạo {day(o.created_at)} ({o.opened_by})
             {o.served_at && ` · Ra món ${hhmm(o.served_at)}`}
             {o.paid_at && ` · Thu ${hhmm(o.paid_at)} (${o.paid_by}) · ${METHOD[o.payment_method!]}`}
@@ -262,7 +262,7 @@ export function OrderDetailPage() {
             )}
           </p>
           {o.status === 'paid' && (
-            <Link to={`/owner/orders/${o.id}/edit`} className="btn mt-2 flex items-center justify-center border border-amber-700 text-amber-800" data-testid="order-edit">
+            <Link to={`/owner/orders/${o.id}/edit`} className="btn btn-brand-outline mt-2" data-testid="order-edit">
               Sửa đơn đã thanh toán
             </Link>
           )}
@@ -270,7 +270,7 @@ export function OrderDetailPage() {
       )}
       <h2 className="text-lg font-semibold">Nhật ký của đơn</h2>
       {log.rows && names && (
-        <ol className="flex flex-col divide-y divide-stone-200 overflow-hidden rounded-xl border border-stone-200 bg-white" data-testid="log-list">
+        <ol className="flex flex-col divide-y divide-line overflow-hidden card" data-testid="log-list">
           {log.rows.map((e) => (
             <LogRow key={e.id} e={e} names={names} />
           ))}

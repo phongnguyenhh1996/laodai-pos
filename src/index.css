@@ -1,7 +1,160 @@
+@import '@fontsource/be-vietnam-pro/400.css';
+@import '@fontsource/be-vietnam-pro/500.css';
+@import '@fontsource/be-vietnam-pro/600.css';
+@import '@fontsource/be-vietnam-pro/700.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-html, body, #root { height: 100%; }
-body { @apply bg-stone-50 text-stone-900 antialiased; -webkit-tap-highlight-color: transparent; }
-.btn { @apply min-h-tap min-w-tap rounded-xl px-4 text-lg font-semibold active:scale-[0.98] disabled:opacity-40; }
+/*
+ * Design tokens (design-system/laodai-pos/MASTER.md).
+ * Nền trung tính slate cho dễ nhìn lâu; cam "appetizing" làm màu thương hiệu (nhóm Restaurant / Food service).
+ * Nút có chữ trắng dùng brand-strong (#C2410C, tương phản 5.2:1) thay vì brand (#EA580C, chỉ 3.6:1).
+ */
+@layer base {
+  :root {
+    --canvas: 243 245 248; /* #F3F5F8 */
+    --surface: 255 255 255;
+    --surface-muted: 248 250 252; /* slate-50 */
+    --surface-sunken: 238 242 246;
+    --line: 226 232 240; /* slate-200 */
+    --line-strong: 203 213 225; /* slate-300 */
+    --ink: 15 23 42; /* slate-900 */
+    --ink-muted: 71 85 105; /* slate-600 – 7.6:1 trên trắng */
+    --ink-subtle: 100 116 139; /* slate-500 – 4.8:1 trên trắng */
+
+    --brand: 234 88 12; /* orange-600 */
+    --brand-strong: 194 65 12; /* orange-700 */
+    --brand-deep: 154 52 18; /* orange-800 */
+    --brand-soft: 255 247 237; /* orange-50 */
+    --brand-line: 253 186 116; /* orange-300 */
+
+    --success: 4 120 87; /* emerald-700 */
+    --success-strong: 6 95 70; /* emerald-800 */
+    --success-soft: 236 253 245;
+    --success-line: 167 243 208;
+
+    --warning: 217 119 6; /* amber-600 */
+    --warning-strong: 146 64 14; /* amber-800 */
+    --warning-soft: 255 251 235;
+    --warning-line: 252 211 77;
+
+    --danger: 220 38 38; /* red-600 */
+    --danger-strong: 185 28 28; /* red-700 */
+    --danger-soft: 254 242 242;
+    --danger-line: 252 165 165;
+
+    --info: 37 99 235; /* blue-600 */
+    --info-soft: 239 246 255;
+    --info-line: 191 219 254;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    @apply bg-canvas font-sans text-ink antialiased;
+    -webkit-tap-highlight-color: transparent;
+    /* Số tiền / giờ thẳng cột ở mọi màn (POS đọc số nhiều). */
+    font-variant-numeric: tabular-nums;
+  }
+  h1,
+  h2,
+  h3 {
+    @apply tracking-tight;
+  }
+  :focus-visible {
+    @apply outline-none ring-4 ring-brand/30;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      transition-duration: 0.01ms !important;
+      animation-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  /* ---------- Nút ---------- */
+  .btn {
+    @apply inline-flex min-h-tap min-w-tap select-none items-center justify-center gap-2 rounded-xl px-4 text-lg font-semibold
+      transition-[background-color,border-color,color,box-shadow] duration-fast ease-out
+      disabled:cursor-not-allowed disabled:opacity-40;
+  }
+  .btn-primary {
+    @apply bg-brand-strong text-white shadow-xs hover:bg-brand-deep active:bg-brand-deep;
+  }
+  .btn-success {
+    @apply bg-success text-white shadow-xs hover:bg-success-strong active:bg-success-strong;
+  }
+  .btn-danger {
+    @apply bg-danger-strong text-white shadow-xs hover:bg-red-800 active:bg-red-800;
+  }
+  .btn-dark {
+    @apply bg-ink text-white shadow-xs hover:bg-slate-700 active:bg-slate-700;
+  }
+  .btn-secondary {
+    @apply border border-line-strong bg-surface text-ink shadow-xs hover:bg-surface-muted active:bg-surface-sunken;
+  }
+  .btn-danger-outline {
+    @apply border border-danger-line bg-surface text-danger-strong shadow-xs hover:bg-danger-soft active:bg-danger-soft;
+  }
+  .btn-brand-outline {
+    @apply border border-brand-line bg-brand-soft text-brand-deep hover:bg-orange-100 active:bg-orange-100;
+  }
+
+  /* Ô chọn (topping, nhân viên, tiền khách đưa…): trạng thái đọc từ aria-pressed / aria-selected. */
+  .btn-choice {
+    @apply border border-line-strong bg-surface text-ink shadow-xs hover:border-brand-line hover:bg-brand-soft;
+  }
+  .btn-choice[aria-pressed='true'],
+  .btn-choice[aria-selected='true'] {
+    @apply border-brand-strong bg-brand-strong text-white shadow-none hover:bg-brand-strong;
+  }
+  /* Nút phân đoạn (Tại chỗ / Mang về, hình thức thanh toán, bộ lọc). */
+  .btn-segment {
+    @apply border border-line-strong bg-surface text-ink-muted shadow-xs hover:bg-surface-muted;
+  }
+  .btn-segment[aria-pressed='true'],
+  .btn-segment[aria-selected='true'] {
+    @apply border-ink bg-ink text-white shadow-none hover:bg-ink;
+  }
+
+  /* ---------- Bề mặt ---------- */
+  .card {
+    @apply rounded-2xl border border-line bg-surface shadow-card;
+  }
+  .panel {
+    @apply rounded-xl border border-line bg-surface-muted;
+  }
+
+  /* ---------- Ô nhập ---------- */
+  .input {
+    @apply min-h-tap w-full rounded-xl border border-line-strong bg-surface px-4 text-lg text-ink shadow-xs outline-none
+      transition-[border-color,box-shadow] duration-fast placeholder:text-ink-subtle
+      focus:border-brand focus:ring-4 focus:ring-brand/15
+      disabled:bg-surface-sunken disabled:text-ink-subtle;
+  }
+  .field-label {
+    @apply text-base font-medium text-ink-muted;
+  }
+
+  /* ---------- Nhỏ ---------- */
+  .badge {
+    @apply inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-0.5 text-sm font-medium;
+  }
+  .eyebrow {
+    @apply text-sm font-semibold uppercase tracking-wide text-ink-subtle;
+  }
+  .num {
+    font-variant-numeric: tabular-nums;
+  }
+  .dot {
+    @apply inline-block h-2.5 w-2.5 shrink-0 rounded-full;
+  }
+}

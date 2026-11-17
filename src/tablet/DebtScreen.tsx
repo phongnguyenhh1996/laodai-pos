@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Banknote, ChevronLeft, HandCoins, Landmark, Search } from 'lucide-react';
 import { parseMoneyInput } from '@/domain/catalog';
 import { customerLabel, debtPaymentProblem } from '@/domain/debt';
 import { formatVnd } from '@/domain/money';
@@ -58,8 +59,9 @@ export function DebtScreen() {
   return (
     <main data-testid="debt-screen" className="mx-auto flex h-full max-w-3xl flex-col gap-5 overflow-y-auto p-6">
       <header className="flex items-center justify-between gap-4">
-        <Link to="/" className="btn flex items-center border border-stone-300 bg-white" data-testid="debt-back">
-          ‹ Hàng đợi
+        <Link to="/" className="btn btn-secondary pl-3" data-testid="debt-back">
+          <ChevronLeft aria-hidden className="h-5 w-5" />
+          Hàng đợi
         </Link>
         <h2 className="text-3xl font-bold">Thu nợ</h2>
       </header>
@@ -73,37 +75,39 @@ export function DebtScreen() {
           <ChosenCustomer book={book} customer={customer} onClear={() => setCustomer(null)} />
           {balance > 0 && (
             <>
-              <div className="grid grid-cols-2 gap-3" role="group" aria-label="Hình thức">
+              <div className="grid grid-cols-2 gap-1.5 rounded-2xl border border-line bg-surface p-1.5 shadow-card" role="group" aria-label="Hình thức">
                 {(['cash', 'transfer'] as const).map((m) => (
                   <button
                     key={m}
                     type="button"
                     aria-pressed={method === m}
                     onClick={() => setMethod(m)}
-                    className={`btn min-h-[64px] border text-xl ${method === m ? 'border-stone-800 bg-stone-800 text-white' : 'border-stone-300 bg-white'}`}
+                    className="btn min-h-[60px] text-xl text-ink-muted hover:bg-surface-muted aria-pressed:bg-ink aria-pressed:text-white"
                     data-testid={`debt-method-${m}`}
                   >
+                    {m === 'cash' ? <Banknote aria-hidden className="h-6 w-6" /> : <Landmark aria-hidden className="h-6 w-6" />}
                     {m === 'cash' ? 'Tiền mặt' : 'Chuyển khoản'}
                   </button>
                 ))}
               </div>
               <div className="grid grid-cols-[1fr_auto] gap-3">
                 <input
-                  className="min-h-[64px] rounded-xl border border-stone-300 px-4 text-xl outline-none focus:border-amber-600"
+                  className="input min-h-[64px] text-xl"
                   inputMode="numeric"
                   placeholder="Số tiền thu (vd. 50k)"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   data-testid="debt-amount"
                 />
-                <button type="button" className="btn border border-stone-300 bg-white" onClick={() => setAmount(String(balance))} data-testid="debt-pay-all">
+                <button type="button" className="btn btn-secondary" onClick={() => setAmount(String(balance))} data-testid="debt-pay-all">
                   Trả hết
                 </button>
               </div>
               <Notice testId="debt-error" tone="error">
                 {error}
               </Notice>
-              <button type="button" className="btn min-h-[72px] bg-emerald-700 text-2xl text-white" onClick={() => void save()} data-testid="debt-confirm">
+              <button type="button" className="btn btn-success min-h-[72px] text-2xl" onClick={() => void save()} data-testid="debt-confirm">
+                <HandCoins aria-hidden className="h-7 w-7" />
                 {parsed ? `Thu ${formatVnd(parsed)}` : 'Thu nợ'}
               </button>
             </>
@@ -111,13 +115,17 @@ export function DebtScreen() {
         </>
       ) : (
         <>
-          <input
-            className="min-h-[64px] rounded-xl border border-stone-300 px-4 text-xl outline-none focus:border-amber-600"
-            placeholder="Tìm khách theo tên / mô tả"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            data-testid="debt-search"
-          />
+          <div className="relative">
+            <Search aria-hidden className="pointer-events-none absolute left-4 top-1/2 h-6 w-6 -translate-y-1/2 text-ink-subtle" />
+            <input
+              className="input min-h-[64px] pl-12 text-xl"
+              aria-label="Tìm khách"
+              placeholder="Tìm khách theo tên / mô tả"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              data-testid="debt-search"
+            />
+          </div>
           <CustomerSuggestions book={book} query={query} onPick={pick} showAllWithDebt />
         </>
       )}

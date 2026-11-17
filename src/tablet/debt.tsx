@@ -1,3 +1,4 @@
+import { ChevronRight, UserRound } from 'lucide-react';
 import { customerLabel, suggestCustomers } from '@/domain/debt';
 import { formatVnd } from '@/domain/money';
 import type { Customer } from '@/domain/types';
@@ -39,11 +40,17 @@ export function CustomerSuggestions({
           <button
             type="button"
             onClick={() => onPick(c)}
-            className="btn flex w-full items-center justify-between border border-stone-300 bg-white text-left"
+            className="btn btn-secondary w-full justify-between text-left"
             data-testid={`customer-suggest-${c.id}`}
           >
-            <span>{customerLabel(c)}</span>
-            <span className="text-base font-normal text-stone-500">nợ {formatVnd(book.balance(c.id))}</span>
+            <span className="flex min-w-0 items-center gap-3">
+              <UserRound aria-hidden className="h-5 w-5 shrink-0 text-ink-subtle" />
+              <span className="truncate">{customerLabel(c)}</span>
+            </span>
+            <span className="flex shrink-0 items-center gap-2">
+              <span className="badge num bg-warning-soft text-base text-warning-strong">nợ {formatVnd(book.balance(c.id))}</span>
+              <ChevronRight aria-hidden className="h-5 w-5 text-ink-subtle" />
+            </span>
           </button>
         </li>
       ))}
@@ -54,16 +61,16 @@ export function CustomerSuggestions({
 /** Khách đã chọn + dư nợ hiện tại, nút đổi khách. */
 export function ChosenCustomer({ book, customer, onClear }: { book: DebtBook; customer: Customer; onClear: () => void }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4" data-testid="customer-chosen">
+    <div className="flex items-center justify-between gap-3 rounded-2xl border border-warning-line bg-warning-soft p-4 shadow-card" data-testid="customer-chosen">
       <div>
         <p className="text-xl font-semibold" data-testid="customer-chosen-label">
           {customerLabel(customer)}
         </p>
-        <p className="text-lg text-stone-600">
-          Đang nợ <b data-testid="customer-balance">{formatVnd(book.balance(customer.id))}</b>
+        <p className="text-lg text-ink-muted">
+          Đang nợ <b className="num text-warning-strong" data-testid="customer-balance">{formatVnd(book.balance(customer.id))}</b>
         </p>
       </div>
-      <button type="button" className="btn border border-stone-300 bg-white" onClick={onClear} data-testid="customer-clear">
+      <button type="button" className="btn btn-secondary" onClick={onClear} data-testid="customer-clear">
         Đổi khách
       </button>
     </div>

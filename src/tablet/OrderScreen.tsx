@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { Banknote, ChefHat, ChevronLeft, Minus, Plus, Save, ShoppingBag, Trash2, UtensilsCrossed, Wallet } from 'lucide-react';
 import { v7 as uuidv7 } from 'uuid';
 import {
   addCombo,
@@ -77,7 +78,7 @@ export function OrderScreen() {
   if (points.length === 0) {
     return (
       <main className="p-6">
-        <p data-testid="menu-no-points" className="text-stone-500">
+        <p data-testid="menu-no-points" className="text-ink-subtle">
           Hồ sơ tablet chưa có điểm bán nào. Nhờ chủ chọn điểm bán trong Cài đặt.
         </p>
       </main>
@@ -191,8 +192,8 @@ export function OrderScreen() {
   }
 
   return (
-    <main data-testid="order-screen" data-point={d.point_id} className="flex h-full gap-4 p-4">
-      <div className="min-w-0 flex-1 overflow-y-auto pr-1">
+    <main data-testid="order-screen" data-point={d.point_id} className="flex h-full flex-col gap-4 overflow-y-auto p-4 md:flex-row md:overflow-hidden">
+      <div className="md:min-w-0 md:flex-1 md:overflow-y-auto md:pr-1">
         <MenuBoard
           catalog={cat}
           pointId={d.point_id}
@@ -203,33 +204,36 @@ export function OrderScreen() {
         />
       </div>
 
-      <aside data-testid="cart" className="flex w-[420px] shrink-0 flex-col gap-3 rounded-2xl border border-stone-200 bg-white p-4">
+      <aside data-testid="cart" className="card flex w-full shrink-0 flex-col gap-3 p-4 md:w-[380px] lg:w-[420px]">
         <div className="flex items-center justify-between gap-2">
-          <button type="button" className="btn border border-stone-300 bg-white" onClick={back} data-testid="order-back">
-            ‹ Hàng đợi
+          <button type="button" className="btn btn-secondary pl-3" onClick={back} data-testid="order-back">
+            <ChevronLeft aria-hidden className="h-5 w-5" />
+            Hàng đợi
           </button>
           <span className="font-mono text-2xl font-bold tracking-wider" data-testid="order-code">
             {saved?.code ?? 'Đơn mới'}
           </span>
         </div>
 
-        <div className="grid grid-cols-2 gap-2" role="group" aria-label="Tại chỗ / Mang về">
+        <div className="grid grid-cols-2 gap-1.5 rounded-xl bg-surface-sunken p-1" role="group" aria-label="Tại chỗ / Mang về">
           {(['dinein', 'takeaway'] as const).map((t) => (
             <button
               key={t}
               type="button"
               aria-pressed={d.dine_type === t}
               onClick={() => edit((x) => setDineType(x, t))}
-              className={`btn border ${d.dine_type === t ? 'border-stone-800 bg-stone-800 text-white' : 'border-stone-300 bg-white'}`}
+              className="btn min-h-[52px] text-ink-muted hover:text-ink aria-pressed:bg-surface aria-pressed:text-ink aria-pressed:shadow-card"
               data-testid={`order-dine-${t}`}
             >
+              {t === 'dinein' ? <UtensilsCrossed aria-hidden className="h-5 w-5" /> : <ShoppingBag aria-hidden className="h-5 w-5" />}
               {t === 'dinein' ? 'Tại chỗ' : 'Mang về'}
             </button>
           ))}
         </div>
 
         <input
-          className="min-h-tap rounded-xl border border-stone-300 px-4 text-lg outline-none focus:border-amber-600"
+          className="input"
+          aria-label="Nhãn / số bàn"
           placeholder="Nhãn / số bàn (tùy chọn)"
           maxLength={40}
           value={d.label}
@@ -238,31 +242,36 @@ export function OrderScreen() {
         />
 
         <ul className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto" data-testid="cart-lines">
-          {empty && <li className="py-6 text-center text-stone-400">Bấm combo hoặc món để thêm</li>}
+          {empty && (
+            <li className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-line-strong py-8 text-center text-ink-subtle">
+              <ShoppingBag aria-hidden className="h-8 w-8 opacity-60" />
+              Bấm combo hoặc món để thêm
+            </li>
+          )}
           {d.items.map((it) => (
-            <li key={it.id} data-testid={`cart-line-${it.id}`} data-product={it.product_id} className="flex items-center gap-2 rounded-xl bg-stone-50 p-2">
+            <li key={it.id} data-testid={`cart-line-${it.id}`} data-product={it.product_id} className="flex items-center gap-2 rounded-xl border border-line bg-surface-muted p-2 pl-3">
               <span className="min-w-0 flex-1">
-                <span className="block text-lg leading-tight">{lineSummary({ ...it, qty: 1 }).replace(/^1× /, '')}</span>
-                <span className="text-base text-stone-500" data-testid={`cart-line-${it.id}-total`}>
+                <span className="block text-lg font-medium leading-tight">{lineSummary({ ...it, qty: 1 }).replace(/^1× /, '')}</span>
+                <span className="num text-base text-ink-subtle" data-testid={`cart-line-${it.id}-total`}>
                   {formatVnd(lineTotal(it))}
                 </span>
               </span>
-              <button type="button" className="btn border border-stone-300 bg-white px-0 text-2xl" onClick={() => edit((x) => ({ ...x, items: stepLineQty(x.items, it.id, -1) }))} aria-label="Bớt" data-testid={`cart-line-${it.id}-minus`}>
-                −
+              <button type="button" className="btn btn-secondary px-0" onClick={() => edit((x) => ({ ...x, items: stepLineQty(x.items, it.id, -1) }))} aria-label="Bớt" data-testid={`cart-line-${it.id}-minus`}>
+                <Minus aria-hidden className="h-6 w-6" />
               </button>
-              <span className="w-8 text-center text-xl font-bold" data-testid={`cart-line-${it.id}-qty`}>
+              <span className="num w-8 text-center text-xl font-bold" data-testid={`cart-line-${it.id}-qty`}>
                 {it.qty}
               </span>
-              <button type="button" className="btn border border-stone-300 bg-white px-0 text-2xl" onClick={() => edit((x) => ({ ...x, items: stepLineQty(x.items, it.id, 1) }))} aria-label="Thêm" data-testid={`cart-line-${it.id}-plus`}>
-                +
+              <button type="button" className="btn btn-secondary px-0" onClick={() => edit((x) => ({ ...x, items: stepLineQty(x.items, it.id, 1) }))} aria-label="Thêm" data-testid={`cart-line-${it.id}-plus`}>
+                <Plus aria-hidden className="h-6 w-6" />
               </button>
             </li>
           ))}
         </ul>
 
-        <div className="flex items-baseline justify-between border-t border-stone-200 pt-3">
-          <span className="text-xl text-stone-600">Tổng</span>
-          <span className="text-3xl font-bold" data-testid="order-total">
+        <div className="flex items-baseline justify-between border-t border-dashed border-line-strong pt-3">
+          <span className="text-xl font-medium text-ink-muted">Tổng</span>
+          <span className="num text-3xl font-bold text-ink" data-testid="order-total">
             {formatVnd(total)}
           </span>
         </div>
@@ -271,25 +280,30 @@ export function OrderScreen() {
           {error}
         </Notice>
 
-        <button type="button" className="btn min-h-[64px] bg-emerald-700 text-xl text-white" disabled={empty || busy} onClick={() => void payExact()} data-testid="order-pay-exact">
+        <button type="button" className="btn btn-success min-h-[64px] text-xl" disabled={empty || busy} onClick={() => void payExact()} data-testid="order-pay-exact">
+          <Banknote aria-hidden className="h-6 w-6" />
           Thu đủ tiền mặt {formatVnd(total)}
         </button>
         <div className="grid grid-cols-2 gap-2">
-          <button type="button" className="btn bg-amber-700 text-white" disabled={empty || busy} onClick={() => void pay()} data-testid="order-pay">
+          <button type="button" className="btn btn-primary" disabled={empty || busy} onClick={() => void pay()} data-testid="order-pay">
+            <Wallet aria-hidden className="h-5 w-5" />
             Thanh toán…
           </button>
           {saved?.status === 'served' ? (
             <span />
           ) : (
-            <button type="button" className="btn bg-stone-800 text-white" disabled={empty || busy} onClick={() => void serve()} data-testid="order-serve">
+            <button type="button" className="btn btn-dark" disabled={empty || busy} onClick={() => void serve()} data-testid="order-serve">
+              <ChefHat aria-hidden className="h-5 w-5" />
               Đã ra món
             </button>
           )}
-          <button type="button" className="btn border border-stone-300 bg-white" disabled={empty || busy} onClick={() => void save()} data-testid="order-save">
+          <button type="button" className="btn btn-secondary" disabled={empty || busy} onClick={() => void save()} data-testid="order-save">
+            <Save aria-hidden className="h-5 w-5" />
             Lưu
           </button>
           {saved && (
-            <button type="button" className="btn border border-red-300 bg-white text-red-700" disabled={busy} onClick={() => setDialog({ kind: 'delete' })} data-testid="order-delete">
+            <button type="button" className="btn btn-danger-outline" disabled={busy} onClick={() => setDialog({ kind: 'delete' })} data-testid="order-delete">
+              <Trash2 aria-hidden className="h-5 w-5" />
               Xóa đơn
             </button>
           )}
@@ -309,12 +323,12 @@ export function OrderScreen() {
         <Sheet testId="delete-sheet" title={`Xóa đơn ${saved?.code ?? ''}? Chọn lý do`}>
           <div className="grid grid-cols-2 gap-3">
             {DELETE_REASONS.map((r) => (
-              <button key={r.id} type="button" className="btn min-h-[72px] border border-red-300 bg-red-50 text-red-800" disabled={busy} onClick={() => void remove(r.id)} data-testid={`delete-reason-${r.id}`}>
+              <button key={r.id} type="button" className="btn btn-danger-outline min-h-[72px] bg-danger-soft" disabled={busy} onClick={() => void remove(r.id)} data-testid={`delete-reason-${r.id}`}>
                 {r.label}
               </button>
             ))}
           </div>
-          <button type="button" className="btn border border-stone-300 bg-white" onClick={() => setDialog(null)} data-testid="delete-cancel">
+          <button type="button" className="btn btn-secondary" onClick={() => setDialog(null)} data-testid="delete-cancel">
             Không xóa
           </button>
         </Sheet>
@@ -323,10 +337,10 @@ export function OrderScreen() {
       {dialog?.kind === 'discard' && (
         <Sheet testId="discard-sheet" title="Bỏ các thay đổi chưa lưu?">
           <div className="grid grid-cols-2 gap-3">
-            <button type="button" className="btn border border-stone-300 bg-white" onClick={() => setDialog(null)} data-testid="discard-no">
+            <button type="button" className="btn btn-secondary" onClick={() => setDialog(null)} data-testid="discard-no">
               Ở lại
             </button>
-            <button type="button" className="btn bg-red-700 text-white" onClick={() => navigate('/')} data-testid="discard-yes">
+            <button type="button" className="btn btn-danger" onClick={() => navigate('/')} data-testid="discard-yes">
               Bỏ thay đổi
             </button>
           </div>
@@ -359,19 +373,19 @@ function ToppingSheet({
             type="button"
             aria-pressed={picked.includes(t.id)}
             onClick={() => toggle(t.id)}
-            className={`btn flex min-h-[64px] flex-col items-start justify-center border text-left ${picked.includes(t.id) ? 'border-amber-700 bg-amber-700 text-white' : 'border-stone-300 bg-white'}`}
+            className="btn btn-choice min-h-[72px] flex-col items-start justify-center gap-0 text-left"
             data-testid={`topping-option-${t.id}`}
           >
             <span>{t.name}</span>
-            <span className="text-base font-normal">+{formatVnd(t.price)}</span>
+            <span className="num text-base font-medium opacity-80">+{formatVnd(t.price)}</span>
           </button>
         ))}
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <button type="button" className="btn border border-stone-300 bg-white" onClick={onCancel} data-testid="topping-cancel">
+        <button type="button" className="btn btn-secondary" onClick={onCancel} data-testid="topping-cancel">
           Hủy
         </button>
-        <button type="button" className="btn bg-amber-700 text-white" onClick={() => onAdd(picked)} data-testid="topping-add">
+        <button type="button" className="btn btn-primary" onClick={() => onAdd(picked)} data-testid="topping-add">
           Thêm · {formatVnd(price)}
         </button>
       </div>

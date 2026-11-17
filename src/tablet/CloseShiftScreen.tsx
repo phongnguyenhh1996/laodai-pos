@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
+import { CircleCheckBig, Power, TriangleAlert } from 'lucide-react';
 import { parseCountInput, parseMoneyInput } from '@/domain/catalog';
 import { formatVnd } from '@/domain/money';
 import { localDb } from '@/lib/localdb';
@@ -26,8 +27,11 @@ export function CloseShiftScreen() {
   if (done) {
     return (
       <main data-testid="shift-closed" className="flex h-full flex-col items-center justify-center gap-8 p-6">
+        <span aria-hidden className="flex h-20 w-20 items-center justify-center rounded-full bg-success-soft text-success">
+          <CircleCheckBig className="h-11 w-11" />
+        </span>
         <p className="text-4xl font-bold">Đã đóng ca</p>
-        <button type="button" className="btn min-w-[200px] border border-stone-300 bg-white" onClick={() => navigate('/', { replace: true })} data-testid="shift-closed-done">
+        <button type="button" className="btn btn-secondary min-w-[200px]" onClick={() => navigate('/', { replace: true })} data-testid="shift-closed-done">
           Xong
         </button>
       </main>
@@ -65,9 +69,15 @@ export function CloseShiftScreen() {
 
   return (
     <main data-testid="close-shift-screen" className="mx-auto flex h-full max-w-xl flex-col gap-6 overflow-y-auto p-6">
-      <h2 className="text-3xl font-bold">Đóng ca – {shift.staff_name}</h2>
-      <p className="text-lg text-stone-600">Đếm rồi nhập số thực tế đang có.</p>
-      <form className="flex flex-col gap-4" onSubmit={review}>
+      <header className="flex flex-col gap-1">
+        <p className="eyebrow flex items-center gap-2">
+          <Power aria-hidden className="h-4 w-4" />
+          Đếm mù
+        </p>
+        <h2 className="text-3xl font-bold">Đóng ca – {shift.staff_name}</h2>
+        <p className="text-lg text-ink-muted">Đếm rồi nhập số thực tế đang có.</p>
+      </header>
+      <form className="card flex flex-col gap-4 p-6" onSubmit={review}>
         <TextField label="Số hộp còn lại" inputMode="numeric" value={boxes} onChange={(e) => setBoxes(e.target.value)} disabled={confirming} data-testid="close-boxes" />
         <TextField label="Số dĩa sạch còn lại" inputMode="numeric" value={plates} onChange={(e) => setPlates(e.target.value)} disabled={confirming} data-testid="close-plates" />
         <TextField label="Tiền mặt đếm được" inputMode="numeric" value={cash} onChange={(e) => setCash(e.target.value)} disabled={confirming} data-testid="close-cash" />
@@ -76,24 +86,27 @@ export function CloseShiftScreen() {
         </Notice>
         {!confirming ? (
           <div className="flex gap-3">
-            <Link to="/" className="btn flex flex-1 items-center justify-center border border-stone-300 bg-white" data-testid="close-cancel">
+            <Link to="/" className="btn btn-secondary flex-1" data-testid="close-cancel">
               Quay lại
             </Link>
-            <button type="submit" className="btn flex-1 bg-stone-800 text-white" data-testid="close-review">
+            <button type="submit" className="btn btn-dark flex-1" data-testid="close-review">
               Tiếp
             </button>
           </div>
         ) : (
-          <div className="flex flex-col gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4" data-testid="close-confirm-box">
+          <div className="flex flex-col gap-3 rounded-xl border border-warning-line bg-warning-soft p-4" data-testid="close-confirm-box">
             <p className="text-lg">
               Hộp: <b>{boxesN}</b> · Dĩa: <b>{platesN}</b> · Tiền mặt: <b>{formatVnd(cashN!)}</b>
             </p>
-            <p className="text-base text-stone-600">Đóng ca rồi thì không sửa được nữa.</p>
+            <p className="flex items-center gap-2 text-base font-medium text-warning-strong">
+              <TriangleAlert aria-hidden className="h-5 w-5 shrink-0" />
+              Đóng ca rồi thì không sửa được nữa.
+            </p>
             <div className="flex gap-3">
-              <button type="button" className="btn flex-1 border border-stone-300 bg-white" onClick={() => setConfirming(false)} data-testid="close-edit">
+              <button type="button" className="btn btn-secondary flex-1" onClick={() => setConfirming(false)} data-testid="close-edit">
                 Sửa lại
               </button>
-              <button type="button" className="btn flex-1 bg-red-700 text-white" disabled={busy} onClick={() => void confirm()} data-testid="close-confirm">
+              <button type="button" className="btn btn-danger flex-1" disabled={busy} onClick={() => void confirm()} data-testid="close-confirm">
                 Xác nhận đóng ca
               </button>
             </div>

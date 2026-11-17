@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Banknote, CircleCheckBig, ChevronLeft, Landmark, NotebookPen, UserPlus } from 'lucide-react';
 import { canConfirmCash, changeDue, quickCashOptions } from '@/domain/cash';
 import { itemsSummary } from '@/domain/cart';
 import { parseMoneyInput } from '@/domain/catalog';
@@ -80,26 +81,27 @@ export function PayScreen() {
   return (
     <main data-testid="pay-screen" className="mx-auto flex h-full max-w-4xl flex-col gap-5 overflow-y-auto p-6">
       <header className="flex items-center justify-between gap-4">
-        <Link to={`/order/${o.id}`} className="btn flex items-center border border-stone-300 bg-white" data-testid="pay-back">
-          ‹ Đơn
+        <Link to={`/order/${o.id}`} className="btn btn-secondary pl-3" data-testid="pay-back">
+          <ChevronLeft aria-hidden className="h-5 w-5" />
+          Đơn
         </Link>
         <div className="text-right">
-          <p className="font-mono text-2xl font-bold tracking-wider" data-testid="pay-code">
+          <p className="font-mono text-2xl font-bold tracking-wider text-ink" data-testid="pay-code">
             {o.code}
             {o.label ? ` · ${o.label}` : ''}
           </p>
-          <p className="text-lg text-stone-600">{itemsSummary(o.items)}</p>
+          <p className="text-lg text-ink-muted">{itemsSummary(o.items)}</p>
         </div>
       </header>
 
-      <div className="flex items-baseline justify-between rounded-2xl bg-white p-5">
-        <span className="text-2xl text-stone-600">Cần thu</span>
-        <span className="text-5xl font-bold" data-testid="pay-total">
+      <div className="flex items-baseline justify-between rounded-2xl border border-brand-line bg-brand-soft p-5 shadow-card">
+        <span className="text-2xl font-medium text-brand-deep">Cần thu</span>
+        <span className="num text-5xl font-bold text-ink" data-testid="pay-total">
           {formatVnd(o.total)}
         </span>
       </div>
 
-      <div className="grid grid-cols-3 gap-3" role="tablist">
+      <div className="grid grid-cols-3 gap-1.5 rounded-2xl border border-line bg-surface p-1.5 shadow-card" role="tablist">
         {(
           [
             ['cash', 'Tiền mặt'],
@@ -113,9 +115,16 @@ export function PayScreen() {
             role="tab"
             aria-selected={method === m}
             onClick={() => setMethod(m)}
-            className={`btn min-h-[64px] border text-xl ${method === m ? 'border-stone-800 bg-stone-800 text-white' : 'border-stone-300 bg-white'}`}
+            className="btn min-h-[60px] text-xl text-ink-muted hover:bg-surface-muted aria-selected:bg-ink aria-selected:text-white"
             data-testid={`pay-method-${m}`}
           >
+            {m === 'cash' ? (
+              <Banknote aria-hidden className="h-6 w-6" />
+            ) : m === 'transfer' ? (
+              <Landmark aria-hidden className="h-6 w-6" />
+            ) : (
+              <NotebookPen aria-hidden className="h-6 w-6" />
+            )}
             {label}
           </button>
         ))}
@@ -123,7 +132,7 @@ export function PayScreen() {
 
       {method === 'cash' ? (
         <section className="flex flex-col gap-4" data-testid="pay-cash">
-          <h2 className="text-xl text-stone-600">Khách đưa</h2>
+          <h2 className="eyebrow">Khách đưa</h2>
           <div className="grid grid-cols-3 gap-3">
             {quickCashOptions(o.total).map((q) => (
               <button
@@ -131,14 +140,14 @@ export function PayScreen() {
                 type="button"
                 aria-pressed={given === q.amount && manual === ''}
                 onClick={() => pickQuick(q.amount)}
-                className={`btn min-h-[64px] border text-xl ${given === q.amount && manual === '' ? 'border-amber-700 bg-amber-700 text-white' : 'border-stone-300 bg-white'}`}
+                className="btn btn-choice num min-h-[64px] text-xl"
                 data-testid={q.kind === 'exact' ? 'cash-exact' : `cash-quick-${q.amount}`}
               >
                 {q.kind === 'exact' ? 'Đủ tiền' : formatVnd(q.amount)}
               </button>
             ))}
             <input
-              className="min-h-[64px] rounded-xl border border-stone-300 px-4 text-xl outline-none focus:border-amber-600"
+              className="input min-h-[64px] text-xl"
               inputMode="numeric"
               placeholder="Nhập tay"
               value={manual}
@@ -146,9 +155,13 @@ export function PayScreen() {
               data-testid="cash-manual"
             />
           </div>
-          <div className="flex items-baseline justify-between rounded-2xl bg-white p-5">
-            <span className="text-2xl text-stone-600">Tiền thối</span>
-            <span className="text-4xl font-bold" data-testid="cash-change">
+          <div
+            className={`flex items-baseline justify-between rounded-2xl border p-5 shadow-card ${
+              change !== null ? 'border-success-line bg-success-soft' : 'border-line bg-surface'
+            }`}
+          >
+            <span className={`text-2xl font-medium ${change !== null ? 'text-success-strong' : 'text-ink-muted'}`}>Tiền thối</span>
+            <span className="num text-4xl font-bold text-ink" data-testid="cash-change">
               {change === null ? (given === null ? '—' : 'Chưa đủ') : formatVnd(change)}
             </span>
           </div>
@@ -157,11 +170,12 @@ export function PayScreen() {
           </Notice>
           <button
             type="button"
-            className="btn min-h-[72px] bg-emerald-700 text-2xl text-white"
+            className="btn btn-success min-h-[72px] text-2xl"
             disabled={!canConfirmCash(o.total, given) || busy}
             onClick={() => void confirm({ method: 'cash', cash_given: given! }, `Đã thu ${formatVnd(o.total)} – đơn ${o.code}`)}
             data-testid="pay-confirm"
           >
+            <CircleCheckBig aria-hidden className="h-7 w-7" />
             Đã thu tiền
           </button>
         </section>
@@ -172,7 +186,7 @@ export function PayScreen() {
           ) : (
             <>
               <input
-                className="min-h-[64px] rounded-xl border border-stone-300 px-4 text-xl outline-none focus:border-amber-600"
+                className="input min-h-[64px] text-xl"
                 placeholder="Tên khách (bắt buộc)"
                 maxLength={60}
                 value={debtName}
@@ -181,12 +195,13 @@ export function PayScreen() {
               />
               {book && <CustomerSuggestions book={book} query={debtName} onPick={setDebtCustomer} />}
               {debtName.trim() && (
-                <div className="flex flex-col gap-3 rounded-xl border border-dashed border-stone-300 p-4" data-testid="debt-new">
-                  <p className="text-lg text-stone-600">
+                <div className="flex flex-col gap-3 rounded-2xl border border-dashed border-line-strong bg-surface p-4" data-testid="debt-new">
+                  <p className="flex items-center gap-2 text-lg text-ink-muted">
+                    <UserPlus aria-hidden className="h-5 w-5 shrink-0" />
                     Không có trong danh sách ⇒ tạo khách mới <b>{debtName.trim()}</b>
                   </p>
                   <input
-                    className="min-h-tap rounded-xl border border-stone-300 px-4 text-lg outline-none focus:border-amber-600"
+                    className="input"
                     placeholder="Mô tả (vd. giáo viên, 20 Lê Lợi) – tùy chọn"
                     maxLength={80}
                     value={debtDesc}
@@ -194,7 +209,7 @@ export function PayScreen() {
                     data-testid="debt-desc"
                   />
                   <input
-                    className="min-h-tap rounded-xl border border-stone-300 px-4 text-lg outline-none focus:border-amber-600"
+                    className="input"
                     placeholder="Số điện thoại – tùy chọn"
                     inputMode="tel"
                     maxLength={20}
@@ -211,7 +226,7 @@ export function PayScreen() {
           </Notice>
           <button
             type="button"
-            className="btn min-h-[72px] bg-red-700 text-2xl text-white"
+            className="btn btn-danger min-h-[72px] text-2xl"
             disabled={busy || (!debtCustomer && !debtName.trim())}
             onClick={() =>
               void confirm(
@@ -226,22 +241,27 @@ export function PayScreen() {
             }
             data-testid="pay-debt-confirm"
           >
+            <NotebookPen aria-hidden className="h-6 w-6" />
             Ghi nợ {formatVnd(o.total)}
           </button>
         </section>
       ) : (
         <section className="flex flex-col gap-4" data-testid="pay-transfer">
-          <p className="text-xl text-stone-600">Kiểm tra đã nhận đủ {formatVnd(o.total)} trên điện thoại / loa báo rồi mới bấm.</p>
+          <p className="flex items-start gap-3 rounded-2xl border border-info-line bg-info-soft p-4 text-xl text-ink">
+            <Landmark aria-hidden className="mt-1 h-6 w-6 shrink-0 text-info" />
+            Kiểm tra đã nhận đủ {formatVnd(o.total)} trên điện thoại / loa báo rồi mới bấm.
+          </p>
           <Notice testId="pay-error" tone="error">
             {error}
           </Notice>
           <button
             type="button"
-            className="btn min-h-[72px] bg-emerald-700 text-2xl text-white"
+            className="btn btn-success min-h-[72px] text-2xl"
             disabled={busy}
             onClick={() => void confirm({ method: 'transfer' }, `Đã nhận chuyển khoản – đơn ${o.code}`)}
             data-testid="pay-transfer-confirm"
           >
+            <CircleCheckBig aria-hidden className="h-7 w-7" />
             Đã nhận chuyển khoản
           </button>
         </section>

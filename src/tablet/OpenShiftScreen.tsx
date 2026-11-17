@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { CircleAlert, LogIn, UserRound } from 'lucide-react';
 import { activeStaff } from '@/domain/catalog';
 import { localDb } from '@/lib/localdb';
 import { errorMessage } from '@/app/ui';
@@ -36,14 +37,18 @@ export function OpenShiftScreen() {
   return (
     <main data-testid="open-shift-screen" className="mx-auto flex h-full max-w-4xl flex-col gap-6 overflow-y-auto p-6">
       {loadError && (
-        <p data-testid="catalog-error" role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-red-700">
+        <p data-testid="catalog-error" role="alert" className="flex items-start gap-3 rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-lg text-danger-strong">
+          <CircleAlert aria-hidden className="mt-1 h-5 w-5 shrink-0" />
           Chưa tải được menu và danh sách nhân viên. Cần có mạng cho lần đầu.
         </p>
       )}
 
-      <section data-testid="staff-picker" className="flex flex-col gap-3">
-        <h2 className="text-2xl text-stone-600">Ai đứng ca?</h2>
-        {!staff && !loadError && <p className="text-stone-400">Đang tải…</p>}
+      <section data-testid="staff-picker" className="card flex flex-col gap-4 p-6">
+        <div>
+          <p className="eyebrow">Mở ca</p>
+          <h2 className="text-3xl font-bold">Ai đứng ca?</h2>
+        </div>
+        {!staff && !loadError && <p className="text-ink-subtle">Đang tải…</p>}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {staff?.map((s) => (
             <button
@@ -51,9 +56,10 @@ export function OpenShiftScreen() {
               type="button"
               aria-pressed={s.id === staffId}
               onClick={() => setStaffId(s.id)}
-              className={`btn min-h-[80px] border text-2xl ${s.id === staffId ? 'border-amber-700 bg-amber-700 text-white' : 'border-stone-300 bg-white'}`}
+              className="btn btn-choice min-h-[88px] text-2xl"
               data-testid={`staff-${s.id}`}
             >
+              <UserRound aria-hidden className="h-6 w-6 opacity-70" />
               {s.name}
             </button>
           ))}
@@ -66,11 +72,12 @@ export function OpenShiftScreen() {
 
       <button
         type="button"
-        className="btn min-h-[80px] bg-emerald-700 text-2xl text-white"
+        className="btn btn-success min-h-[80px] text-2xl"
         disabled={!chosen || busy}
         onClick={() => void open()}
         data-testid="open-shift"
       >
+        <LogIn aria-hidden className="h-7 w-7" />
         {chosen ? `Mở ca – ${chosen.name}` : 'Chọn tên để mở ca'}
       </button>
     </main>

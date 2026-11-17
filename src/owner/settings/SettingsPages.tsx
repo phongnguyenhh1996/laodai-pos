@@ -47,7 +47,7 @@ function SettingsHome() {
           <NavItem key={e.key} to={`${SETTINGS}/${e.key}`} testId={`settings-section-${e.key}`} title={e.title} />
         ))}
       </NavList>
-      <p className="text-sm text-stone-500">
+      <p className="text-sm text-ink-subtle">
         Không có xóa: món, topping, combo ngừng bán hoặc nhân viên nghỉ thì bỏ chọn “Đang bán” / “Đang làm”. Tablet nhận thay đổi ở lần
         đồng bộ kế tiếp (khi mở lại màn bán hàng, khi có mạng lại, hoặc sau vài phút).
       </p>
@@ -170,7 +170,7 @@ function EntityForm({
   return (
     <form className="flex flex-col gap-4" onSubmit={submit} data-testid={`settings-form-${def.key}`}>
       {saved && !dirty && (
-        <p data-testid="settings-saved" role="status" className="rounded-lg bg-emerald-50 px-4 py-3 text-emerald-800">
+        <p data-testid="settings-saved" role="status" className="rounded-lg bg-success-soft px-4 py-3 text-success-strong">
           Đã lưu. Tablet nhận thay đổi ở lần đồng bộ kế tiếp.
         </p>
       )}
@@ -178,12 +178,12 @@ function EntityForm({
         <Field key={f.key} def={f} form={form} cat={cat} disabled={busy || (f.createOnly === true && id !== null)} onChange={set} />
       ))}
       {preview && (
-        <p data-testid="settings-preview" className="rounded-lg bg-stone-100 px-4 py-3 text-stone-700">
+        <p data-testid="settings-preview" className="rounded-lg bg-surface-sunken px-4 py-3 text-ink">
           {preview}
         </p>
       )}
       <ErrorText testId="settings-error">{error}</ErrorText>
-      <button type="submit" className="btn bg-amber-700 text-white" disabled={busy} data-testid="settings-save">
+      <button type="submit" className="btn btn-primary" disabled={busy} data-testid="settings-save">
         {busy ? 'Đang lưu…' : 'Lưu'}
       </button>
       {def.priceHistory && id && <PriceHistory type={def.priceHistory} entityId={id} />}
@@ -206,7 +206,7 @@ function Field({
 }) {
   const testId = `field-${def.key}`;
   const value = form[def.key];
-  const hint = def.hint && <span className="text-sm text-stone-500">{def.hint}</span>;
+  const hint = def.hint && <span className="text-sm text-ink-subtle">{def.hint}</span>;
 
   switch (def.kind) {
     case 'text':
@@ -227,7 +227,7 @@ function Field({
             data-testid={testId}
           />
           {parsed !== null && String(value).trim() !== String(parsed) && (
-            <span className="text-sm text-stone-600" data-testid={`${testId}-parsed`}>
+            <span className="text-sm text-ink-muted" data-testid={`${testId}-parsed`}>
               = {formatVnd(parsed)}
             </span>
           )}
@@ -240,7 +240,7 @@ function Field({
         <label className="flex min-h-tap items-center gap-3 text-lg">
           <input
             type="checkbox"
-            className="h-6 w-6 accent-amber-700"
+            className="h-6 w-6 accent-brand-strong"
             checked={value === true}
             disabled={disabled}
             onChange={(e) => onChange(def.key, e.target.checked)}
@@ -252,9 +252,9 @@ function Field({
     case 'select':
       return (
         <label className="flex flex-col gap-1">
-          <span className="text-base font-medium text-stone-600">{def.label}</span>
+          <span className="text-base font-medium text-ink-muted">{def.label}</span>
           <select
-            className="min-h-tap rounded-xl border border-stone-300 bg-white px-3 text-lg disabled:bg-stone-100"
+            className="input px-3"
             value={String(value)}
             disabled={disabled}
             onChange={(e) => onChange(def.key, e.target.value)}
@@ -274,13 +274,13 @@ function Field({
       const options = def.options?.(form, cat) ?? [];
       return (
         <fieldset className="flex flex-col gap-1" data-testid={testId}>
-          <legend className="mb-1 text-base font-medium text-stone-600">{def.label}</legend>
-          {options.length === 0 && <span className="text-stone-400">Chưa có lựa chọn</span>}
+          <legend className="mb-1 text-base font-medium text-ink-muted">{def.label}</legend>
+          {options.length === 0 && <span className="text-ink-subtle">Chưa có lựa chọn</span>}
           {options.map((o) => (
             <label key={o.value} className="flex min-h-tap items-center gap-3 rounded-lg px-1 text-lg">
               <input
                 type="checkbox"
-                className="h-6 w-6 accent-amber-700"
+                className="h-6 w-6 accent-brand-strong"
                 checked={selected.includes(o.value)}
                 disabled={disabled}
                 onChange={(e) =>
@@ -325,14 +325,14 @@ function PriceHistory({ type, entityId }: { type: 'product' | 'topping'; entityI
     <section className="mt-2 flex flex-col gap-2" data-testid="price-history">
       <h2 className="text-lg font-semibold">Lịch sử giá</h2>
       <ErrorText testId="price-history-error">{error}</ErrorText>
-      {rows?.length === 0 && <p className="text-stone-500">Chưa đổi giá lần nào.</p>}
-      <ul className="flex flex-col divide-y divide-stone-200 rounded-xl border border-stone-200 bg-white">
+      {rows?.length === 0 && <p className="text-ink-subtle">Chưa đổi giá lần nào.</p>}
+      <ul className="flex flex-col divide-y divide-line card">
         {rows?.map((r) => (
           <li key={r.id} className="flex justify-between gap-3 px-4 py-2" data-testid="price-history-row">
             <span>
               {formatVnd(r.old_price)} → <strong>{formatVnd(r.new_price)}</strong>
             </span>
-            <span className="text-stone-500">{dateTime.format(new Date(r.changed_at))}</span>
+            <span className="text-ink-subtle">{dateTime.format(new Date(r.changed_at))}</span>
           </li>
         ))}
       </ul>

@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Route, Routes, useNavigate } from 'react-router-dom';
+import { LockKeyhole, Store } from 'lucide-react';
 import { ErrorText, Splash, TextField, errorMessage } from '@/app/ui';
 import { useActivation } from '@/app/useActivation';
 import { useIdleTimeout } from '@/app/useIdleTimeout';
@@ -103,11 +104,14 @@ function OwnerUnlock({
 
   return (
     <main data-testid="owner-unlock" className="mx-auto flex h-full max-w-md flex-col justify-center gap-6 p-6">
-      <header className="flex flex-col gap-2">
+      <header className="flex flex-col gap-3">
+        <span aria-hidden className="flex h-14 w-14 items-center justify-center rounded-2xl bg-ink text-white shadow-card">
+          <LockKeyhole className="h-7 w-7" />
+        </span>
         <h1 className="text-3xl font-bold">Chế độ chủ</h1>
-        <p className="text-lg text-stone-600">Nhập mật khẩu chủ. Mỗi lần vào đều được báo cho chủ.</p>
+        <p className="text-lg text-ink-muted">Nhập mật khẩu chủ. Mỗi lần vào đều được báo cho chủ.</p>
       </header>
-      <form className="flex flex-col gap-4" onSubmit={submit}>
+      <form className="card flex flex-col gap-4 p-6" onSubmit={submit}>
         <TextField
           label="Mật khẩu chủ"
           type="password"
@@ -120,10 +124,10 @@ function OwnerUnlock({
         />
         <ErrorText testId="owner-error">{error}</ErrorText>
         <div className="flex gap-3">
-          <button type="button" className="btn flex-1 border border-stone-300 bg-white" onClick={onCancel} data-testid="owner-cancel">
+          <button type="button" className="btn btn-secondary flex-1" onClick={onCancel} data-testid="owner-cancel">
             Quay lại bán hàng
           </button>
-          <button type="submit" className="btn flex-1 bg-amber-700 text-white" disabled={busy} data-testid="owner-unlock-submit">
+          <button type="submit" className="btn btn-primary flex-1" disabled={busy} data-testid="owner-unlock-submit">
             {busy ? 'Đang kiểm tra…' : 'Vào'}
           </button>
         </div>
@@ -205,8 +209,14 @@ function OwnerLogin() {
 
   return (
     <main data-testid="owner-login" className="mx-auto flex h-full max-w-md flex-col justify-center gap-6 p-6">
-      <h1 className="text-3xl font-bold">Đăng nhập chủ</h1>
-      <form className="flex flex-col gap-4" onSubmit={submit}>
+      <header className="flex flex-col gap-3">
+        <span aria-hidden className="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-strong text-white shadow-card">
+          <Store className="h-7 w-7" />
+        </span>
+        <h1 className="text-3xl font-bold">Đăng nhập chủ</h1>
+        <p className="text-lg text-ink-muted">Laodai POS · quản lý quán</p>
+      </header>
+      <form className="card flex flex-col gap-4 p-6" onSubmit={submit}>
         <TextField
           label="Email"
           type="email"
@@ -226,7 +236,7 @@ function OwnerLogin() {
           data-testid="owner-password"
         />
         <ErrorText testId="owner-error">{error}</ErrorText>
-        <button type="submit" className="btn bg-amber-700 text-white" disabled={busy} data-testid="owner-login-submit">
+        <button type="submit" className="btn btn-primary" disabled={busy} data-testid="owner-login-submit">
           {busy ? 'Đang đăng nhập…' : 'Đăng nhập'}
         </button>
       </form>

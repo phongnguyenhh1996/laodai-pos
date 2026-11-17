@@ -43,7 +43,7 @@ function ShiftList() {
     <OwnerLayout title="Ca" back="/owner" testId="shift-list">
       <ErrorText testId="shift-error">{error}</ErrorText>
       {!rows && !error && <Splash />}
-      {rows?.length === 0 && <p className="text-stone-500">Chưa có ca nào.</p>}
+      {rows?.length === 0 && <p className="text-ink-subtle">Chưa có ca nào.</p>}
       {rows && rows.length > 0 && (
         <NavList>
           {rows.map((s) => (
@@ -51,7 +51,8 @@ function ShiftList() {
               key={s.id}
               to={`/owner/shifts/${s.id}`}
               testId={`shift-row-${s.id}`}
-              title={`${s.status === 'open' ? '🟢 ' : ''}${s.staff_name} – ${s.tablet_name}`}
+              title={`${s.staff_name} – ${s.tablet_name}`}
+              live={s.status === 'open'}
               subtitle={`${range(s)}${s.recalculated_at ? ' · đã điều chỉnh' : ''}`}
             />
           ))}
@@ -85,7 +86,7 @@ function ShiftDetailPage() {
     <OwnerLayout title={s ? `Ca ${s.staff_name} – ${s.tablet_name}` : 'Ca'} back="/owner/shifts" testId="shift-detail">
       <ErrorText testId="shift-error">{error}</ErrorText>
       {detail === undefined && !error && <Splash />}
-      {detail === null && <p className="text-stone-500">Không có ca này.</p>}
+      {detail === null && <p className="text-ink-subtle">Không có ca này.</p>}
       {detail && <ShiftBody detail={detail} onChanged={reload} />}
     </OwnerLayout>
   );
@@ -98,10 +99,10 @@ function ShiftBody({ detail, onChanged }: { detail: ShiftDetail; onChanged: () =
 
   return (
     <div className="flex flex-col gap-4" data-testid="shift-report" data-status={s.status}>
-      <p className="text-stone-600" data-testid="shift-range">
+      <p className="text-ink-muted" data-testid="shift-range">
         {range(s)}
         {s.recalculated_at && (
-          <span className="ml-2 rounded bg-amber-100 px-2 py-0.5 text-sm text-amber-800" data-testid="shift-adjusted">
+          <span className="ml-2 rounded bg-warning-soft px-2 py-0.5 text-sm text-warning-strong" data-testid="shift-adjusted">
             đã điều chỉnh
           </span>
         )}
@@ -150,7 +151,7 @@ function ShiftBody({ detail, onChanged }: { detail: ShiftDetail; onChanged: () =
         )}
         <Row label="Đơn còn mở" value={String(r.open_orders)} testId="rep-open-orders" />
         <p className="flex items-baseline justify-between gap-3">
-          <span className="text-stone-600">Sửa đơn đang mở</span>
+          <span className="text-ink-muted">Sửa đơn đang mở</span>
           <Link to={`/owner/log?type=edits&staff=${s.staff_id}`} className="underline" data-testid="rep-edits">
             {detail.edits} lần
           </Link>
@@ -158,7 +159,7 @@ function ShiftBody({ detail, onChanged }: { detail: ShiftDetail; onChanged: () =
       </Card>
 
       <Card title="Bổ sung giữa ca">
-        {adjustments.length === 0 && <p className="text-stone-500">Chưa có.</p>}
+        {adjustments.length === 0 && <p className="text-ink-subtle">Chưa có.</p>}
         {adjustments.map((a) => (
           <p key={a.id} data-testid="adjustment-row" className="text-base">
             {hhmm(a.at)} · +{a.kind === 'cash' ? formatVnd(a.qty) : a.qty} {KIND_LABEL[a.kind]}
@@ -169,7 +170,7 @@ function ShiftBody({ detail, onChanged }: { detail: ShiftDetail; onChanged: () =
       </Card>
 
       <Card title={`Đơn của ca (${detail.orders.length})`}>
-        <p className="text-sm text-stone-500">Đơn mở trong ca này hoặc thu tiền trong ca này.</p>
+        <p className="text-sm text-ink-subtle">Đơn mở trong ca này hoặc thu tiền trong ca này.</p>
         {detail.orders.map((o) => (
           <OrderLine key={o.id} o={o} />
         ))}
@@ -185,19 +186,19 @@ const METHOD_LABEL = { cash: 'TM', transfer: 'CK', debt: 'Nợ' } as const;
 
 function OrderLine({ o }: { o: ShiftOrderRow }) {
   return (
-    <div data-testid={`shift-order-${o.id}`} data-status={o.status} className="flex flex-col border-t border-stone-100 py-2">
+    <div data-testid={`shift-order-${o.id}`} data-status={o.status} className="flex flex-col border-t border-line py-2">
       <p className="flex flex-wrap items-baseline justify-between gap-2">
         <span>
           <Link to={`/owner/orders/${o.id}`} className="font-mono font-bold underline">
             {o.code}
           </Link> {o.label ? `· ${o.label} ` : ''}· {hhmm(o.created_at)} ·{' '}
-          <span className={o.status === 'deleted' ? 'text-red-700' : ''}>{STATUS_LABEL[o.status]}</span>
+          <span className={o.status === 'deleted' ? 'text-danger-strong' : ''}>{STATUS_LABEL[o.status]}</span>
           {o.payment_method && ` · ${METHOD_LABEL[o.payment_method]}`}
         </span>
         <b className={o.status === 'deleted' ? 'line-through' : ''}>{formatVnd(o.total)}</b>
       </p>
-      <p className="text-sm text-stone-600">{o.items.map(lineSummary).join(' · ')}</p>
-      <p className="text-sm text-stone-500" data-testid={`shift-order-${o.id}-who`}>
+      <p className="text-sm text-ink-muted">{o.items.map(lineSummary).join(' · ')}</p>
+      <p className="text-sm text-ink-subtle" data-testid={`shift-order-${o.id}-who`}>
         Mở: {o.opened_by}
         {o.paid_by ? ` · Thu: ${o.paid_by}` : ''}
       </p>
@@ -235,7 +236,7 @@ function AdjustForm({ shiftId, onSaved }: { shiftId: string; onSaved: () => Prom
   }
 
   return (
-    <form className="mt-2 flex flex-col gap-3 rounded-xl bg-stone-50 p-3" onSubmit={submit} data-testid="adjust-form">
+    <form className="mt-2 flex flex-col gap-3 rounded-xl bg-surface-muted p-3" onSubmit={submit} data-testid="adjust-form">
       <div className="grid grid-cols-3 gap-2" role="group" aria-label="Loại bổ sung">
         {(['boxes', 'plates', 'cash'] as const).map((k) => (
           <button
@@ -243,7 +244,7 @@ function AdjustForm({ shiftId, onSaved }: { shiftId: string; onSaved: () => Prom
             type="button"
             aria-pressed={kind === k}
             onClick={() => setKind(k)}
-            className={`btn border ${kind === k ? 'border-stone-800 bg-stone-800 text-white' : 'border-stone-300 bg-white'}`}
+            className="btn btn-segment"
             data-testid={`adjust-kind-${k}`}
           >
             {k === 'boxes' ? 'Hộp' : k === 'plates' ? 'Dĩa' : 'Tiền lẻ'}
@@ -253,7 +254,7 @@ function AdjustForm({ shiftId, onSaved }: { shiftId: string; onSaved: () => Prom
       <TextField label={kind === 'cash' ? 'Số tiền bổ sung' : 'Số lượng bổ sung'} inputMode="numeric" value={qty} onChange={(e) => setQty(e.target.value)} data-testid="adjust-qty" />
       <TextField label="Ghi chú (tùy chọn)" value={note} onChange={(e) => setNote(e.target.value)} data-testid="adjust-note" />
       <ErrorText testId="adjust-error">{error}</ErrorText>
-      <button type="submit" className="btn bg-amber-700 text-white" disabled={busy} data-testid="adjust-submit">
+      <button type="submit" className="btn btn-primary" disabled={busy} data-testid="adjust-submit">
         {kind === 'cash' && parsed ? `Bổ sung ${formatVnd(parsed)}` : 'Bổ sung'}
       </button>
     </form>
@@ -262,7 +263,7 @@ function AdjustForm({ shiftId, onSaved }: { shiftId: string; onSaved: () => Prom
 
 function Card({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="flex flex-col gap-1 rounded-xl border border-stone-200 bg-white p-4">
+    <section className="flex flex-col gap-1 card p-4">
       <h2 className="mb-1 text-lg font-semibold">{title}</h2>
       {children}
     </section>
@@ -272,8 +273,8 @@ function Card({ title, children }: { title: string; children: ReactNode }) {
 function Row({ label, value, testId, strong, alert }: { label: string; value: string; testId: string; strong?: boolean; alert?: boolean }) {
   return (
     <p className="flex items-baseline justify-between gap-3">
-      <span className="text-stone-600">{label}</span>
-      <span className={`text-right ${strong ? 'font-bold' : ''} ${alert ? 'text-red-700' : ''}`} data-testid={testId} data-alert={alert ? 'true' : undefined}>
+      <span className="text-ink-muted">{label}</span>
+      <span className={`text-right ${strong ? 'font-bold' : ''} ${alert ? 'text-danger-strong' : ''}`} data-testid={testId} data-alert={alert ? 'true' : undefined}>
         {value}
       </span>
     </p>

@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { ChefHat, Clock, HandCoins, Plus, Power, Wallet } from 'lucide-react';
 import { itemsSummary } from '@/domain/cart';
 import { formatVnd } from '@/domain/money';
 import { buildQueue, type QueueCard, type WaitColor } from '@/domain/queue';
@@ -13,10 +14,17 @@ import { Notice, useTablet } from './parts';
 const DEFAULT_WAIT = { wait_yellow_min: 5, wait_red_min: 10 };
 
 const CARD_STYLE: Record<WaitColor, string> = {
-  none: 'border-stone-200 bg-white',
-  normal: 'border-stone-200 bg-white',
-  yellow: 'border-amber-400 bg-amber-100',
-  red: 'border-red-500 bg-red-100',
+  none: 'border-line border-l-line-strong bg-surface',
+  normal: 'border-line border-l-success bg-surface',
+  yellow: 'border-warning-line border-l-warning bg-warning-soft',
+  red: 'border-danger-line border-l-danger bg-danger-soft',
+};
+
+const POS_STYLE: Record<WaitColor, string> = {
+  none: 'bg-ink text-white',
+  normal: 'bg-ink text-white',
+  yellow: 'bg-warning text-white',
+  red: 'bg-danger text-white',
 };
 
 /** Thông báo ngắn sau khi thanh toán / xóa đơn, truyền qua state của điều hướng. */
@@ -69,8 +77,8 @@ export function QueueScreen() {
   );
 
   return (
-    <main data-testid="queue-screen" className="flex h-full gap-6 p-6">
-      <div className="flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto pr-1">
+    <main data-testid="queue-screen" className="flex h-full flex-col-reverse gap-4 overflow-y-auto p-4 md:flex-row md:gap-6 md:overflow-hidden md:p-6">
+      <div className="flex flex-col gap-4 md:min-w-0 md:flex-1 md:overflow-y-auto md:pr-1">
         <Notice testId="queue-flash" tone="ok">
           {flash}
         </Notice>
@@ -78,29 +86,37 @@ export function QueueScreen() {
           {error}
         </Notice>
         <section data-testid="queue-serve" className="flex flex-col gap-3">
-          <h2 className="text-xl font-semibold text-stone-600">Chờ ra món ({queue?.serve.length ?? 0})</h2>
+          <SectionTitle icon={<ChefHat className="h-5 w-5" />} count={queue?.serve.length ?? 0}>
+            Chờ ra món
+          </SectionTitle>
           {queue?.serve.map(renderCard)}
         </section>
-        <section data-testid="queue-pay" className="flex flex-col gap-3">
-          <h2 className="text-xl font-semibold text-stone-600">Chờ thanh toán ({queue?.pay.length ?? 0})</h2>
+        <section data-testid="queue-pay" className="mt-2 flex flex-col gap-3">
+          <SectionTitle icon={<Wallet className="h-5 w-5" />} count={queue?.pay.length ?? 0}>
+            Chờ thanh toán
+          </SectionTitle>
           {queue?.pay.map(renderCard)}
         </section>
         {queue && queue.serve.length + queue.pay.length === 0 && (
-          <p data-testid="queue-empty" className="py-8 text-center text-xl text-stone-400">
+          <p data-testid="queue-empty" className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-line-strong py-12 text-center text-xl text-ink-subtle">
+            <ChefHat aria-hidden className="h-10 w-10 opacity-60" />
             Chưa có đơn nào đang chờ.
           </p>
         )}
       </div>
 
-      <aside className="flex w-64 shrink-0 flex-col gap-3">
-        <Link to="/order/new" className="btn flex min-h-[120px] items-center justify-center bg-amber-700 text-3xl text-white" data-testid="new-order">
-          + Đơn mới
+      <aside className="grid shrink-0 grid-cols-2 gap-3 md:flex md:w-64 md:flex-col">
+        <Link to="/order/new" className="btn btn-primary col-span-2 min-h-[88px] flex-col rounded-2xl text-3xl shadow-card md:min-h-[140px]" data-testid="new-order">
+          <Plus aria-hidden className="h-10 w-10" strokeWidth={2.5} />
+          Đơn mới
         </Link>
-        <div className="flex-1" />
-        <Link to="/debt" className="btn flex items-center justify-center border border-stone-300 bg-white" data-testid="open-debt">
+        <div className="hidden flex-1 md:block" />
+        <Link to="/debt" className="btn btn-secondary justify-start" data-testid="open-debt">
+          <HandCoins aria-hidden className="h-5 w-5 text-ink-muted" />
           Thu nợ
         </Link>
-        <Link to="/shift/close" className="btn flex items-center justify-center border border-stone-300 bg-white" data-testid="open-close-shift">
+        <Link to="/shift/close" className="btn btn-secondary justify-start" data-testid="open-close-shift">
+          <Power aria-hidden className="h-5 w-5 text-ink-muted" />
           Đóng ca
         </Link>
       </aside>
@@ -129,45 +145,58 @@ function Card({
       data-group={card.group}
       data-color={card.color}
       data-position={card.position}
-      className={`flex items-stretch gap-3 rounded-2xl border-2 p-3 ${CARD_STYLE[card.color]}`}
+      className={`flex items-stretch gap-3 rounded-2xl border border-l-[6px] p-3 shadow-card ${CARD_STYLE[card.color]}`}
     >
       <button type="button" onClick={onOpen} className="flex min-w-0 flex-1 items-center gap-4 text-left" data-testid={`queue-open-${id}`}>
-        <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-stone-800 text-2xl font-bold text-white" data-testid={`queue-pos-${id}`}>
+        <span className={`num flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-2xl font-bold ${POS_STYLE[card.color]}`} data-testid={`queue-pos-${id}`}>
           {card.position}
         </span>
         <span className="flex min-w-0 flex-col">
           <span className="flex flex-wrap items-baseline gap-x-3">
-            <span className="font-mono text-2xl font-bold tracking-wider" data-testid={`queue-code-${id}`}>
+            <span className="font-mono text-2xl font-bold tracking-wider text-ink" data-testid={`queue-code-${id}`}>
               {o.code}
             </span>
             {o.label && (
-              <span className="text-xl font-semibold text-amber-800" data-testid={`queue-label-${id}`}>
+              <span className="badge bg-brand-soft text-lg font-semibold text-brand-deep" data-testid={`queue-label-${id}`}>
                 {o.label}
               </span>
             )}
-            {pointName && <span className="text-base text-stone-500">{pointName}</span>}
-            <span className="text-base text-stone-500">{o.dine_type === 'dinein' ? 'Tại chỗ' : 'Mang về'}</span>
+            {pointName && <span className="badge bg-info-soft text-info">{pointName}</span>}
+            <span className="badge bg-surface-sunken text-ink-muted">{o.dine_type === 'dinein' ? 'Tại chỗ' : 'Mang về'}</span>
           </span>
-          <span className="truncate text-lg text-stone-700" data-testid={`queue-items-${id}`}>
+          <span className="mt-0.5 truncate text-lg text-ink" data-testid={`queue-items-${id}`}>
             {itemsSummary(o.items)}
           </span>
-          <span className="text-base text-stone-500">
+          <span className="num flex items-center gap-1.5 text-base text-ink-subtle">
+            <Clock aria-hidden className="h-4 w-4" />
             {hhmm(o.created_at)} · chờ <b data-testid={`queue-wait-${id}`}>{card.waitMinutes} phút</b> ·{' '}
-            <b className="text-stone-800" data-testid={`queue-total-${id}`}>
+            <b className="text-ink" data-testid={`queue-total-${id}`}>
               {formatVnd(o.total)}
             </b>
           </span>
         </span>
       </button>
       {card.group === 'serve' ? (
-        <button type="button" onClick={onServe} className="btn shrink-0 bg-emerald-700 px-6 text-white" data-testid={`queue-serve-btn-${id}`}>
+        <button type="button" onClick={onServe} className="btn btn-success shrink-0 px-6" data-testid={`queue-serve-btn-${id}`}>
           Đã ra món
         </button>
       ) : (
-        <button type="button" onClick={onPay} className="btn shrink-0 bg-amber-700 px-6 text-white" data-testid={`queue-pay-btn-${id}`}>
+        <button type="button" onClick={onPay} className="btn btn-primary shrink-0 px-6" data-testid={`queue-pay-btn-${id}`}>
           Thanh toán
         </button>
       )}
     </article>
+  );
+}
+
+function SectionTitle({ icon, count, children }: { icon: ReactNode; count: number; children: ReactNode }) {
+  return (
+    <h2 className="flex items-center gap-2 text-lg font-semibold text-ink-muted">
+      <span aria-hidden className="text-ink-subtle">
+        {icon}
+      </span>
+      {children}
+      <span className="badge num bg-surface-sunken text-base text-ink">{count}</span>
+    </h2>
   );
 }

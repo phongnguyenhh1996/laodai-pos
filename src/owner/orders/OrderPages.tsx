@@ -30,7 +30,7 @@ export const METHOD_LABEL: Record<PaymentMethod, string> = { cash: 'Tiền mặt
 const METHOD_SHORT: Record<PaymentMethod, string> = { cash: 'TM', transfer: 'CK', debt: 'Nợ' };
 const STATUS_LABEL: Record<OrderStatus, string> = { open: 'Chờ ra món', served: 'Chờ thanh toán', paid: 'Đã thu', deleted: 'Đã xóa' };
 
-const select = 'min-h-tap w-full rounded-xl border border-stone-300 bg-white px-3 text-lg';
+const select = 'input px-3';
 
 function useCatalog(): OwnerCatalog | null {
   const { client } = useOwner();
@@ -130,7 +130,7 @@ function OrderList() {
       <ErrorText testId="orders-error">{error}</ErrorText>
       {!rows && !error && <Splash />}
       {rows && (
-        <p className="flex justify-between text-stone-600" data-testid="orders-summary">
+        <p className="flex justify-between text-ink-muted" data-testid="orders-summary">
           <span data-testid="orders-count">{rows.length} đơn</span>
           <span>
             Đã thu {paid.length}: <b data-testid="orders-sum">{formatVnd(sum)}</b>
@@ -138,12 +138,12 @@ function OrderList() {
         </p>
       )}
       {rows?.length === 0 && (
-        <p className="text-stone-500" data-testid="orders-empty">
+        <p className="text-ink-subtle" data-testid="orders-empty">
           Không có đơn nào.
         </p>
       )}
       {rows && rows.length > 0 && (
-        <ul className="flex flex-col divide-y divide-stone-200 overflow-hidden rounded-xl border border-stone-200 bg-white" data-testid="orders-list">
+        <ul className="flex flex-col divide-y divide-line overflow-hidden card" data-testid="orders-list">
           {rows.map((o) => (
             <OrderRow key={o.id} o={o} />
           ))}
@@ -157,13 +157,13 @@ function OrderRow({ o }: { o: OrderListRow }) {
   const deleted = o.status === 'deleted';
   return (
     <li data-testid="orders-row" data-id={o.id} data-status={o.status} data-method={o.payment_method ?? ''}>
-      <Link to={`/owner/orders/${o.id}`} className="flex flex-col gap-0.5 px-4 py-3 active:bg-stone-50">
+      <Link to={`/owner/orders/${o.id}`} className="flex flex-col gap-0.5 px-4 py-3 active:bg-surface-muted">
         <span className="flex items-baseline justify-between gap-2">
           <span>
-            <b className="font-mono">{o.code}</b> · {hhmm(o.at)} · <span className={deleted ? 'text-red-700' : ''}>{STATUS_LABEL[o.status]}</span>
+            <b className="font-mono">{o.code}</b> · {hhmm(o.at)} · <span className={deleted ? 'text-danger-strong' : ''}>{STATUS_LABEL[o.status]}</span>
             {o.payment_method && ` · ${METHOD_SHORT[o.payment_method]}`}
             {o.owner_edited && (
-              <span className="ml-2 rounded bg-amber-100 px-1.5 text-sm text-amber-800" data-testid="orders-row-edited">
+              <span className="ml-2 rounded bg-warning-soft px-1.5 text-sm text-warning-strong" data-testid="orders-row-edited">
                 chủ đã sửa
               </span>
             )}
@@ -172,8 +172,8 @@ function OrderRow({ o }: { o: OrderListRow }) {
             {formatVnd(o.total)}
           </b>
         </span>
-        <span className="text-sm text-stone-600">{itemsSummary(o.items)}</span>
-        <span className="text-sm text-stone-500" data-testid="orders-row-who">
+        <span className="text-sm text-ink-muted">{itemsSummary(o.items)}</span>
+        <span className="text-sm text-ink-subtle" data-testid="orders-row-who">
           {o.point_name} · Mở: {o.opened_by}
           {o.paid_by ? ` · Thu: ${o.paid_by}` : ''}
           {o.customer_label ? ` · ${o.customer_label}` : ''}
@@ -214,9 +214,9 @@ function OrderEditPage() {
     <OwnerLayout title={order ? `Sửa đơn ${order.code}` : 'Sửa đơn'} back={`/owner/orders/${orderId}`} testId="order-edit">
       <ErrorText testId="edit-load-error">{error}</ErrorText>
       {(order === undefined || (order && !cat)) && !error && <Splash />}
-      {order === null && <p className="text-stone-500">Không có đơn này.</p>}
+      {order === null && <p className="text-ink-subtle">Không có đơn này.</p>}
       {order && order.status !== 'paid' && (
-        <p className="text-stone-500" data-testid="edit-not-paid">
+        <p className="text-ink-subtle" data-testid="edit-not-paid">
           Chỉ sửa được đơn đã thanh toán.
         </p>
       )}
@@ -263,38 +263,38 @@ function EditForm({ order, cat }: { order: EditableOrder; cat: EditCatalog }) {
 
   return (
     <div className="flex flex-col gap-4" data-testid="edit-form">
-      <p className="text-stone-600">
+      <p className="text-ink-muted">
         {order.point_name} · {order.tablet_name} · {order.dine_type === 'dinein' ? 'Tại chỗ' : 'Mang về'}
       </p>
       {order.closed_shift_ids.length > 0 && (
-        <p className="rounded-lg bg-amber-50 px-4 py-3 text-amber-900" data-testid="edit-recalc-note">
+        <p className="rounded-lg bg-warning-soft px-4 py-3 text-warning-strong" data-testid="edit-recalc-note">
           Ca của đơn này đã đóng: lưu xong sẽ <b>tính lại đối soát</b> và đánh dấu “đã điều chỉnh”. Telegram được báo ngay.
         </p>
       )}
 
-      <section className="flex flex-col gap-2 rounded-xl border border-stone-200 bg-white p-4">
+      <section className="flex flex-col gap-2 card p-4">
         <h2 className="text-lg font-semibold">Món</h2>
-        {draft.items.length === 0 && <p className="text-stone-500">Chưa có món.</p>}
+        {draft.items.length === 0 && <p className="text-ink-subtle">Chưa có món.</p>}
         {draft.items.map((it) => (
           <div key={it.id} className="flex items-center justify-between gap-2" data-testid={`edit-line-${it.id}`}>
             <span className="min-w-0 flex-1">
               {lineSummary(it)}
-              <span className="block text-sm text-stone-500">{formatVnd(lineTotal(it))}</span>
+              <span className="block text-sm text-ink-subtle">{formatVnd(lineTotal(it))}</span>
             </span>
-            <button type="button" className="btn w-14 border border-stone-300 bg-white text-2xl" onClick={() => update((d) => ({ ...d, items: stepLineQty(d.items, it.id, -1) }))} data-testid={`edit-line-${it.id}-minus`} aria-label="Bớt">
+            <button type="button" className="btn w-14 btn-secondary text-2xl" onClick={() => update((d) => ({ ...d, items: stepLineQty(d.items, it.id, -1) }))} data-testid={`edit-line-${it.id}-minus`} aria-label="Bớt">
               −
             </button>
             <b className="w-8 text-center" data-testid={`edit-line-${it.id}-qty`}>
               {it.qty}
             </b>
-            <button type="button" className="btn w-14 border border-stone-300 bg-white text-2xl" onClick={() => update((d) => ({ ...d, items: stepLineQty(d.items, it.id, 1) }))} data-testid={`edit-line-${it.id}-plus`} aria-label="Thêm">
+            <button type="button" className="btn w-14 btn-secondary text-2xl" onClick={() => update((d) => ({ ...d, items: stepLineQty(d.items, it.id, 1) }))} data-testid={`edit-line-${it.id}-plus`} aria-label="Thêm">
               +
             </button>
           </div>
         ))}
 
         <details className="mt-2" data-testid="edit-add">
-          <summary className="btn flex cursor-pointer items-center border border-dashed border-stone-400 bg-stone-50" data-testid="edit-add-open">
+          <summary className="btn flex cursor-pointer items-center border border-dashed border-line-strong bg-surface-muted" data-testid="edit-add-open">
             + Thêm món (giá hiện hành)
           </summary>
           <div className="mt-2 flex flex-col gap-2">
@@ -303,7 +303,7 @@ function EditForm({ order, cat }: { order: EditableOrder; cat: EditCatalog }) {
                 <button
                   key={c.id}
                   type="button"
-                  className="btn border border-amber-300 bg-amber-50 text-left text-base"
+                  className="btn btn-brand-outline justify-start text-left text-base"
                   onClick={() => update((d) => ({ ...d, items: addCombo(d.items, uuidv7(), c, cat.products, cat.toppings, order.menu_id) }))}
                   data-testid={`edit-add-combo-${c.id}`}
                 >
@@ -315,7 +315,7 @@ function EditForm({ order, cat }: { order: EditableOrder; cat: EditCatalog }) {
                   key={p.id}
                   type="button"
                   aria-pressed={picking?.id === p.id}
-                  className={`btn border text-left text-base ${picking?.id === p.id ? 'border-stone-800 bg-stone-800 text-white' : 'border-stone-300 bg-white'}`}
+                  className="btn btn-choice justify-start text-left text-base"
                   onClick={() => setPicking(picking?.id === p.id ? null : p)}
                   data-testid={`edit-add-product-${p.id}`}
                 >
@@ -338,7 +338,7 @@ function EditForm({ order, cat }: { order: EditableOrder; cat: EditCatalog }) {
         </details>
       </section>
 
-      <section className="flex flex-col gap-2 rounded-xl border border-stone-200 bg-white p-4">
+      <section className="flex flex-col gap-2 card p-4">
         <h2 className="text-lg font-semibold">Hình thức thanh toán</h2>
         <div className="grid grid-cols-3 gap-2" role="group" aria-label="Hình thức">
           {(['cash', 'transfer', 'debt'] as const).map((m) => (
@@ -347,7 +347,7 @@ function EditForm({ order, cat }: { order: EditableOrder; cat: EditCatalog }) {
               type="button"
               aria-pressed={draft.payment_method === m}
               onClick={() => update((d) => setEditMethod(d, m))}
-              className={`btn border ${draft.payment_method === m ? 'border-stone-800 bg-stone-800 text-white' : 'border-stone-300 bg-white'}`}
+              className="btn btn-segment"
               data-testid={`edit-method-${m}`}
             >
               {METHOD_LABEL[m]}
@@ -359,30 +359,30 @@ function EditForm({ order, cat }: { order: EditableOrder; cat: EditCatalog }) {
         )}
       </section>
 
-      <section className="flex flex-col gap-1 rounded-xl border border-stone-200 bg-white p-4">
+      <section className="flex flex-col gap-1 card p-4">
         <p className="flex justify-between">
-          <span className="text-stone-600">Tổng trước</span>
+          <span className="text-ink-muted">Tổng trước</span>
           <span data-testid="edit-total-before">{formatVnd(sum.before)}</span>
         </p>
         <p className="flex justify-between">
-          <span className="text-stone-600">Tổng sau</span>
+          <span className="text-ink-muted">Tổng sau</span>
           <b className="text-xl" data-testid="edit-total-after">
             {formatVnd(sum.after)}
           </b>
         </p>
         <p className="flex justify-between">
-          <span className="text-stone-600">Chênh lệch</span>
+          <span className="text-ink-muted">Chênh lệch</span>
           <span data-testid="edit-total-diff">{formatSigned(sum.diff)}</span>
         </p>
       </section>
 
       <ErrorText testId="edit-error">{error}</ErrorText>
       {problem && (
-        <p className="text-stone-500" data-testid="edit-problem">
+        <p className="text-ink-subtle" data-testid="edit-problem">
           {problem}
         </p>
       )}
-      <button type="button" className="btn bg-amber-700 text-white disabled:opacity-50" disabled={!!problem || busy} onClick={() => void save()} data-testid="edit-save">
+      <button type="button" className="btn btn-primary" disabled={!!problem || busy} onClick={() => void save()} data-testid="edit-save">
         {busy ? 'Đang lưu…' : 'Lưu thay đổi'}
       </button>
     </div>
@@ -393,7 +393,7 @@ function ToppingPicker({ product, toppings, onAdd }: { product: Product; topping
   const [chosen, setChosen] = useState<string[]>([]);
   const price = product.price + toppings.filter((t) => chosen.includes(t.id)).reduce((s, t) => s + t.price, 0);
   return (
-    <div className="flex flex-col gap-2 rounded-xl bg-stone-50 p-3" data-testid="edit-topping-picker">
+    <div className="flex flex-col gap-2 rounded-xl bg-surface-muted p-3" data-testid="edit-topping-picker">
       <p className="font-medium">{product.name} + topping</p>
       <div className="grid grid-cols-2 gap-2">
         {toppings.map((t) => (
@@ -402,14 +402,14 @@ function ToppingPicker({ product, toppings, onAdd }: { product: Product; topping
             type="button"
             aria-pressed={chosen.includes(t.id)}
             onClick={() => setChosen((c) => (c.includes(t.id) ? c.filter((x) => x !== t.id) : [...c, t.id]))}
-            className={`btn border text-base ${chosen.includes(t.id) ? 'border-amber-700 bg-amber-100' : 'border-stone-300 bg-white'}`}
+            className="btn btn-choice text-base"
             data-testid={`edit-topping-${t.id}`}
           >
             {t.name} +{formatVnd(t.price)}
           </button>
         ))}
       </div>
-      <button type="button" className="btn bg-stone-800 text-white" onClick={() => onAdd(toppings.filter((t) => chosen.includes(t.id)))} data-testid="edit-add-confirm">
+      <button type="button" className="btn btn-dark" onClick={() => onAdd(toppings.filter((t) => chosen.includes(t.id)))} data-testid="edit-add-confirm">
         Thêm · {formatVnd(price)}
       </button>
     </div>
@@ -421,9 +421,9 @@ function CustomerPicker({ customers, chosenId, onPick }: { customers: EditCatalo
   const chosen = useMemo(() => customers.find((c) => c.id === chosenId) ?? null, [customers, chosenId]);
   if (chosen)
     return (
-      <p className="flex items-center justify-between gap-2 rounded-lg bg-stone-50 px-3 py-2">
+      <p className="flex items-center justify-between gap-2 rounded-lg bg-surface-muted px-3 py-2">
         <span data-testid="edit-customer-chosen">{customerLabel(chosen)}</span>
-        <button type="button" className="btn border border-stone-300 bg-white" onClick={() => onPick(null)} data-testid="edit-customer-clear">
+        <button type="button" className="btn btn-secondary" onClick={() => onPick(null)} data-testid="edit-customer-clear">
           Đổi khách
         </button>
       </p>
@@ -433,7 +433,7 @@ function CustomerPicker({ customers, chosenId, onPick }: { customers: EditCatalo
     <div className="flex flex-col gap-2">
       <TextField label="Khách nợ (gõ tên / mô tả)" value={q} onChange={(e) => setQ(e.target.value)} data-testid="edit-customer-search" />
       {list.map((c) => (
-        <button key={c.id} type="button" className="btn border border-stone-300 bg-white text-left" onClick={() => onPick(c.id)} data-testid={`edit-customer-${c.id}`}>
+        <button key={c.id} type="button" className="btn btn-secondary text-left" onClick={() => onPick(c.id)} data-testid={`edit-customer-${c.id}`}>
           {customerLabel(c)}
         </button>
       ))}

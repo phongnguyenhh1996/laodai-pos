@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { useState, type FormEvent } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
+import { ChevronRight, TabletSmartphone } from 'lucide-react';
 import { ErrorText, Splash, TextField, errorMessage } from '@/app/ui';
 import { useActivation } from '@/app/useActivation';
 import { activateTablet, listTabletProfiles, signInOwnerEphemeral, type TabletProfileOption } from '@/lib/auth';
@@ -53,9 +54,12 @@ export function ActivateScreen() {
 
   return (
     <main data-testid="activate-screen" className="mx-auto flex h-full max-w-md flex-col justify-center gap-6 p-6">
-      <header className="flex flex-col gap-2">
+      <header className="flex flex-col gap-3">
+        <span aria-hidden className="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-strong text-white shadow-card">
+          <TabletSmartphone className="h-7 w-7" />
+        </span>
         <h1 className="text-3xl font-bold">Kích hoạt tablet</h1>
-        <p className="text-lg text-stone-600">
+        <p className="text-lg text-ink-muted">
           {step.kind === 'login'
             ? 'Chủ đăng nhập một lần để gắn máy này với một hồ sơ tablet.'
             : 'Chọn hồ sơ cho máy này.'}
@@ -63,7 +67,7 @@ export function ActivateScreen() {
       </header>
 
       {step.kind === 'login' ? (
-        <form className="flex flex-col gap-4" onSubmit={login} data-testid="activate-login-form">
+        <form className="card flex flex-col gap-4 p-6" onSubmit={login} data-testid="activate-login-form">
           <TextField
             label="Email chủ"
             type="email"
@@ -83,7 +87,7 @@ export function ActivateScreen() {
             data-testid="activate-password"
           />
           <ErrorText testId="activate-error">{error}</ErrorText>
-          <button type="submit" className="btn bg-amber-700 text-white" disabled={busy} data-testid="activate-login">
+          <button type="submit" className="btn btn-primary" disabled={busy} data-testid="activate-login">
             {busy ? 'Đang đăng nhập…' : 'Đăng nhập'}
           </button>
         </form>
@@ -93,15 +97,16 @@ export function ActivateScreen() {
             <button
               key={p.id}
               type="button"
-              className="btn border border-stone-300 bg-white text-left text-xl"
+              className="btn btn-secondary min-h-[72px] justify-between text-left text-xl"
               disabled={busy}
               onClick={() => pick(step.owner, p.id)}
               data-testid={`activate-profile-${p.id}`}
             >
               {p.name}
+              <ChevronRight aria-hidden className="h-6 w-6 text-ink-subtle" />
             </button>
           ))}
-          {step.profiles.length === 0 && <p className="text-stone-500">Chưa có hồ sơ tablet nào trong Cài đặt.</p>}
+          {step.profiles.length === 0 && <p className="text-ink-subtle">Chưa có hồ sơ tablet nào trong Cài đặt.</p>}
           <ErrorText testId="activate-error">{error}</ErrorText>
         </div>
       )}
