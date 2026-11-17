@@ -48,6 +48,20 @@ describe('reconcile: quy tắc', () => {
     expect(after.revenue.total).toBe(before.revenue.total);
   });
 
+  it('đếm thiếu tiền: chênh lệch âm đúng số thiếu; thu nợ ở ca khác và đơn mở ở ca trước (thu ở ca này) tính đúng ca', () => {
+    const d = run('dem-thieu-tien');
+    expect(d.cash).toEqual({ expected: 500_000 + 100_000 + 31_000 + 28_000 + 50_000, counted: 689_000, diff: -20_000 });
+    expect(d.boxes.by_orders).toBe(2); // đơn mở ở ca trước không tính hộp cho ca này
+  });
+
+  it('dùng hộp không có đơn: thực dùng (đầu ca + bổ sung − còn lại) lớn hơn theo đơn ⇒ chênh lệch dương', () => {
+    const d = run('dung-hop-khong-don');
+    // 200 + 50 − 230 = 20 hộp; theo đơn: xôi 2 + cơm mang về (1 + 2 topping thêm hộp) + cơm tại chỗ 0 + đơn mở 1 = 6
+    expect(d.boxes).toEqual({ used: 20, by_orders: 6, diff: 14 });
+    expect(d.plates).toEqual({ used: 1, by_orders: 1, diff: 0 });
+    expect(d.deleted_after_served).toEqual([{ order_id: expect.any(String), code: 'F24', boxes: 3, plates: 0 }]);
+  });
+
   it('đơn xóa có served_at sau deleted_at (dữ liệu lạ) không tính là "xóa sau khi ra món"', () => {
     const c = cases.find((x) => x.name === 'co-ban')!;
     const odd = c.input.orders.map((o) =>

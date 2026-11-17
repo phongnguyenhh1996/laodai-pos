@@ -7,3 +7,4 @@ export * from './transport';
 export * from './runner';
 export * from './catalog';
 export * from './debtLocal';
+export * from './restore';

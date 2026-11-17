@@ -32,6 +32,7 @@ src/domain/        logic nghiệp vụ thuần (giá, giỏ hàng, bao bì, ti�
 src/sync/          offline-first: Dexie, outbox, device_seq, thao tác tablet, engine đồng bộ,
                    transport RPC `sync_push`, SyncRunner (tự gửi khi có thao tác / có mạng, thử lại backoff),
                    danh mục tablet (`catalog.ts`: menu/giá/điểm bán/nhân viên/hồ sơ/khách nợ + dư nợ lưu trên máy, tự làm mới),
+                   khôi phục khi kích hoạt lại (`restore.ts`: ca + đơn đang mở trên server về máy mới),
                    sổ nợ tại máy (`debtLocal.ts`: ghi / thu nợ chưa phản ánh vào danh mục ⇒ dư nợ đúng ngay, kể cả offline)
 src/lib/sync.ts    bộ đồng bộ của tablet (chạy từ lúc vào màn bán hàng) + chỉ báo `sync-status`
 src/lib/auth.ts    đăng nhập chủ, kích hoạt tablet, chế độ chủ trên tablet (phiên tạm, tự thoát 2 phút)

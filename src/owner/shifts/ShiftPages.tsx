@@ -121,21 +121,21 @@ function ShiftBody({ detail, onChanged }: { detail: ShiftDetail; onChanged: () =
         <Row label="Chủ bổ sung" value={formatVnd(adj('cash'))} testId="rep-cash-adj" />
         <Row label="Kỳ vọng" value={formatVnd(r.cash.expected)} testId="rep-cash-expected" strong />
         {closed && <Row label="Đếm được" value={formatVnd(r.cash.counted ?? 0)} testId="rep-cash-counted" />}
-        {closed && <Row label="Chênh lệch" value={formatSigned(r.cash.diff ?? 0)} testId="rep-cash-diff" strong />}
+        {closed && <Row label="Chênh lệch" value={formatSigned(r.cash.diff ?? 0)} testId="rep-cash-diff" strong alert={!!r.cash.diff} />}
       </Card>
 
       <Card title="Hộp">
         <Row label="Đầu ca + bổ sung" value={`${s.open_boxes} + ${adj('boxes')} = ${s.open_boxes + adj('boxes')}`} testId="rep-boxes-supply" />
         {closed && <Row label="Còn lại" value={String(s.close_boxes_left)} testId="rep-boxes-left" />}
         <Row label="Thực dùng / theo đơn" value={`${r.boxes.used ?? '–'} / ${r.boxes.by_orders}`} testId="rep-boxes" />
-        {closed && <Row label="Chênh lệch" value={formatSigned(r.boxes.diff ?? 0, false)} testId="rep-boxes-diff" strong />}
+        {closed && <Row label="Chênh lệch" value={formatSigned(r.boxes.diff ?? 0, false)} testId="rep-boxes-diff" strong alert={!!r.boxes.diff} />}
       </Card>
 
       <Card title="Dĩa">
         <Row label="Đầu ca + bổ sung" value={`${s.open_plates} + ${adj('plates')} = ${s.open_plates + adj('plates')}`} testId="rep-plates-supply" />
         {closed && <Row label="Còn lại" value={String(s.close_plates_left)} testId="rep-plates-left" />}
         <Row label="Thực dùng / theo đơn" value={`${r.plates.used ?? '–'} / ${r.plates.by_orders}`} testId="rep-plates" />
-        {closed && <Row label="Chênh lệch" value={formatSigned(r.plates.diff ?? 0, false)} testId="rep-plates-diff" strong />}
+        {closed && <Row label="Chênh lệch" value={formatSigned(r.plates.diff ?? 0, false)} testId="rep-plates-diff" strong alert={!!r.plates.diff} />}
       </Card>
 
       <Card title="Xóa & đơn mở">
@@ -261,11 +261,11 @@ function Card({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-function Row({ label, value, testId, strong }: { label: string; value: string; testId: string; strong?: boolean }) {
+function Row({ label, value, testId, strong, alert }: { label: string; value: string; testId: string; strong?: boolean; alert?: boolean }) {
   return (
     <p className="flex items-baseline justify-between gap-3">
       <span className="text-stone-600">{label}</span>
-      <span className={`text-right ${strong ? 'font-bold' : ''}`} data-testid={testId}>
+      <span className={`text-right ${strong ? 'font-bold' : ''} ${alert ? 'text-red-700' : ''}`} data-testid={testId} data-alert={alert ? 'true' : undefined}>
         {value}
       </span>
     </p>

@@ -198,4 +198,37 @@ describe('B. Ca', () => {
     // Chênh lệch chỉ tới tay chủ
     cy.telegramWaitFor('Đóng ca – Lan').its('text').should('contain', 'đếm 540.000 / kỳ vọng 559.000 → −19.000');
   });
+
+  it('kích hoạt lại tablet khi ca còn mở (máy mới / dữ liệu bị xóa) ⇒ lấy lại ca + đơn đang mở, đóng được ca', () => {
+    cy.activateTablet('A');
+    cy.openShift('Lan');
+    cy.get(tid('new-order')).click();
+    cy.get(tid('order-label')).type('còn mở');
+    cy.get(tid(`menu-combo-${SEED.combos.xoiGaTrung}`)).click();
+    cy.get(tid('order-serve')).click();
+    cy.waitSynced();
+
+    // Chủ kích hoạt lại trên máy trống
+    cy.activateTablet('A');
+    cy.get(tid('queue-screen')).should('be.visible');
+    cy.get(tid('shift-staff')).should('contain.text', 'Lan');
+    cy.get(`${tid('queue-pay')} [data-testid^=queue-card-]`).should('have.length', 1).and('contain.text', 'còn mở');
+
+    cy.get('[data-testid^=queue-pay-btn-]').click();
+    cy.get(tid('cash-exact')).click();
+    cy.get(tid('pay-confirm')).click();
+    cy.get(tid('open-close-shift')).click();
+    cy.get(tid('close-boxes')).type('199');
+    cy.get(tid('close-plates')).type('60');
+    cy.get(tid('close-cash')).type('531000');
+    cy.get(tid('close-review')).click();
+    cy.get(tid('close-confirm')).click();
+    cy.get(tid('shift-closed')).should('be.visible');
+    cy.waitSynced();
+    cy.task<DbShift[]>('db:shifts', 'A').then((shifts) => {
+      expect(shifts).to.have.length(1);
+      expect(shifts[0]).to.include({ staff_name: 'Lan', status: 'closed', close_cash_counted: 531_000 });
+    });
+    cy.telegramWaitFor('Đóng ca – Lan').its('text').should('contain', 'đếm 531.000 / kỳ vọng 531.000');
+  });
 });

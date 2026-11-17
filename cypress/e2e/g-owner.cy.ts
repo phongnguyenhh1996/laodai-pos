@@ -54,8 +54,11 @@ describe('G. Chủ', () => {
     });
 
     // Tablet đồng bộ danh mục: đơn mới sẽ dùng giá mới (combo cũng tính lại theo giá mới)
+    // Kích hoạt tablet A: server còn ca của Lan + 2 đơn đang mở ⇒ tablet lấy lại cả ca lẫn đơn,
+    // đơn cũ vẫn giá cũ (2 × 25.000), đơn tạo sau khi đổi giá là giá mới (28.000)
     cy.activateTablet('A');
-    cy.openShift('Mai');
+    cy.get(tid('shift-staff')).should('contain.text', 'Lan');
+    cy.get('[data-testid^=queue-total-]').then(($t) => expect([...$t].map((t) => t.textContent)).to.deep.eq(['50.000', '28.000']));
     cy.get(tid('new-order')).click();
     cy.get(tid(`menu-product-${SEED.products.xoiGa}-price`)).should('contain.text', '28.000');
     cy.get(tid(`menu-combo-${SEED.combos.xoiGaTrung}-price`)).should('contain.text', '34.000');

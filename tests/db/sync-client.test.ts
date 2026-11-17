@@ -5,7 +5,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   LaodaiDB, META, SyncRunner, SyncTransportError, createOrder, createRpcTransport, flushOutbox, openShift,
-  payOrder, serveOrder, setMeta, type SyncTransport,
+  closeShift, createSupabaseRestoreSource, currentShift, payOrder, restoreOpenState, serveOrder, setMeta, updateOrder,
+  visibleOrders, type SyncTransport,
 } from '@/sync';
 import type { TabletProfile } from '@/domain/types';
 import { resetDb, sql, tabletClient } from '../support/db';
@@ -126,5 +127,38 @@ describe('tablet ↔ sync_push', () => {
     }
     runner.stop();
     expect(await sql('select id from orders')).toEqual([{ id: a.id }]);
+  });
+});
+
+describe('kích hoạt lại khi server còn ca đang mở', () => {
+  it('máy mới lấy lại đúng ca + đơn đang mở (dòng đã bỏ không về), rồi đóng được ca và bán tiếp', async () => {
+    const a = await createOrder(db, draft(2));
+    const b = await createOrder(db, draft());
+    const paid = await createOrder(db, draft());
+    await updateOrder(db, a.id, { items: [item('xoiXeo')] }); // dòng xôi gà bị bỏ trên server
+    await serveOrder(db, b.id);
+    await payOrder(db, paid.id, { method: 'transfer' });
+    await flushOutbox(db, transport);
+    const shift = (await currentShift(db))!;
+
+    // Máy mới (IndexedDB trống), cùng hồ sơ A
+    const fresh = new LaodaiDB(`db-sync-fresh-${++n}`);
+    await setMeta(fresh, META.activation, { tablet_profile_id: SEED.tablets.A, tablet_name: 'Tablet A', activated_at: '', owner_email: '' });
+    expect(await restoreOpenState(fresh, createSupabaseRestoreSource(tab))).toEqual({ shift: true, orders: 2 });
+    expect(await currentShift(fresh)).toMatchObject({ id: shift.id, staff_id: SEED.staff.Lan, staff_name: 'Lan', open_boxes: 200, open_float: 500_000 });
+    const got = (await visibleOrders(fresh)).sort((x, y) => x.device_seq - y.device_seq);
+    expect(got.map((o) => [o.id, o.status, o.total])).toEqual([[a.id, 'open', 15_000], [b.id, 'served', 31_000]]);
+    expect(got[0].items.map((i) => i.product_id)).toEqual([SEED.products.xoiXeo]);
+
+    // Đóng ca cũ từ máy mới: server nhận; ca sau mở được, đơn cũ vẫn thu được
+    await closeShift(fresh, { boxes_left: 197, plates_left: 60, cash_counted: 500_000 });
+    await openShift(fresh, { staff_id: SEED.staff.Mai, staff_name: 'Mai', profile: PROFILE_A });
+    await payOrder(fresh, a.id, { method: 'cash', cash_given: 15_000 });
+    const rep = await flushOutbox(fresh, transport);
+    expect(rep).toMatchObject({ rejected: 0, remaining: 0 });
+    const shifts = await sql<{ status: string }>('select status from shifts where tablet_profile_id = $1 order by opened_at', [SEED.tablets.A]);
+    expect(shifts.map((s) => s.status)).toEqual(['closed', 'open']);
+    expect((await sql('select status from orders where id = $1', [a.id]))[0].status).toBe('paid');
+    await fresh.delete();
   });
 });

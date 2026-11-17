@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { META, setMeta, seedDeviceSeq, type Activation } from '@/sync';
+import { META, createSupabaseRestoreSource, restoreOpenState, setMeta, seedDeviceSeq, type Activation } from '@/sync';
 import { createEphemeralClient, decodeClaims, storedClaims, supabase } from './supabase';
 import { getActivation, localDb } from './localdb';
 
@@ -110,6 +110,9 @@ export async function activateTablet(owner: SupabaseClient, profileId: string, n
   };
   await setMeta(localDb, META.activation, activation);
   await seedDeviceSeq(localDb, res.last_device_seq);
+  // Server còn ca đang mở của hồ sơ này (máy mới / dữ liệu bị xóa) ⇒ lấy lại ca + đơn đang mở để đóng được ca.
+  // Lỗi mạng ở bước này không chặn kích hoạt: máy vẫn bán được, nhưng chủ sẽ thấy ca cũ chưa đóng.
+  await restoreOpenState(localDb, createSupabaseRestoreSource(supabase)).catch((e: unknown) => console.warn('Không khôi phục được ca đang mở', e));
   return activation;
 }
 
