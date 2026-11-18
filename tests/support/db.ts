@@ -58,19 +58,22 @@ export async function ownerClient(): Promise<SupabaseClient> {
 export async function tabletSession(profileId: string): Promise<{ access_token: string; refresh_token: string }> {
   const admin = serviceClient();
   const email = `tablet-${profileId}@tablets.laodai.local`;
-  const password = `t-${crypto.randomUUID()}`;
   const app_metadata = { role: 'tablet', tablet_profile_id: profileId };
   const existing = await sql<{ id: string }>('select id from auth.users where email = $1', [email]);
   if (existing[0]) {
-    const { error } = await admin.auth.admin.updateUserById(existing[0].id, { password, app_metadata });
+    // Không đổi mật khẩu (sẽ thu hồi phiên của máy khác cùng hồ sơ), chỉ chỉnh app_metadata.
+    const { error } = await admin.auth.admin.updateUserById(existing[0].id, { app_metadata });
     if (error) throw error;
   } else {
+    const password = `t-${crypto.randomUUID()}`;
     const { data, error } = await admin.auth.admin.createUser({ email, password, email_confirm: true, app_metadata });
     if (error) throw error;
     await sql('update public.tablet_profiles set auth_user_id = $1 where id = $2', [data.user.id, profileId]);
   }
+  const { data: link, error: linkErr } = await admin.auth.admin.generateLink({ type: 'magiclink', email });
+  if (linkErr) throw linkErr;
   const c = anonClient();
-  const { data, error } = await c.auth.signInWithPassword({ email, password });
+  const { data, error } = await c.auth.verifyOtp({ token_hash: link.properties.hashed_token, type: 'magiclink' });
   if (error) throw error;
   return { access_token: data.session!.access_token, refresh_token: data.session!.refresh_token };
 }
