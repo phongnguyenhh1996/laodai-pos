@@ -79,6 +79,8 @@ export function OrderScreen() {
   const queueRef = useRef<Promise<unknown>>(Promise.resolve());
   /** Id của đơn mới, cố định cho tới khi tạo xong: bấm lại sau lỗi mạng không tạo đơn thứ hai. */
   const newIdRef = useRef(uuidv7());
+  /** Đơn được tạo ở lần mở màn này ⇒ về hàng đợi thẻ hiện ra có hiệu ứng. */
+  const createdHere = useRef<string | null>(null);
 
   /** Ghi bản nháp: đơn mới ⇒ create_order; đơn cũ có thay đổi ⇒ update_order. */
   async function persist(): Promise<Order> {
@@ -90,6 +92,7 @@ export function OrderScreen() {
     if (!s) {
       // Từ đây đơn đã có trên server (savedRef bên dưới): bước sau lỗi rồi bấm lại là sửa chứ không tạo đơn thứ hai.
       o = await pos.createOrder({ id: newIdRef.current, ...fields });
+      createdHere.current = o.id;
     } else if (draftChanged(x, s)) {
       o = await pos.updateOrder(s.id, fields);
     } else {
@@ -277,7 +280,8 @@ export function OrderScreen() {
     }
   }
 
-  const done = (flash?: string) => navigate('/', { replace: true, state: flash ? ({ flash } satisfies QueueFlash) : null });
+  const done = (flash?: string, extra?: Omit<QueueFlash, 'flash'>) =>
+    navigate('/', { replace: true, state: { flash, created: createdHere.current ?? undefined, ...extra } satisfies QueueFlash });
 
   const save = () => run(async () => {
     await flush();
@@ -296,7 +300,9 @@ export function OrderScreen() {
   const payExact = () => run(async () => {
     const o = await flush();
     await pos.payOrder(o.id, { method: 'cash', cash_given: o.total });
-    done(`Đã thu ${formatVnd(o.total)} – đơn ${o.code}`);
+    // Đơn đã có trong hàng đợi trước khi mở ⇒ thẻ hiện "Đã thanh toán" rồi biến mất; đơn vừa tạo thì không hiện gì.
+    const fresh = createdHere.current === o.id;
+    done(`Đã thu ${formatVnd(o.total)} – đơn ${o.code}`, fresh ? { created: undefined } : { paid: o });
   });
   const remove = (reason: DeleteReason) => run(async () => {
     if (!saved) return;
@@ -310,7 +316,7 @@ export function OrderScreen() {
     // (Đơn ship bị xóa mất địa chỉ ⇒ không lưu được: hỏi bỏ thay đổi.)
     if (saved && !empty && !noAddress) void run(async () => {
       await flushAuto();
-      navigate('/');
+      navigate('/', { state: { created: createdHere.current ?? undefined } satisfies QueueFlash });
     });
     else if (dirty) setDialog({ kind: 'discard' });
     else navigate('/');

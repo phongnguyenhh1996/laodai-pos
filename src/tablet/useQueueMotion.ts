@@ -120,3 +120,28 @@ export function playExit(card: HTMLElement, overlay: HTMLElement | null, kind: k
     );
   }
 }
+
+/** Thời gian thẻ đơn mới được đánh dấu "vừa vào" (hiệu ứng xuất hiện + viền cam nhấp nháy). */
+export const ENTER_MS = 1600;
+
+/** Đơn mới vào hàng đợi: thẻ rơi nhẹ xuống, bật lên đúng cỡ, viền cam sáng rồi tắt dần. */
+export function playEnter(card: HTMLElement) {
+  if (!canAnimate()) return;
+  card.animate(
+    [
+      { opacity: 0, transform: 'translateY(-14px) scale(0.94)' },
+      { opacity: 1, transform: 'translateY(0) scale(1.02)', offset: 0.6 },
+      { opacity: 1, transform: 'none' },
+    ],
+    { duration: 460, easing: EASE_OUT, fill: 'backwards' },
+  );
+  card.animate(
+    [
+      { boxShadow: '0 0 0 0 rgb(var(--brand) / 0.55)' },
+      { boxShadow: '0 0 0 6px rgb(var(--brand) / 0.25)', offset: 0.3 },
+      { boxShadow: '0 0 0 3px rgb(var(--brand) / 0.35)', offset: 0.6 },
+      { boxShadow: '0 0 0 0 rgb(var(--brand) / 0)' },
+    ],
+    { duration: ENTER_MS, easing: 'ease-out' },
+  );
+}

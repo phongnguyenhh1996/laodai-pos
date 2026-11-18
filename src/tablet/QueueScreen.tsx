@@ -10,7 +10,7 @@ import { pos } from '@/lib/pos';
 import { errorMessage } from '@/app/ui';
 import { useNow } from '@/app/useLive';
 import { Notice, useTablet } from './parts';
-import { EXIT_MS, canAnimate, playExit, useFlip } from './useQueueMotion';
+import { ENTER_MS, EXIT_MS, canAnimate, playEnter, playExit, useFlip } from './useQueueMotion';
 
 const DEFAULT_WAIT = { wait_yellow_min: 5, wait_red_min: 10 };
 
@@ -39,8 +39,10 @@ const WAIT_STYLE: Record<WaitColor, string> = {
 /** Thông báo ngắn sau khi thanh toán / xóa đơn, truyền qua state của điều hướng. */
 export interface QueueFlash {
   flash?: string;
-  /** Đơn vừa thanh toán trên máy này: hiện lại thoáng qua ở "Chờ thanh toán" rồi biến mất. */
+  /** Đơn vừa thanh toán trên máy này: hiện lại thoáng qua ở chỗ cũ rồi biến mất. */
   paid?: Order;
+  /** Đơn vừa tạo trên máy này: thẻ hiện ra có hiệu ứng. */
+  created?: string;
 }
 
 type ExitKind = keyof typeof EXIT_MS;
@@ -82,8 +84,9 @@ export function QueueScreen() {
   const [leaving, setLeaving] = useState<Leaving[]>(() => {
     const paid = (location.state as QueueFlash | null)?.paid;
     if (!paid || !canAnimate() || orders.some((o) => o.id === paid.id)) return [];
-    const index = orders.filter((o) => o.status === 'served' && o.created_at < paid.created_at).length;
-    const card: QueueCard = { order: paid, group: 'pay', position: 0, waitMinutes: 0, color: 'none' };
+    const status = paid.status === 'open' ? 'open' : 'served';
+    const index = orders.filter((o) => o.status === status && o.created_at < paid.created_at).length;
+    const card: QueueCard = { order: paid, group: status === 'open' ? 'serve' : 'pay', position: 0, waitMinutes: 0, color: 'none' };
     return [{ card, index, kind: 'paid', until: Date.now() + EXIT_MS.paid }];
   });
 
@@ -96,6 +99,12 @@ export function QueueScreen() {
   const settings = catalog?.config ?? DEFAULT_WAIT;
   const queue = buildQueue(orders, now, settings);
 
+  // Đơn mới vào hàng đợi (vừa tạo trên máy này, hoặc máy khác tạo khi đang xem) ⇒ hiệu ứng xuất hiện.
+  const [entering, setEntering] = useState<Map<string, number>>(() => {
+    const created = (location.state as QueueFlash | null)?.created;
+    return created && canAnimate() ? new Map([[created, Date.now() + ENTER_MS]]) : new Map();
+  });
+
   // Đơn rời hàng đợi khi đang xem (máy khác thu / xóa, hoặc vừa thu trên máy này) ⇒ giữ thẻ lại để chạy hiệu ứng.
   const lastCards = useRef<Map<string, { card: QueueCard; index: number }> | null>(null);
   useLayoutEffect(() => {
@@ -104,6 +113,14 @@ export function QueueScreen() {
     const prev = lastCards.current;
     lastCards.current = cur;
     if (!prev || !canAnimate()) return;
+    const added = [...cur.keys()].filter((id) => !prev.has(id));
+    if (added.length > 0) {
+      setEntering((m) => {
+        const next = new Map(m);
+        for (const id of added) if (!next.has(id)) next.set(id, Date.now() + ENTER_MS);
+        return next;
+      });
+    }
     const gone = [...prev.entries()].filter(([id]) => !cur.has(id));
     if (gone.length === 0) return;
     setLeaving((l) => [
@@ -125,6 +142,16 @@ export function QueueScreen() {
     return () => clearTimeout(t);
   }, [leaving]);
 
+  useEffect(() => {
+    if (entering.size === 0) return;
+    const next = Math.min(...entering.values());
+    const t = setTimeout(
+      () => setEntering((m) => new Map([...m].filter(([, until]) => until > Date.now() + 20))),
+      Math.max(0, next - Date.now()),
+    );
+    return () => clearTimeout(t);
+  }, [entering]);
+
   const serveSlots = withLeaving(queue.serve, leaving.filter((l) => l.card.group === 'serve'));
   const paySlots = withLeaving(queue.pay, leaving.filter((l) => l.card.group === 'pay'));
 
@@ -137,6 +164,8 @@ export function QueueScreen() {
 
   async function serve(id: string) {
     setError(null);
+    // Thẻ sắp bay sang "Chờ thanh toán": không chạy lại hiệu ứng xuất hiện ở chỗ mới.
+    setEntering((m) => (m.has(id) ? new Map([...m].filter(([k]) => k !== id)) : m));
     try {
       await pos.serveOrder(id);
     } catch (e) {
@@ -149,6 +178,7 @@ export function QueueScreen() {
       key={c.order.id}
       card={c}
       leaving={exit}
+      entering={!exit && entering.has(c.order.id)}
       pointName={multiPoint ? pointName(c.order.point_id) : null}
       onOpen={() => navigate(`/order/${c.order.id}`)}
       onServe={() => void serve(c.order.id)}
@@ -230,6 +260,7 @@ const DINE_ICON: Record<DineType, LucideIcon> = { dinein: UtensilsCrossed, takea
 function Card({
   card,
   leaving,
+  entering,
   pointName,
   onOpen,
   onServe,
@@ -238,6 +269,8 @@ function Card({
   card: QueueCard;
   /** Thẻ đang rời hàng đợi: chỉ để hiện hiệu ứng, không bấm được, không có testid. */
   leaving?: ExitKind;
+  /** Đơn vừa vào hàng đợi: chạy hiệu ứng xuất hiện (một lần). */
+  entering?: boolean;
   pointName: string | null;
   onOpen: () => void;
   onServe: () => void;
@@ -252,6 +285,9 @@ function Card({
   useLayoutEffect(() => {
     if (leaving && ref.current) playExit(ref.current, overlayRef.current, leaving);
   }, [leaving]);
+  useLayoutEffect(() => {
+    if (entering && ref.current) playEnter(ref.current);
+  }, [entering]);
   return (
     <article
       ref={ref}
