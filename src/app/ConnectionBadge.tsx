@@ -27,10 +27,12 @@ export function ConnectionBadge({ state }: { state: ConnState }) {
       data-testid="conn-status"
       data-state={state}
       role="status"
-      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-semibold ${STYLE[state]}`}
+      title={CONN_LABELS[state]}
+      className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-1 text-sm font-semibold md:px-3 ${STYLE[state]}`}
     >
       <Icon aria-hidden className="h-4 w-4 shrink-0" />
-      {CONN_LABELS[state]}
+      {/* Điện thoại chỉ hiện biểu tượng (màu vẫn báo trạng thái); chữ vẫn đọc được cho trình đọc màn hình. */}
+      <span className="sr-only md:not-sr-only">{CONN_LABELS[state]}</span>
     </span>
   );
 }

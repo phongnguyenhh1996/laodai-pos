@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeftRight, Banknote, Bike, ChefHat, ChevronLeft, MapPin, Minus, Plus, Save, ShoppingBag, Trash2, UtensilsCrossed, Wallet, X } from 'lucide-react';
+import { ArrowLeftRight, Banknote, Bike, ChefHat, ChevronLeft, ChevronUp, MapPin, Minus, Plus, Save, ShoppingBag, Trash2, UtensilsCrossed, Wallet, X } from 'lucide-react';
 import { v7 as uuidv7 } from 'uuid';
 import {
   addCombo,
@@ -9,6 +9,7 @@ import {
   draftAddress,
   draftChanged,
   draftTotal,
+  itemsSummary,
   lineSummary,
   needsAddress,
   newDraft,
@@ -38,6 +39,9 @@ const DINE_TYPES: ReadonlyArray<{ id: DineType; Icon: typeof ShoppingBag }> = [
 
 const DELETE_REASONS = (['mistake', 'customer_left', 'customer_changed', 'other'] as const).map((id) => ({ id, label: DELETE_REASON_LABELS[id] }));
 
+/** Nút thao tác phụ: điện thoại xếp biểu tượng trên chữ cho vừa ba nút một hàng. */
+const ACTION_BTN = 'flex-col gap-0.5 px-1 text-sm md:flex-row md:gap-2 md:px-4 md:text-lg';
+
 /** Chờ ngần này sau lần sửa cuối mới tự lưu (gõ nhãn, bấm +/− liên tục chỉ ra một update_order). */
 const AUTOSAVE_MS = 800;
 
@@ -59,6 +63,8 @@ export function OrderScreen() {
   const [dialog, setDialog] = useState<Dialog>(null);
   /** Dòng đang chọn để đổi món: bấm món / combo kế tiếp sẽ thay dòng này thay vì thêm mới. */
   const [swapId, setSwapId] = useState<string | null>(null);
+  /** Điện thoại: giỏ đang mở rộng (tablet luôn hiện đủ). */
+  const [cartOpen, setCartOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   /** Đang gõ địa chỉ: chưa tự lưu (mỗi lần đổi địa chỉ đơn ship là một tin Telegram), lưu khi rời ô. */
@@ -310,9 +316,42 @@ export function OrderScreen() {
     else navigate('/');
   }
 
+  const itemCount = d.items.reduce((s, it) => s + it.qty, 0);
+
+  // Điện thoại: đầu đơn ở trên, thực đơn cuộn ở giữa, giỏ (thu gọn còn một dòng) + nút thao tác luôn ở đáy:
+  // bấm món là thấy ngay số món / tổng tiền, không phải cuộn xuống mới tạo đơn được.
+  // Tablet (md+): thực đơn bên trái, đầu đơn + giỏ thành một cột bên phải.
   return (
-    <main data-testid="order-screen" data-point={d.point_id} className="flex h-full flex-col gap-4 overflow-y-auto p-4 md:flex-row md:overflow-hidden">
-      <div className="flex flex-col gap-3 md:min-w-0 md:flex-1 md:overflow-y-auto md:pr-1">
+    <main
+      data-testid="order-screen"
+      data-point={d.point_id}
+      className="flex h-full flex-col md:grid md:grid-cols-[minmax(0,1fr)_380px] md:grid-rows-[auto_minmax(0,1fr)] md:gap-x-4 md:p-4 lg:grid-cols-[minmax(0,1fr)_420px]"
+    >
+      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-line bg-surface px-3 py-2 md:card md:col-start-2 md:row-start-1 md:rounded-b-none md:border-b-0 md:px-4 md:pb-3 md:pt-4 md:shadow-none">
+        <button type="button" className="btn btn-secondary min-h-[48px] pl-3 md:min-h-tap" onClick={back} data-testid="order-back">
+          <ChevronLeft aria-hidden className="h-5 w-5" />
+          Hàng đợi
+        </button>
+        {saved ? (
+          <span className="flex flex-col items-end">
+            <span className="text-xl font-bold md:text-2xl">
+              Đơn #
+              <span className="font-mono tracking-wider" data-testid="order-code">
+                {saved.code}
+              </span>
+            </span>
+            <span className="text-sm text-ink-subtle" data-testid="order-autosave" data-state={autoPending ? 'saving' : 'saved'}>
+              {autoPending ? 'Đang lưu…' : empty ? 'Chưa lưu: đơn trống' : 'Đã lưu'}
+            </span>
+          </span>
+        ) : (
+          <span className="text-xl font-bold md:text-2xl" data-testid="order-code">
+            Đơn mới
+          </span>
+        )}
+      </div>
+
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3 md:col-start-1 md:row-span-2 md:row-start-1 md:p-0 md:pr-1">
         {swapLine && (
           <div data-testid="swap-banner" role="status" className="sticky top-0 z-10 flex items-center gap-3 rounded-xl border border-brand-line bg-brand-soft px-4 py-3 text-lg font-medium text-brand-deep shadow-card">
             <ArrowLeftRight aria-hidden className="h-5 w-5 shrink-0" />
@@ -335,31 +374,41 @@ export function OrderScreen() {
         />
       </div>
 
-      <aside data-testid="cart" className="card flex w-full shrink-0 flex-col gap-3 p-4 md:w-[380px] lg:w-[420px]">
-        <div className="flex items-center justify-between gap-2">
-          <button type="button" className="btn btn-secondary pl-3" onClick={back} data-testid="order-back">
-            <ChevronLeft aria-hidden className="h-5 w-5" />
-            Hàng đợi
-          </button>
-          {saved ? (
-            <span className="flex flex-col items-end">
-              <span className="text-2xl font-bold">
-                Đơn #
-                <span className="font-mono tracking-wider" data-testid="order-code">
-                  {saved.code}
-                </span>
+      <aside
+        data-testid="cart"
+        className="flex max-h-[75%] shrink-0 flex-col gap-2 border-t border-line bg-surface p-3 shadow-raised md:card md:col-start-2 md:row-start-2 md:max-h-none md:min-h-0 md:gap-3 md:rounded-t-none md:border-t-0 md:p-4 md:pt-0"
+      >
+        {/* Chỉ trên điện thoại: một dòng tóm tắt giỏ, bấm để mở / thu gọn chi tiết. */}
+        <button
+          type="button"
+          className="flex min-h-[52px] items-center gap-3 rounded-xl bg-surface-sunken px-3 py-2 text-left md:hidden"
+          aria-expanded={cartOpen}
+          onClick={() => setCartOpen((v) => !v)}
+          data-testid="cart-toggle"
+        >
+          <span className="relative shrink-0">
+            <ShoppingBag aria-hidden className="h-6 w-6 text-ink-muted" />
+            {itemCount > 0 && (
+              <span className="num absolute -right-2 -top-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-brand-strong px-1 text-xs font-bold text-white">
+                {itemCount}
               </span>
-              <span className="text-sm text-ink-subtle" data-testid="order-autosave" data-state={autoPending ? 'saving' : 'saved'}>
-                {autoPending ? 'Đang lưu…' : empty ? 'Chưa lưu: đơn trống' : 'Đã lưu'}
-              </span>
+            )}
+          </span>
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="truncate text-base font-medium leading-tight">
+              {empty ? 'Chưa có món' : `${DINE_LABELS[d.dine_type]}${d.label.trim() ? ` · ${d.label.trim()}` : ''} · ${itemsSummary(d.items)}`}
             </span>
-          ) : (
-            <span className="text-2xl font-bold" data-testid="order-code">
-              Đơn mới
-            </span>
-          )}
-        </div>
+            {noAddress ? (
+              <span className="text-sm font-medium text-danger-strong">Thiếu địa chỉ ship: bấm để nhập</span>
+            ) : (
+              <span className="text-sm text-ink-subtle">{cartOpen ? 'Bấm để thu gọn' : 'Bấm để xem giỏ'}</span>
+            )}
+          </span>
+          <span className="num shrink-0 text-xl font-bold">{formatVnd(total)}</span>
+          <ChevronUp aria-hidden className={`h-5 w-5 shrink-0 text-ink-subtle transition-transform duration-fast ${cartOpen ? 'rotate-180' : ''}`} />
+        </button>
 
+        <div className={`${cartOpen ? 'flex' : 'hidden'} min-h-0 flex-col gap-3 overflow-y-auto md:flex md:flex-1 md:overflow-visible`}>
         <div className="grid grid-cols-3 gap-1.5 rounded-xl bg-surface-sunken p-1" role="group" aria-label="Tại chỗ / Mang về / Ship">
           {DINE_TYPES.map(({ id: t, Icon }) => (
             <button
@@ -367,7 +416,7 @@ export function OrderScreen() {
               type="button"
               aria-pressed={d.dine_type === t}
               onClick={() => edit((x) => setDineType(x, t))}
-              className="btn min-h-[52px] px-2 text-ink-muted hover:text-ink aria-pressed:bg-surface aria-pressed:text-ink aria-pressed:shadow-card"
+              className="btn min-h-[52px] gap-1.5 whitespace-nowrap px-1 text-base text-ink-muted md:gap-2 md:px-2 md:text-lg hover:text-ink aria-pressed:bg-surface aria-pressed:text-ink aria-pressed:shadow-card"
               data-testid={`order-dine-${t}`}
             >
               <Icon aria-hidden className="h-5 w-5 shrink-0" />
@@ -412,7 +461,7 @@ export function OrderScreen() {
           data-testid="order-label"
         />
 
-        <ul className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto" data-testid="cart-lines">
+        <ul className="flex flex-col gap-2 md:min-h-0 md:flex-1 md:overflow-y-auto" data-testid="cart-lines">
           {empty && (
             <li className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-line-strong py-8 text-center text-ink-subtle">
               <ShoppingBag aria-hidden className="h-8 w-8 opacity-60" />
@@ -432,7 +481,11 @@ export function OrderScreen() {
                 className="min-w-0 flex-1 rounded-lg py-1 text-left"
                 aria-pressed={swapLine?.id === it.id}
                 aria-label={`Đổi món ${lineSummary(it)}`}
-                onClick={() => setSwapId((cur) => (cur === it.id ? null : it.id))}
+                onClick={() => {
+                  // Điện thoại: chọn dòng để đổi ⇒ thu gọn giỏ cho thấy thực đơn.
+                  if (swapLine?.id !== it.id) setCartOpen(false);
+                  setSwapId((cur) => (cur === it.id ? null : it.id));
+                }}
                 data-testid={`cart-line-${it.id}-pick`}
               >
                 <span className="block text-lg font-medium leading-tight">{lineSummary({ ...it, qty: 1 }).replace(/^1× /, '')}</span>
@@ -453,42 +506,45 @@ export function OrderScreen() {
           ))}
         </ul>
 
-        <div className="flex items-baseline justify-between border-t border-dashed border-line-strong pt-3">
+        {/* Điện thoại đã có tổng ở dòng tóm tắt. */}
+        <div className="hidden items-baseline justify-between border-t border-dashed border-line-strong pt-3 md:flex">
           <span className="text-xl font-medium text-ink-muted">Tổng</span>
           <span className="num text-3xl font-bold text-ink" data-testid="order-total">
             {formatVnd(total)}
           </span>
+        </div>
         </div>
 
         <Notice testId="order-error" tone="error">
           {error ?? (saved && empty ? 'Đơn không còn món nào: thêm món, hoặc bấm Xóa đơn.' : null)}
         </Notice>
 
-        <button type="button" className="btn btn-success min-h-[64px] text-xl" disabled={blocked} onClick={() => void payExact()} data-testid="order-pay-exact">
+        <button type="button" className="btn btn-success min-h-[56px] text-xl md:min-h-[64px]" disabled={blocked} onClick={() => void payExact()} data-testid="order-pay-exact">
           <Banknote aria-hidden className="h-6 w-6" />
           Thu đủ tiền mặt {formatVnd(total)}
         </button>
-        <div className="grid grid-cols-2 gap-2">
-          <button type="button" className="btn btn-primary" disabled={blocked} onClick={() => void pay()} data-testid="order-pay">
+        {/* Điện thoại: các nút còn lại xếp một hàng (biểu tượng trên, chữ dưới). */}
+        <div className="grid auto-cols-fr grid-flow-col gap-2 md:grid-flow-row md:grid-cols-2">
+          <button type="button" className={`btn btn-primary ${ACTION_BTN}`} disabled={blocked} onClick={() => void pay()} data-testid="order-pay">
             <Wallet aria-hidden className="h-5 w-5" />
             Thanh toán…
           </button>
           {saved?.status === 'served' ? (
-            <span />
+            <span className="hidden md:block" />
           ) : (
-            <button type="button" className="btn btn-dark" disabled={blocked} onClick={() => void serve()} data-testid="order-serve">
+            <button type="button" className={`btn btn-dark ${ACTION_BTN}`} disabled={blocked} onClick={() => void serve()} data-testid="order-serve">
               <ChefHat aria-hidden className="h-5 w-5" />
               Đã ra món
             </button>
           )}
           {!saved && (
-            <button type="button" className="btn btn-secondary" disabled={blocked} onClick={() => void save()} data-testid="order-save">
+            <button type="button" className={`btn btn-secondary ${ACTION_BTN}`} disabled={blocked} onClick={() => void save()} data-testid="order-save">
               <Save aria-hidden className="h-5 w-5" />
               Tạo đơn
             </button>
           )}
           {saved && (
-            <button type="button" className="btn btn-danger-outline" disabled={busy} onClick={() => setDialog({ kind: 'delete' })} data-testid="order-delete">
+            <button type="button" className={`btn btn-danger-outline ${ACTION_BTN}`} disabled={busy} onClick={() => setDialog({ kind: 'delete' })} data-testid="order-delete">
               <Trash2 aria-hidden className="h-5 w-5" />
               Xóa đơn
             </button>

@@ -11,6 +11,12 @@ import { errorMessage } from '@/app/ui';
 import { useNow } from '@/app/useLive';
 import { Notice, useTablet } from './parts';
 
+/** Thu nợ / Đóng ca: điện thoại là ô nhỏ (biểu tượng trên, chữ dưới) cạnh "Đơn mới"; tablet là nút dài. */
+const SIDE_BTN = 'btn btn-secondary w-[72px] flex-col gap-0.5 px-1 text-sm md:w-auto md:flex-row md:justify-start md:gap-2 md:px-4 md:text-lg';
+
+/** Nút trên thẻ đơn: điện thoại thấp hơn, nằm dưới nội dung; tablet là cột bên phải như cũ. */
+const CARD_BTN = 'min-h-[48px] w-full text-base md:min-h-tap md:w-auto md:shrink-0 md:px-6 md:text-lg';
+
 const DEFAULT_WAIT = { wait_yellow_min: 5, wait_red_min: 10 };
 
 const CARD_STYLE: Record<WaitColor, string> = {
@@ -76,8 +82,9 @@ export function QueueScreen() {
   );
 
   return (
-    <main data-testid="queue-screen" className="flex h-full flex-col-reverse gap-4 overflow-y-auto p-4 md:flex-row md:gap-6 md:overflow-hidden md:p-6">
-      <div className="flex flex-col gap-4 md:min-w-0 md:flex-1 md:overflow-y-auto md:pr-1">
+    // Điện thoại: hàng đợi cuộn, thanh "Đơn mới" luôn nằm dưới đáy (trong tầm ngón cái). Tablet: cột nút bên phải.
+    <main data-testid="queue-screen" className="flex h-full flex-col md:flex-row md:gap-6 md:p-6">
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 md:min-w-0 md:p-0 md:pr-1">
         <Notice testId="queue-flash" tone="ok">
           {flash}
         </Notice>
@@ -104,17 +111,21 @@ export function QueueScreen() {
         )}
       </div>
 
-      <aside className="grid shrink-0 grid-cols-2 gap-3 md:flex md:w-64 md:flex-col">
-        <Link to="/order/new" className="btn btn-primary col-span-2 min-h-[88px] flex-col rounded-2xl text-3xl shadow-card md:min-h-[140px]" data-testid="new-order">
-          <Plus aria-hidden className="h-10 w-10" strokeWidth={2.5} />
+      <aside className="flex shrink-0 gap-2 border-t border-line bg-surface p-3 shadow-raised md:w-64 md:flex-col md:gap-3 md:border-0 md:bg-transparent md:p-0 md:shadow-none">
+        <Link
+          to="/order/new"
+          className="btn btn-primary order-last min-h-[64px] flex-1 rounded-2xl text-2xl shadow-card md:order-none md:min-h-[140px] md:flex-none md:flex-col md:text-3xl"
+          data-testid="new-order"
+        >
+          <Plus aria-hidden className="h-8 w-8 md:h-10 md:w-10" strokeWidth={2.5} />
           Đơn mới
         </Link>
         <div className="hidden flex-1 md:block" />
-        <Link to="/debt" className="btn btn-secondary justify-start" data-testid="open-debt">
+        <Link to="/debt" className={SIDE_BTN} data-testid="open-debt">
           <HandCoins aria-hidden className="h-5 w-5 text-ink-muted" />
           Thu nợ
         </Link>
-        <Link to="/shift/close" className="btn btn-secondary justify-start" data-testid="open-close-shift">
+        <Link to="/shift/close" className={SIDE_BTN} data-testid="open-close-shift">
           <Power aria-hidden className="h-5 w-5 text-ink-muted" />
           Đóng ca
         </Link>
@@ -138,21 +149,25 @@ function Card({
 }) {
   const o = card.order;
   const id = o.id;
+  // Điện thoại: nút thao tác xuống hàng dưới, rộng hết thẻ, để chữ của đơn không bị ép hẹp.
   return (
     <article
       data-testid={`queue-card-${id}`}
       data-group={card.group}
       data-color={card.color}
       data-position={card.position}
-      className={`flex items-stretch gap-3 rounded-2xl border border-l-[6px] p-3 shadow-card ${CARD_STYLE[card.color]}`}
+      className={`flex flex-col gap-2 rounded-2xl border border-l-[6px] p-3 shadow-card md:flex-row md:items-stretch md:gap-3 ${CARD_STYLE[card.color]}`}
     >
-      <button type="button" onClick={onOpen} className="flex min-w-0 flex-1 items-center gap-4 text-left" data-testid={`queue-open-${id}`}>
-        <span className={`num flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-2xl font-bold ${POS_STYLE[card.color]}`} data-testid={`queue-pos-${id}`}>
+      <button type="button" onClick={onOpen} className="flex min-w-0 flex-1 items-center gap-3 text-left md:gap-4" data-testid={`queue-open-${id}`}>
+        <span
+          className={`num flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-xl font-bold md:h-14 md:w-14 md:rounded-2xl md:text-2xl ${POS_STYLE[card.color]}`}
+          data-testid={`queue-pos-${id}`}
+        >
           {card.position}
         </span>
         <span className="flex min-w-0 flex-col">
-          <span className="flex flex-wrap items-baseline gap-x-3">
-            <span className="text-2xl font-bold text-ink">
+          <span className="flex flex-wrap items-baseline gap-x-2 md:gap-x-3">
+            <span className="text-xl font-bold text-ink md:text-2xl">
               Đơn #
               <span className="font-mono tracking-wider" data-testid={`queue-code-${id}`}>
                 {o.code}
@@ -177,10 +192,10 @@ function Card({
               <span className="truncate">{o.address}</span>
             </span>
           )}
-          <span className="mt-0.5 truncate text-lg text-ink" data-testid={`queue-items-${id}`}>
+          <span className="mt-0.5 line-clamp-2 text-base text-ink md:truncate md:text-lg" data-testid={`queue-items-${id}`}>
             {itemsSummary(o.items)}
           </span>
-          <span className="num flex items-center gap-1.5 text-base text-ink-subtle">
+          <span className="num flex flex-wrap items-center gap-x-1.5 text-sm text-ink-subtle md:text-base">
             <Clock aria-hidden className="h-4 w-4" />
             {hhmm(o.created_at)} · chờ <b data-testid={`queue-wait-${id}`}>{card.waitMinutes} phút</b> ·{' '}
             <b className="text-ink" data-testid={`queue-total-${id}`}>
@@ -190,11 +205,11 @@ function Card({
         </span>
       </button>
       {card.group === 'serve' ? (
-        <button type="button" onClick={onServe} className="btn btn-success shrink-0 px-6" data-testid={`queue-serve-btn-${id}`}>
+        <button type="button" onClick={onServe} className={`btn btn-success ${CARD_BTN}`} data-testid={`queue-serve-btn-${id}`}>
           Đã ra món
         </button>
       ) : (
-        <button type="button" onClick={onPay} className="btn btn-primary shrink-0 px-6" data-testid={`queue-pay-btn-${id}`}>
+        <button type="button" onClick={onPay} className={`btn btn-primary ${CARD_BTN}`} data-testid={`queue-pay-btn-${id}`}>
           Thanh toán
         </button>
       )}

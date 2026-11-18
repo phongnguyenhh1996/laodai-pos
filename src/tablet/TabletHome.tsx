@@ -42,28 +42,29 @@ export function TabletHome({ activation }: { activation: Activation }) {
 
   return (
     <div data-testid="tablet-home" className="flex h-full flex-col bg-canvas">
-      <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-line bg-surface px-4 py-3 shadow-xs md:px-6">
-        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
-          <span aria-hidden className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-strong text-white">
-            <Store className="h-6 w-6" />
+      {/* Điện thoại: gọn một dòng (chỉ báo kết nối, nút chế độ chủ chỉ còn biểu tượng) để dành chỗ cho thực đơn / hàng đợi. */}
+      <header className="flex items-center justify-between gap-2 border-b border-line bg-surface px-3 py-2 shadow-xs md:gap-x-4 md:gap-y-2 md:px-6 md:py-3">
+        <div className="flex min-w-0 items-center gap-2 md:flex-wrap md:gap-x-3 md:gap-y-2">
+          <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-strong text-white md:h-11 md:w-11">
+            <Store className="h-5 w-5 md:h-6 md:w-6" />
           </span>
-          <h1 className="truncate text-xl font-bold" data-testid="tablet-name">
+          <h1 className="min-w-0 truncate text-lg font-bold md:text-xl" data-testid="tablet-name">
             {tabletName}
           </h1>
           {ctx?.shift && (
-            <span className="badge gap-1.5 bg-surface-sunken py-1 text-base text-ink-muted" data-testid="shift-staff">
-              <UserRound aria-hidden className="h-4 w-4" />
-              Ca của {ctx.shift.staff_name}
+            <span className="badge min-w-0 shrink gap-1.5 truncate bg-surface-sunken py-1 text-sm text-ink-muted md:text-base" data-testid="shift-staff">
+              <UserRound aria-hidden className="h-4 w-4 shrink-0" />
+              <span className="truncate">Ca của {ctx.shift.staff_name}</span>
             </span>
           )}
           <ConnectionBadge state={snap.conn} />
-          <span className="text-xs text-ink-subtle" data-testid="app-version" title="Phiên bản app">
+          <span className="hidden text-xs text-ink-subtle md:inline" data-testid="app-version" title="Phiên bản app">
             v{APP_VERSION}
           </span>
         </div>
-        <Link to="/owner" className="btn btn-secondary shrink-0" data-testid="open-owner-mode">
+        <Link to="/owner" className="btn btn-secondary shrink-0 px-3 md:px-4" data-testid="open-owner-mode" aria-label="Chế độ chủ">
           <LockKeyhole aria-hidden className="h-5 w-5" />
-          Chế độ chủ
+          <span className="hidden md:inline">Chế độ chủ</span>
         </Link>
       </header>
       {ctx && snap.conn === 'offline' && (
