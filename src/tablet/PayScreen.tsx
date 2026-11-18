@@ -68,7 +68,7 @@ export function PayScreen() {
     setError(null);
     try {
       await pos.payOrder(o.id, payment);
-      navigate('/', { replace: true, state: { flash } satisfies QueueFlash });
+      navigate('/', { replace: true, state: { flash, paid: o } satisfies QueueFlash });
     } catch (e) {
       setError(errorMessage(e));
       busyRef.current = false;

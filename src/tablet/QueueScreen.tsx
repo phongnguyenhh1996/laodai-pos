@@ -1,15 +1,16 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Bike, ChefHat, Clock, Inbox, MapPin, Plus, ShoppingBag, UtensilsCrossed, Wallet, type LucideIcon } from 'lucide-react';
+import { Bike, Check, ChefHat, Clock, Inbox, MapPin, Plus, ShoppingBag, UtensilsCrossed, Wallet, type LucideIcon } from 'lucide-react';
 import { itemsSummary } from '@/domain/cart';
 import { formatVnd } from '@/domain/money';
 import { buildQueue, type QueueCard, type WaitColor } from '@/domain/queue';
 import { hhmm } from '@/domain/time';
-import { DINE_LABELS, type DineType } from '@/domain/types';
+import { DINE_LABELS, type DineType, type Order } from '@/domain/types';
 import { pos } from '@/lib/pos';
 import { errorMessage } from '@/app/ui';
 import { useNow } from '@/app/useLive';
 import { Notice, useTablet } from './parts';
+import { EXIT_MS, canAnimate, playExit, useFlip } from './useQueueMotion';
 
 const DEFAULT_WAIT = { wait_yellow_min: 5, wait_red_min: 10 };
 
@@ -38,6 +39,32 @@ const WAIT_STYLE: Record<WaitColor, string> = {
 /** Thông báo ngắn sau khi thanh toán / xóa đơn, truyền qua state của điều hướng. */
 export interface QueueFlash {
   flash?: string;
+  /** Đơn vừa thanh toán trên máy này: hiện lại thoáng qua ở "Chờ thanh toán" rồi biến mất. */
+  paid?: Order;
+}
+
+type ExitKind = keyof typeof EXIT_MS;
+
+/** Thẻ đang rời hàng đợi (đã thanh toán / bị xóa / máy khác thu): vẫn vẽ ở chỗ cũ tới khi hiệu ứng xong. */
+interface Leaving {
+  card: QueueCard;
+  index: number;
+  kind: ExitKind;
+  until: number;
+}
+
+interface Slot {
+  card: QueueCard;
+  leaving?: ExitKind;
+}
+
+/** Chèn thẻ đang rời vào đúng chỗ cũ trong nhóm. */
+function withLeaving(cards: QueueCard[], leaving: Leaving[]): Slot[] {
+  const out: Slot[] = cards.map((card) => ({ card }));
+  for (const l of [...leaving].sort((a, b) => a.index - b.index)) {
+    out.splice(Math.min(l.index, out.length), 0, { card: l.card, leaving: l.kind });
+  }
+  return out;
 }
 
 /**
@@ -51,6 +78,14 @@ export function QueueScreen() {
   const now = useNow(1000);
   const [error, setError] = useState<string | null>(null);
   const [flash, setFlash] = useState<string | null>((location.state as QueueFlash | null)?.flash ?? null);
+  const paidId = useRef((location.state as QueueFlash | null)?.paid?.id ?? null);
+  const [leaving, setLeaving] = useState<Leaving[]>(() => {
+    const paid = (location.state as QueueFlash | null)?.paid;
+    if (!paid || !canAnimate() || orders.some((o) => o.id === paid.id)) return [];
+    const index = orders.filter((o) => o.status === 'served' && o.created_at < paid.created_at).length;
+    const card: QueueCard = { order: paid, group: 'pay', position: 0, waitMinutes: 0, color: 'none' };
+    return [{ card, index, kind: 'paid', until: Date.now() + EXIT_MS.paid }];
+  });
 
   useEffect(() => {
     if (!flash) return;
@@ -60,6 +95,43 @@ export function QueueScreen() {
 
   const settings = catalog?.config ?? DEFAULT_WAIT;
   const queue = buildQueue(orders, now, settings);
+
+  // Đơn rời hàng đợi khi đang xem (máy khác thu / xóa, hoặc vừa thu trên máy này) ⇒ giữ thẻ lại để chạy hiệu ứng.
+  const lastCards = useRef<Map<string, { card: QueueCard; index: number }> | null>(null);
+  useLayoutEffect(() => {
+    const cur = new Map<string, { card: QueueCard; index: number }>();
+    for (const list of [queue.serve, queue.pay]) list.forEach((card, index) => cur.set(card.order.id, { card, index }));
+    const prev = lastCards.current;
+    lastCards.current = cur;
+    if (!prev || !canAnimate()) return;
+    const gone = [...prev.entries()].filter(([id]) => !cur.has(id));
+    if (gone.length === 0) return;
+    setLeaving((l) => [
+      ...l,
+      ...gone
+        .filter(([id]) => !l.some((x) => x.card.order.id === id))
+        .map(([id, { card, index }]): Leaving => {
+          const kind: ExitKind = id === paidId.current ? 'paid' : 'gone';
+          return { card, index, kind, until: Date.now() + EXIT_MS[kind] };
+        }),
+    ]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orders]);
+
+  useEffect(() => {
+    if (leaving.length === 0) return;
+    const next = Math.min(...leaving.map((l) => l.until));
+    const t = setTimeout(() => setLeaving((l) => l.filter((x) => x.until > Date.now() + 20)), Math.max(0, next - Date.now()));
+    return () => clearTimeout(t);
+  }, [leaving]);
+
+  const serveSlots = withLeaving(queue.serve, leaving.filter((l) => l.card.group === 'serve'));
+  const paySlots = withLeaving(queue.pay, leaving.filter((l) => l.card.group === 'pay'));
+
+  // Đã ra món ⇒ thẻ bay xuống "Chờ thanh toán"; các thẻ còn lại trượt vào chỗ trống.
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const slotKey = (s: Slot) => `${s.card.order.id}${s.leaving ? '~' : ''}`;
+  useFlip(scrollRef, `${serveSlots.map(slotKey).join(',')}|${paySlots.map(slotKey).join(',')}`);
   const pointName = (id: string) => catalog?.points.find((p) => p.id === id)?.name ?? '';
   const multiPoint = (catalog?.profile.point_ids.length ?? 0) > 1;
 
@@ -72,10 +144,11 @@ export function QueueScreen() {
     }
   }
 
-  const renderCard = (c: QueueCard) => (
+  const renderCard = ({ card: c, leaving: exit }: Slot) => (
     <Card
       key={c.order.id}
       card={c}
+      leaving={exit}
       pointName={multiPoint ? pointName(c.order.point_id) : null}
       onOpen={() => navigate(`/order/${c.order.id}`)}
       onServe={() => void serve(c.order.id)}
@@ -85,7 +158,7 @@ export function QueueScreen() {
 
   const serveCount = queue?.serve.length ?? 0;
   const payCount = queue?.pay.length ?? 0;
-  const empty = !!queue && serveCount + payCount === 0;
+  const empty = serveSlots.length + paySlots.length === 0;
 
   return (
     // Tablet: thanh trên (tiêu đề + Đơn mới), số liệu, lưới thẻ đơn. Điện thoại: danh sách cuộn, chừa chỗ cho thanh đáy (TabletHome).
@@ -100,7 +173,7 @@ export function QueueScreen() {
         </Link>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 pb-[120px] md:gap-5 md:p-6">
+      <div ref={scrollRef} className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 pb-[120px] md:gap-5 md:p-6">
         <div className="grid grid-cols-2 gap-2.5 md:gap-4">
           <Stat icon={ChefHat} tone="warning" label="Chờ ra món" value={serveCount} />
           <Stat icon={Wallet} tone="brand" label="Chờ thanh toán" value={payCount} />
@@ -113,11 +186,11 @@ export function QueueScreen() {
         </Notice>
         <section data-testid="queue-serve" className={`${empty ? 'hidden' : 'flex'} flex-col gap-3`}>
           <SectionTitle count={serveCount}>Chờ ra món</SectionTitle>
-          <div className="grid gap-3 md:grid-cols-2 md:gap-4 lg:grid-cols-3">{queue?.serve.map(renderCard)}</div>
+          <div className="grid gap-3 md:grid-cols-2 md:gap-4 lg:grid-cols-3">{serveSlots.map(renderCard)}</div>
         </section>
         <section data-testid="queue-pay" className={`${empty ? 'hidden' : 'flex'} flex-col gap-3`}>
           <SectionTitle count={payCount}>Chờ thanh toán</SectionTitle>
-          <div className="grid gap-3 md:grid-cols-2 md:gap-4 lg:grid-cols-3">{queue?.pay.map(renderCard)}</div>
+          <div className="grid gap-3 md:grid-cols-2 md:gap-4 lg:grid-cols-3">{paySlots.map(renderCard)}</div>
         </section>
         {empty && (
           <div data-testid="queue-empty" className="card flex flex-1 flex-col items-center justify-center gap-3 px-6 py-12 text-center">
@@ -156,12 +229,15 @@ const DINE_ICON: Record<DineType, LucideIcon> = { dinein: UtensilsCrossed, takea
 
 function Card({
   card,
+  leaving,
   pointName,
   onOpen,
   onServe,
   onPay,
 }: {
   card: QueueCard;
+  /** Thẻ đang rời hàng đợi: chỉ để hiện hiệu ứng, không bấm được, không có testid. */
+  leaving?: ExitKind;
   pointName: string | null;
   onOpen: () => void;
   onServe: () => void;
@@ -170,22 +246,44 @@ function Card({
   const o = card.order;
   const id = o.id;
   const DineIcon = DINE_ICON[o.dine_type];
+  const tid = (k: string) => (leaving ? undefined : `queue-${k}-${id}`);
+  const ref = useRef<HTMLElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (leaving && ref.current) playExit(ref.current, overlayRef.current, leaving);
+  }, [leaving]);
   return (
     <article
-      data-testid={`queue-card-${id}`}
+      ref={ref}
+      data-testid={tid('card')}
       data-group={card.group}
       data-color={card.color}
       data-position={card.position}
-      className={`flex flex-col gap-3 rounded-2xl border bg-surface p-4 ${CARD_STYLE[card.color]}`}
+      data-flip-id={leaving ? undefined : id}
+      data-flip-group={card.group}
+      aria-hidden={leaving ? true : undefined}
+      className={`relative flex flex-col gap-3 rounded-2xl border bg-surface p-4 ${CARD_STYLE[card.color]} ${leaving ? 'pointer-events-none' : ''}`}
     >
-      <button type="button" onClick={onOpen} className="flex min-w-0 flex-col gap-3 rounded-lg text-left" data-testid={`queue-open-${id}`}>
+      {leaving === 'paid' && (
+        <div
+          ref={overlayRef}
+          style={{ opacity: 0 }}
+          className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 rounded-[inherit] bg-success-soft text-success-strong"
+        >
+          <span className="icon-tile h-14 w-14 rounded-full bg-success text-white">
+            <Check className="h-8 w-8" strokeWidth={3} />
+          </span>
+          <span className="text-lg font-bold">Đã thanh toán</span>
+        </div>
+      )}
+      <button type="button" onClick={onOpen} className="flex min-w-0 flex-col gap-3 rounded-lg text-left" data-testid={tid('open')}>
         <span className="flex w-full items-center gap-2.5">
-          <span className={`icon-tile num h-9 w-9 text-base font-bold ${POS_STYLE[card.color]}`} data-testid={`queue-pos-${id}`}>
-            {card.position}
+          <span className={`icon-tile num h-9 w-9 text-base font-bold ${POS_STYLE[card.color]}`} data-testid={tid('pos')}>
+            {leaving === 'paid' ? <Check aria-hidden className="h-5 w-5" strokeWidth={3} /> : card.position}
           </span>
           <span className="min-w-0 flex-1 truncate text-lg font-bold text-ink">
             Đơn #
-            <span className="font-mono tracking-wider" data-testid={`queue-code-${id}`}>
+            <span className="font-mono tracking-wider" data-testid={tid('code')}>
               {o.code}
             </span>
           </span>
@@ -193,46 +291,46 @@ function Card({
         </span>
         <span className="flex flex-wrap items-center gap-1.5">
           {o.label && (
-            <span className="badge rounded-md bg-brand-soft text-[15px] font-semibold text-brand-deep" data-testid={`queue-label-${id}`}>
+            <span className="badge rounded-md bg-brand-soft text-[15px] font-semibold text-brand-deep" data-testid={tid('label')}>
               {o.label}
             </span>
           )}
           {pointName && <span className="badge rounded-md bg-warning-soft text-warning-strong">{pointName}</span>}
           <span
             className={`badge rounded-md ${o.dine_type === 'delivery' ? 'bg-warning-soft text-warning-strong' : 'bg-info-soft text-info-strong'}`}
-            data-testid={`queue-dine-${id}`}
+            data-testid={tid('dine')}
           >
             <DineIcon aria-hidden className="h-3.5 w-3.5" />
             {DINE_LABELS[o.dine_type]}
           </span>
         </span>
         {o.dine_type === 'delivery' && o.address && (
-          <span className="flex items-center gap-1.5 truncate text-base text-ink-muted" data-testid={`queue-address-${id}`}>
+          <span className="flex items-center gap-1.5 truncate text-base text-ink-muted" data-testid={tid('address')}>
             <MapPin aria-hidden className="h-4 w-4 shrink-0" />
             <span className="truncate">{o.address}</span>
           </span>
         )}
-        <span className="line-clamp-2 text-base text-ink" data-testid={`queue-items-${id}`}>
+        <span className="line-clamp-2 text-base text-ink" data-testid={tid('items')}>
           {itemsSummary(o.items)}
         </span>
       </button>
       <div className="flex items-center gap-2 border-t border-line pt-3">
         <span className={`badge num rounded-md text-[13px] ${WAIT_STYLE[card.color]}`}>
           <Clock aria-hidden className="h-3.5 w-3.5" />
-          Chờ <span data-testid={`queue-wait-${id}`}>{card.waitMinutes} phút</span>
+          Chờ <span data-testid={tid('wait')}>{card.waitMinutes} phút</span>
         </span>
         <span className="flex-1" />
-        <b className="num text-xl font-bold text-ink" data-testid={`queue-total-${id}`}>
+        <b className="num text-xl font-bold text-ink" data-testid={tid('total')}>
           {formatVnd(o.total)}
         </b>
       </div>
       {card.group === 'serve' ? (
-        <button type="button" onClick={onServe} className="btn btn-success min-h-[48px] w-full text-base" data-testid={`queue-serve-btn-${id}`}>
+        <button type="button" onClick={onServe} className="btn btn-success min-h-[48px] w-full text-base" data-testid={tid('serve-btn')}>
           <ChefHat aria-hidden className="h-5 w-5" />
           Đã ra món
         </button>
       ) : (
-        <button type="button" onClick={onPay} className="btn btn-primary min-h-[48px] w-full text-base" data-testid={`queue-pay-btn-${id}`}>
+        <button type="button" onClick={onPay} className="btn btn-primary min-h-[48px] w-full text-base" data-testid={tid('pay-btn')}>
           <Wallet aria-hidden className="h-5 w-5" />
           Thanh toán
         </button>
