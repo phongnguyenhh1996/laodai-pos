@@ -18,6 +18,24 @@ export function writeActivation(a: Activation, storage: Storage | undefined = gl
   storage?.setItem(ACTIVATION_KEY, JSON.stringify(a));
 }
 
+/**
+ * Chủ đổi tên quầy: cập nhật tên lưu trên máy (tên lưu lúc kích hoạt chỉ là bản chụp).
+ * Chỉ ghi khi đúng hồ sơ đang kích hoạt và tên thật sự khác.
+ */
+export function syncActivationName(
+  profileId: string,
+  name: string,
+  storage: Storage | undefined = globalThis.localStorage,
+): void {
+  const a = readActivation(storage);
+  if (!a || a.tablet_profile_id !== profileId || a.tablet_name === name) return;
+  try {
+    writeActivation({ ...a, tablet_name: name }, storage);
+  } catch {
+    /* không ghi được localStorage: lần sau vẫn hiện tên mới từ danh mục */
+  }
+}
+
 export function clearActivation(storage: Storage | undefined = globalThis.localStorage): void {
   storage?.removeItem(ACTIVATION_KEY);
 }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { BarChart3, BookUser, ChefHat, Clock, ReceiptText, ScrollText, Settings, Timer, Trash2, Users } from 'lucide-react';
+import { BarChart3, BookUser, ChefHat, Clock, ReceiptText, ScrollText, Settings, Store, Timer, Trash2, Users } from 'lucide-react';
 import { ErrorText, Splash, errorMessage } from '@/app/ui';
 import { useNow } from '@/app/useLive';
 import { formatVnd } from '@/domain/money';
@@ -13,6 +13,7 @@ import { NavItem, NavList, OwnerLayout } from './OwnerLayout';
 
 /** Trang đầu chế độ chủ: Tổng quan hôm nay (realtime) + menu các màn chủ. */
 export function OwnerHome() {
+  const { tabletName } = useOwner();
   return (
     <OwnerLayout title="Tổng quan" testId="owner-home">
       <DashboardPanel />
@@ -28,6 +29,7 @@ export function OwnerHome() {
           title="Cài đặt"
           subtitle="Menu, món, topping, combo, giá · nhân viên · điểm bán · quầy"
         />
+        <NavItem to="/owner/device" testId="owner-nav-device" icon={Store} title="Quầy của máy này" subtitle={`Đang ở ${tabletName} · chuyển máy sang quầy khác`} />
       </NavList>
     </OwnerLayout>
   );

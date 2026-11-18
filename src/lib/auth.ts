@@ -80,7 +80,12 @@ interface ActivateResponse {
  * Kích hoạt tablet (mục 1.2): Edge Function cấp phiên vai trò `tablet` cho hồ sơ đã chọn,
  * sau đó phiên chủ trên máy này bị hủy (đăng xuất phía server), phiên `tablet` được lưu làm phiên chính.
  */
-export async function activateTablet(owner: SupabaseClient, profileId: string, now = () => new Date()): Promise<Activation> {
+export async function activateTablet(
+  owner: SupabaseClient,
+  profileId: string,
+  now = () => new Date(),
+  opts: { replaceCurrent?: boolean } = {},
+): Promise<Activation> {
   const { data: who } = await owner.auth.getSession();
   const ownerEmail = who.session?.user.email ?? '';
   let res: ActivateResponse;
@@ -97,6 +102,8 @@ export async function activateTablet(owner: SupabaseClient, profileId: string, n
 
   // Hủy phiên chủ trên máy này (thu hồi refresh token phía server).
   await owner.auth.signOut({ scope: 'local' }).catch(() => undefined);
+  // Đổi quầy: thu hồi phiên quầy cũ của riêng máy này (máy khác cùng quầy cũ không bị ảnh hưởng).
+  if (opts.replaceCurrent) await supabase.auth.signOut({ scope: 'local' }).catch(() => undefined);
 
   const { error } = await supabase.auth.setSession(res.session);
   if (error) throw toAuthError(error);
@@ -110,6 +117,15 @@ export async function activateTablet(owner: SupabaseClient, profileId: string, n
   // Ca + đơn đang mở nằm trên server: máy mới kích hoạt (kể cả máy thứ hai của cùng hồ sơ) thấy ngay.
   writeActivation(activation);
   return activation;
+}
+
+/**
+ * Chế độ chủ: chuyển máy này sang quầy khác (dùng phiên chủ tạm đang mở, không cần đăng nhập lại).
+ * Ca + đơn của quầy cũ nằm nguyên trên server; máy khác đang ở quầy cũ vẫn bán bình thường.
+ * Phiên chủ tạm bị hủy ⇒ sau khi đổi, máy về màn bán hàng của quầy mới.
+ */
+export function switchTablet(owner: SupabaseClient, profileId: string): Promise<Activation> {
+  return activateTablet(owner, profileId, undefined, { replaceCurrent: true });
 }
 
 /**

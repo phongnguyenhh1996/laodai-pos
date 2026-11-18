@@ -4,6 +4,7 @@ import { CloudOff, LockKeyhole, RefreshCw, Store, UserRound } from 'lucide-react
 import { startTablet, tabletStore } from '@/lib/pos';
 import { ConnectionBadge } from '@/app/ConnectionBadge';
 import { APP_VERSION } from '@/app/version';
+import { useTabletName } from '@/app/useActivation';
 import { Splash } from '@/app/ui';
 import type { Activation } from '@/pos';
 import { CloseShiftScreen } from './CloseShiftScreen';
@@ -22,6 +23,7 @@ import { TabletContext, type TabletCtx } from './parts';
 export function TabletHome({ activation }: { activation: Activation }) {
   const snap = useSyncExternalStore(tabletStore.subscribe, tabletStore.getSnapshot);
   const [lastPointId, setLastPointId] = useState<string | null>(null);
+  const tabletName = useTabletName(activation);
 
   // Chạy suốt vòng đời app từ lúc vào màn bán hàng (kể cả khi chuyển sang chế độ chủ): không dừng khi rời màn.
   // Mỗi lần quay lại màn bán hàng (vd. vừa thoát chế độ chủ) thì tải lại ngay.
@@ -46,7 +48,7 @@ export function TabletHome({ activation }: { activation: Activation }) {
             <Store className="h-6 w-6" />
           </span>
           <h1 className="truncate text-xl font-bold" data-testid="tablet-name">
-            {activation.tablet_name}
+            {tabletName}
           </h1>
           {ctx?.shift && (
             <span className="badge gap-1.5 bg-surface-sunken py-1 text-base text-ink-muted" data-testid="shift-staff">

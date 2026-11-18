@@ -5,6 +5,8 @@ export interface OwnerSession {
   /** Client mang phiên chủ tạm (chỉ trong bộ nhớ, tự thoát sau 2 phút không thao tác). */
   client: SupabaseClient;
   email: string;
+  /** Quầy (hồ sơ tablet) của máy đang vào chế độ chủ. */
+  tabletProfileId: string;
   /** Tên quầy của máy đang vào chế độ chủ. */
   tabletName: string;
   /** Thoát chế độ chủ, về màn bán hàng. */

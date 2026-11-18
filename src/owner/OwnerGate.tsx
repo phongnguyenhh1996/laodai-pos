@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import { LockKeyhole } from 'lucide-react';
 import { ErrorText, Splash, TextField, errorMessage } from '@/app/ui';
-import { useActivation } from '@/app/useActivation';
+import { useActivation, useTabletName } from '@/app/useActivation';
 import { useIdleTimeout } from '@/app/useIdleTimeout';
 import { enterOwnerModeOnTablet, exitOwnerMode } from '@/lib/auth';
 import type { Activation } from '@/pos';
@@ -15,6 +15,7 @@ import { DebtRoutes } from './debts/DebtPages';
 import { LogPage } from './log/LogPages';
 import { OrderRoutes } from './orders/OrderPages';
 import { ReportPage } from './reports/ReportPage';
+import { DevicePage } from './device/DevicePage';
 
 /** Chế độ chủ tự thoát sau 2 phút không thao tác (mục 1.2). */
 export const OWNER_IDLE_MS = 2 * 60_000;
@@ -28,6 +29,7 @@ function OwnerRoutes() {
       <Route path="log" element={<LogPage />} />
       <Route path="orders/*" element={<OrderRoutes />} />
       <Route path="reports" element={<ReportPage />} />
+      <Route path="device" element={<DevicePage />} />
       <Route path="*" element={<OwnerHome />} />
     </Routes>
   );
@@ -47,6 +49,7 @@ export function OwnerGate() {
 function OwnerMode({ activation }: { activation: Activation }) {
   const navigate = useNavigate();
   const [owner, setOwner] = useState<SupabaseClient | null>(null);
+  const tabletName = useTabletName(activation);
 
   // Rời chế độ chủ bằng bất kỳ đường nào (nút Thoát, hết giờ, nút Back) ⇒ thu hồi phiên tạm.
   useEffect(() => (owner ? () => exitOwnerMode(owner) : undefined), [owner]);
@@ -56,10 +59,11 @@ function OwnerMode({ activation }: { activation: Activation }) {
       owner && {
         client: owner,
         email: activation.owner_email,
-        tabletName: activation.tablet_name,
+        tabletProfileId: activation.tablet_profile_id,
+        tabletName,
         leave: () => navigate('/', { replace: true }),
       },
-    [owner, activation, navigate],
+    [owner, activation, tabletName, navigate],
   );
 
   useIdleTimeout(OWNER_IDLE_MS, () => navigate('/', { replace: true }), owner !== null);

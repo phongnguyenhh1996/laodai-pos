@@ -5,7 +5,8 @@ import '@testing-library/jest-dom/vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { App } from './App';
 import { tabletStore } from '@/lib/pos';
-import { AuthError, enterOwnerModeOnTablet, exitOwnerMode } from '@/lib/auth';
+import { AuthError, enterOwnerModeOnTablet, exitOwnerMode, listTabletProfiles, switchTablet } from '@/lib/auth';
+import { readActivation, writeActivation } from '@/pos';
 import { OWNER_IDLE_MS } from '@/owner/OwnerGate';
 import { COMBO_XOI_FULL, COM_GA, PRODUCTS, XOI_GA } from '@/domain/fixtures';
 import { storeSession } from '@/test-utils/auth';
@@ -15,6 +16,8 @@ vi.mock('@/lib/auth', async (orig) => ({
   ...(await orig<typeof import('@/lib/auth')>()),
   enterOwnerModeOnTablet: vi.fn(),
   exitOwnerMode: vi.fn(),
+  listTabletProfiles: vi.fn(),
+  switchTablet: vi.fn(),
 }));
 
 function go(path: string) {
@@ -93,6 +96,19 @@ describe('cổng tablet', () => {
     await waitFor(() => expect(screen.queryByTestId('point-tab-com')).not.toBeInTheDocument());
     expect(screen.getByTestId('menu-panel')).toHaveAttribute('data-point', 'xoi-a');
     expect(screen.getByTestId(`menu-product-${XOI_GA.id}-price`)).toHaveTextContent('28.000');
+  });
+
+  it('chủ đổi tên quầy: màn bán hàng hiện tên mới ngay (không cần kích hoạt lại), tên mới ghi lại xuống máy', async () => {
+    server.catalog = { ...CATALOG, profile: { ...CATALOG.profile, name: 'Quầy chợ' } };
+    activateDevice();
+    go('/');
+    await waitFor(() => expect(screen.getByTestId('tablet-name')).toHaveTextContent('Quầy chợ'));
+    expect(readActivation()?.tablet_name).toBe('Quầy chợ');
+
+    server.catalog = { ...CATALOG, profile: { ...CATALOG.profile, name: 'Quầy cổng trường' } };
+    act(() => server.pulse('catalog'));
+    await waitFor(() => expect(screen.getByTestId('tablet-name')).toHaveTextContent('Quầy cổng trường'));
+    expect(readActivation()?.tablet_name).toBe('Quầy cổng trường');
   });
 
   it('hồ sơ không còn điểm bán nào: báo nhờ chủ cài đặt', async () => {
@@ -185,6 +201,61 @@ describe('chế độ chủ trên tablet', () => {
     fireEvent.click(await screen.findByTestId('owner-exit'));
     expect(await screen.findByTestId('tablet-home')).toBeInTheDocument();
     await waitFor(() => expect(exitOwnerMode).toHaveBeenCalledWith(fakeOwner));
+  });
+});
+
+describe('đổi quầy cho máy này (chế độ chủ)', () => {
+  async function openDevicePage() {
+    vi.mocked(enterOwnerModeOnTablet).mockResolvedValue(fakeOwnerClient());
+    vi.mocked(listTabletProfiles).mockResolvedValue([
+      { id: 'tab-a', name: 'Tablet A' },
+      { id: 'tab-b', name: 'Quầy B' },
+    ]);
+    activateDevice();
+    go('/owner');
+    fireEvent.change(await screen.findByTestId('owner-password'), { target: { value: 'pw' } });
+    fireEvent.click(screen.getByTestId('owner-unlock-submit'));
+    expect(await screen.findByTestId('owner-nav-device')).toHaveTextContent('Đang ở Tablet A');
+    fireEvent.click(screen.getByTestId('owner-nav-device'));
+    await screen.findByTestId('device-profiles');
+  }
+
+  it('quầy đang dùng không chọn được; chọn quầy khác ⇒ hỏi lại rồi mới chuyển; Thôi thì không làm gì', async () => {
+    await openDevicePage();
+    expect(screen.getByTestId('device-profile-tab-a')).toBeDisabled();
+    expect(screen.getByTestId('device-profile-tab-a')).toHaveTextContent('Đang dùng');
+    fireEvent.click(screen.getByTestId('device-profile-tab-b'));
+    expect(screen.getByTestId('device-switch')).toHaveTextContent('Chuyển sang Quầy B');
+    fireEvent.click(screen.getByTestId('device-cancel'));
+    expect(screen.queryByTestId('device-confirm')).not.toBeInTheDocument();
+    expect(switchTablet).not.toHaveBeenCalled();
+  });
+
+  it('chuyển xong: về màn bán hàng của quầy mới, không cần đăng nhập lại', async () => {
+    vi.mocked(switchTablet).mockImplementation(async () => {
+      const next = { ...ACT, tablet_profile_id: 'tab-b', tablet_name: 'Quầy B' };
+      server.catalog = { ...CATALOG, profile: { ...CATALOG.profile, id: 'tab-b', name: 'Quầy B' } };
+      writeActivation(next);
+      storeSession({ role: 'tablet', tablet_profile_id: 'tab-b' });
+      return next;
+    });
+    await openDevicePage();
+    fireEvent.click(screen.getByTestId('device-profile-tab-b'));
+    fireEvent.click(screen.getByTestId('device-switch'));
+    expect(await screen.findByTestId('tablet-home')).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/');
+    expect(switchTablet).toHaveBeenCalledWith(expect.anything(), 'tab-b');
+    await waitFor(() => expect(screen.getByTestId('tablet-name')).toHaveTextContent('Quầy B'));
+    expect(await screen.findByTestId('staff-s1')).toBeInTheDocument();
+  });
+
+  it('lỗi khi chuyển: báo lỗi, máy vẫn ở quầy cũ', async () => {
+    vi.mocked(switchTablet).mockRejectedValue(new AuthError('offline'));
+    await openDevicePage();
+    fireEvent.click(screen.getByTestId('device-profile-tab-b'));
+    fireEvent.click(screen.getByTestId('device-switch'));
+    expect(await screen.findByTestId('device-error')).toHaveTextContent('Không có mạng');
+    expect(readActivation()?.tablet_profile_id).toBe('tab-a');
   });
 });
 
