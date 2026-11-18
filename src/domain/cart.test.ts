@@ -5,11 +5,15 @@ import {
   addLine,
   addProduct,
   canSwitchPoint,
+  draftAddress,
   draftChanged,
   draftTotal,
   itemsSummary,
   lineSummary,
+  needsAddress,
   newDraft,
+  replaceWithCombo,
+  replaceWithProduct,
   setDineType,
   setLineQty,
   stepLineQty,
@@ -17,7 +21,7 @@ import {
 } from './cart';
 import { CANH, CHA, COMBOS, COMBO_XOI_FULL, COM_GA, COM_MENU, DUA, PRODUCTS, TOPPINGS, TRUNG, XOI_CU, XOI_GA, XOI_MENU, XOI_XEO } from './fixtures';
 import { PricingError } from './pricing';
-import type { Point } from './types';
+import type { DineType, Point } from './types';
 
 const XOI_A: Point = { id: 'xoi-a', name: 'Xôi A', menu_id: XOI_MENU, active: true, default_dine_type: 'takeaway', sort: 1 };
 const XOI_B: Point = { id: 'xoi-b', name: 'Xôi B', menu_id: XOI_MENU, active: true, default_dine_type: 'takeaway', sort: 2 };
@@ -82,6 +86,31 @@ describe('cart', () => {
     expect(() => stepLineQty(items, 'khong-co', 1)).toThrow(CartError);
   });
 
+  it('đổi món: thay dòng đã chọn, giữ số lượng + vị trí; trùng dòng khác ⇒ gộp; trùng chính nó ⇒ không đổi', () => {
+    let items = addProduct([], 'l1', XOI_GA, [], XOI_MENU);
+    items = addProduct(items, 'l2', XOI_XEO, [], XOI_MENU);
+    items = stepLineQty(items, 'l1', 1); // 2× Xôi gà, 1× Xôi xéo
+    const swapped = replaceWithProduct(items, 'l1', 'l3', XOI_GA, [TRUNG], XOI_MENU);
+    expect(swapped.map((i) => [i.id, i.product_id, i.qty, i.toppings_snap.length])).toEqual([
+      ['l3', XOI_GA.id, 2, 1],
+      ['l2', XOI_XEO.id, 1, 0],
+    ]);
+    expect(draftTotal({ items: swapped })).toBe(2 * (25_000 + 6_000) + 15_000);
+    expect(items[0].qty).toBe(2); // bất biến
+
+    const merged = replaceWithProduct(items, 'l2', 'l4', XOI_GA, [], XOI_MENU);
+    expect(merged.map((i) => [i.id, i.qty])).toEqual([['l1', 3]]);
+
+    expect(replaceWithProduct(items, 'l1', 'l5', XOI_GA, [], XOI_MENU)).toEqual(items);
+
+    const combo = replaceWithCombo(items, 'l2', 'l6', COMBO_XOI_FULL, PRODUCTS, TOPPINGS, XOI_MENU);
+    expect(combo.map((i) => i.id)).toEqual(['l1', 'l6']);
+    expect(combo[1].qty).toBe(1);
+
+    expect(() => replaceWithProduct(items, 'l1', 'l7', COM_GA, [], XOI_MENU)).toThrow(CartError);
+    expect(() => replaceWithProduct(items, 'khong-co', 'l7', XOI_XEO, [], XOI_MENU)).toThrow(CartError);
+  });
+
   it('addLine giữ nguyên mảng cũ (bất biến)', () => {
     const a = addProduct([], 'l1', XOI_GA, [], XOI_MENU);
     const b = addLine(a, { ...a[0], id: 'l2' });
@@ -122,7 +151,7 @@ describe('cart', () => {
 
   it('draftChanged: chỉ khi khác đơn đã lưu', () => {
     const items = addProduct([], 'l1', XOI_GA, [TRUNG], XOI_MENU);
-    const saved = { point_id: 'xoi-a', dine_type: 'takeaway' as const, label: null, items };
+    const saved = { point_id: 'xoi-a', dine_type: 'takeaway' as DineType, label: null, address: null, items };
     const d = { ...newDraft(XOI_A), items };
     expect(draftChanged(d, saved)).toBe(false);
     expect(draftChanged({ ...d, label: '  ' }, saved)).toBe(false);
@@ -134,5 +163,23 @@ describe('cart', () => {
     expect(draftChanged({ ...d, items: [] }, saved)).toBe(true);
     expect(draftChanged({ ...d, items: [{ ...items[0], id: 'khac' }] }, saved)).toBe(true);
     expect(draftChanged({ ...d, items: [{ ...items[0], toppings_snap: [] }] }, saved)).toBe(true);
+  });
+
+  it('đơn ship: bắt buộc địa chỉ; địa chỉ chỉ tính khi là đơn ship', () => {
+    const items = addProduct([], 'l1', XOI_GA, [], XOI_MENU);
+    const d = { ...newDraft(XOI_A), items };
+    expect(needsAddress(d)).toBe(false);
+    const ship = setDineType(d, 'delivery');
+    expect(needsAddress(ship)).toBe(true);
+    expect(needsAddress({ ...ship, address: '   ' })).toBe(true);
+    expect(needsAddress({ ...ship, address: '12 Lê Lợi' })).toBe(false);
+    expect(draftAddress({ ...ship, address: '  12 Lê Lợi ' })).toBe('12 Lê Lợi');
+    // Gõ địa chỉ rồi đổi về Mang về ⇒ không gửi địa chỉ.
+    expect(draftAddress({ ...d, address: '12 Lê Lợi' })).toBeNull();
+
+    const saved = { point_id: 'xoi-a', dine_type: 'delivery' as DineType, label: null, address: '12 Lê Lợi', items };
+    expect(draftChanged({ ...ship, address: '12 Lê Lợi ' }, saved)).toBe(false);
+    expect(draftChanged({ ...ship, address: '14 Lê Lợi' }, saved)).toBe(true);
+    expect(draftChanged({ ...d, address: '12 Lê Lợi' }, saved)).toBe(true);
   });
 });

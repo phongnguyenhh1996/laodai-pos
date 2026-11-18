@@ -11,7 +11,7 @@ POS cá nhân cho quán nhỏ: sáng 2 điểm bán xôi chạy song song, trưa
 | Thành phần | Lựa chọn |
 |---|---|
 | App | PWA (React + Vite + TypeScript, Tailwind, `vite-plugin-pwa`) — một app, hai chế độ: **Bán hàng** (tablet) và **Chủ** (điện thoại) |
-| Lưu trữ offline | IndexedDB qua Dexie + hàng đợi đồng bộ (outbox) |
+| Dữ liệu trên máy | Không lưu dữ liệu bán hàng trên máy: đọc / ghi thẳng Supabase, cập nhật qua Realtime |
 | Backend | Supabase: Postgres + RLS, Auth, Realtime, Edge Functions, `pg_cron` |
 | Thông báo | Telegram bot (Edge Function), đồng thời ghi nhật ký trong app |
 | Hosting | Cloudflare Pages (free) |
@@ -19,11 +19,13 @@ POS cá nhân cho quán nhỏ: sáng 2 điểm bán xôi chạy song song, trưa
 
 Chi phí vận hành dự kiến: 0đ/tháng (gói free).
 
-### 1.1 Offline-first
-- Mọi ID do client sinh (UUID v7), mọi thao tác ghi vào IndexedDB trước, rồi đẩy lên server qua RPC **idempotent**.
-- Mỗi tablet có `device_seq` tăng dần cho mỗi đơn → server phát hiện **lỗ hổng số** (đơn bị mất / dữ liệu local bị xóa trước khi sync) và báo chủ.
-- Telegram được gửi từ server ⇒ thao tác lúc offline sẽ báo khi tablet sync lại (thông báo ghi rõ "thời điểm thực hiện" và "thời điểm đồng bộ").
-- Đơn đã thanh toán **bị xóa khỏi tablet ngay khi sync xong** — tablet không giữ dữ liệu doanh thu.
+### 1.1 Realtime, server là nguồn sự thật
+- Không có chế độ offline: nhiều máy có thể dùng chung một hồ sơ tablet (vd. hai tablet ở cùng điểm bán) nên ca, hàng đợi, mã đơn phải có **một bản duy nhất trên server** để không xung đột.
+- Mỗi thao tác (mở ca, tạo / sửa / ra món / xóa / thanh toán đơn, thu nợ, đóng ca) gọi thẳng RPC **idempotent** `sync_push` và chỉ coi là xong khi server trả lời. Mất mạng ⇒ báo "Mất kết nối", thao tác không lưu; bấm lại khi có mạng. Gửi lại sau khi mất phản hồi dùng lại `op_id` ⇒ server không ghi hai lần.
+- Server cấp **mã đơn** và **số thứ tự** (`device_seq`) trong khóa theo hồ sơ tablet ⇒ hai máy không bao giờ trùng mã / trùng số. Giờ thực hiện là giờ server.
+- Tablet nghe thay đổi qua Supabase Realtime trên bảng `live_pulse` (mỗi thay đổi của đơn / ca / danh mục tăng một bộ đếm): máy khác mở ca, tạo / thanh toán đơn, chủ đổi giá ⇒ mọi máy cập nhật ngay. Không nghe thẳng bảng `orders` vì RLS giấu đơn đã thanh toán với tablet.
+- Máy khác vừa thanh toán / xóa / đóng ca mà máy này chưa kịp thấy ⇒ server từ chối, tablet báo rõ ("đơn đã được thanh toán ở máy khác") và tải lại.
+- Tablet không giữ dữ liệu doanh thu: không có bản sao đơn nào trên máy, RLS chỉ cho đọc đơn đang mở.
 
 ### 1.2 Đăng nhập & phân quyền
 - **Chủ**: 1 tài khoản (email + mật khẩu), dùng trên nhiều thiết bị.
@@ -200,7 +202,7 @@ Mỗi tin có link mở thẳng chi tiết trong app chủ.
 6. **Thu nợ**.
 7. **Đóng ca**: 3 ô số → Xác nhận.
 
-Thiết kế: nút ≥ 56px, chữ to, tối đa 2–3 chạm cho một đơn combo, hiện trạng thái đồng bộ (đã sync / đang chờ N thao tác / offline).
+Thiết kế: nút ≥ 56px, chữ to, tối đa 2–3 chạm cho một đơn combo, hiện trạng thái kết nối (đã kết nối / đang kết nối / mất kết nối; mất kết nối thì có dải báo đỏ).
 
 ### Điện thoại (chế độ chủ)
 1. **Tổng quan** (realtime): doanh thu hôm nay theo điểm; các ca đang mở; đơn đang chờ lâu.
@@ -219,14 +221,14 @@ Mỗi bước chỉ được tính là **xong** khi các test ghi trong ngoặc 
 
 1. Khởi tạo dự án (Vite + PWA + Tailwind), dựng sẵn khung Vitest, Cypress, Supabase local, Telegram mock; Supabase schema + RLS + seed. *(chạy được `npm run test:all` với test mẫu)*
 2. Auth chủ, kích hoạt tablet, vai trò `tablet`, chế độ chủ trên tablet. *(10.3 RLS; E2E A1–A5, E27)*
-3. Lớp offline: Dexie, outbox, RPC đồng bộ idempotent, `device_seq`. *(unit sync; 10.3 idempotent + lỗ hổng số)*
+3. Lớp dữ liệu tablet: RPC idempotent `sync_push`, server cấp mã đơn / `device_seq`, Realtime (`live_pulse`). *(unit `src/pos`; 10.3 idempotent + nhiều máy)* — ban đầu là lớp offline (Dexie + outbox), đã thay bằng realtime.
 4. Cài đặt của chủ: menu/món/topping/combo/giá, nhân viên, điểm bán, hồ sơ tablet. *(unit pricing; E2E G32, G37)*
 5. Mở ca → tạo/sửa/xóa đơn → hàng đợi → ra món → thanh toán. *(unit pricing/packaging/cash/orderCode/queue; E2E B6–B9, C10–C16)*
 6. Ghi nợ, thu nợ, sổ nợ (chuyển nợ). *(unit debt; E2E D17–D20)*
 7. Đóng ca, đếm mù, đối soát server-side. *(unit + SQL reconcile dùng chung bộ dữ liệu mẫu; E2E E23, E25)*
 8. Audit log + Telegram + tổng kết ngày. *(snapshot format; E2E E21, E22, H38)*
 9. Dashboard & báo cáo của chủ, sửa đơn đã thanh toán + tính lại ca. *(E2E E24, G33–G36)*
-10. Chạy toàn bộ E2E offline (F28–F31) và gian lận (E21–E27); thử trên tablet thật theo checklist: offline, ghim màn hình, tốc độ.
+10. Chạy toàn bộ E2E nhiều máy / mất kết nối (F28–F31) và gian lận (E21–E27); thử trên tablet thật theo checklist: mất mạng, ghim màn hình, tốc độ.
 
 ## 9. Đợt 2
 Sơ đồ bàn (tùy chọn theo điểm bán), in bill Bluetooth 58mm (Web Bluetooth/ESC-POS) kèm biển "không bill = miễn phí", **gộp khách nợ**, báo cáo nâng cao (thời gian ra món trung bình, so sánh nhân viên).
@@ -298,15 +300,16 @@ Toàn bộ logic nghiệp vụ phía client nằm trong `src/domain/` dưới d�
 - Chuyển một khoản nợ sang khách khác: tổng nợ toàn hệ thống không đổi.
 - Gợi ý khách: tìm không phân biệt dấu ("dung" khớp "Dũng"), khớp cả phần mô tả, khách đã bị gộp vào người khác không hiện.
 
-**Đồng bộ offline** (`src/sync`, chạy với `fake-indexeddb`)
-- Thao tác được ghi vào outbox theo đúng thứ tự. Mất mạng thì outbox giữ nguyên. Có mạng lại thì gửi đúng thứ tự.
-- Gửi trùng (retry) không tạo bản ghi trùng (kiểm tra idempotent bằng mock RPC).
-- `device_seq` tăng liên tục, không bị nhảy khi app reload.
-- Đơn đã thanh toán **bị xóa khỏi IndexedDB ngay sau khi sync thành công**. Nếu sync thất bại thì đơn vẫn được giữ lại.
+**Lớp realtime** (`src/pos`, server giả trong bộ nhớ `src/test-utils/fakeServer.ts`)
+- Thao tác chỉ xong khi server trả lời; kết quả (đơn / ca) vào hàng đợi ngay. Mất mạng ⇒ báo lỗi, không mất đơn đang soạn.
+- Lỗi mạng ⇒ gửi lại cùng `op_id`; mất phản hồi rồi bấm lại đúng thao tác đó ⇒ dùng lại `op_id` (không tạo đơn / thu tiền hai lần).
+- Server báo thay đổi ⇒ tải lại đúng phần đổi (ca + đơn hoặc danh mục); kênh realtime rớt ⇒ tải lại khi nối lại, khi có mạng, khi quay lại màn hình và định kỳ.
+- Kết quả tải về trễ hơn một thao tác ghi thì bị bỏ và tải lại (không đè dữ liệu mới bằng dữ liệu cũ).
+- Máy đang chạy bản offline cũ: hồ sơ kích hoạt được chuyển sang, thao tác còn kẹt trong IndexedDB được gửi nốt rồi xóa (`legacy.ts`).
 
 **Định dạng Telegram** (`supabase/functions/_shared/format`)
 - Snapshot test cho từng loại tin: mở ca, đóng ca, xóa đơn, ghi nợ, thu nợ, chủ sửa đơn, lỗ hổng số đơn, tablet đăng nhập, vào chế độ chủ, tổng kết ngày.
-- Tiền định dạng kiểu `1.600.000`. Thao tác thực hiện lúc offline thì tin hiện cả "thời điểm thực hiện" và "thời điểm đồng bộ".
+- Tiền định dạng kiểu `1.600.000`. Thao tác đồng bộ trễ (chỉ còn ở thao tác cũ của bản offline) thì tin hiện cả "thời điểm thực hiện" và "thời điểm đồng bộ".
 
 ### 10.3 Test database / RLS / RPC (Vitest + Supabase local)
 
@@ -328,7 +331,8 @@ Toàn bộ logic nghiệp vụ phía client nằm trong `src/domain/` dưới d�
 **RPC & trigger:**
 - Gửi lại cùng một RPC đồng bộ hai lần thì chỉ có một bản ghi.
 - Mỗi thay đổi trên đơn sinh đúng một dòng `audit_log`, có `before` và `after`.
-- Phát hiện lỗ hổng: gửi đơn có `device_seq` 1, 2, 4 thì sinh cảnh báo thiếu số 3. Khi số 3 đến muộn thì đánh dấu cảnh báo đã được giải quyết.
+- Server cấp `device_seq` và mã đơn (bỏ qua số / mã máy gửi lên): hai máy cùng hồ sơ tạo đơn cùng lúc ⇒ số liên tiếp, mã khác nhau, không lỗ hổng.
+- Hai máy cùng hồ sơ: chung một ca; máy này thanh toán thì máy kia thu lại bị từ chối; máy nghe Realtime thấy đơn mới và thấy đơn biến mất khi được thanh toán ở máy khác. Tablet chỉ đọc được `live_pulse` của chính hồ sơ mình + danh mục.
 - Hàm đối soát SQL cho **cùng kết quả** với `domain/reconcile` trên cùng một bộ dữ liệu mẫu (bảng dữ liệu kiểm thử dùng chung, đặt trong `tests/fixtures/reconcile-cases.json`).
 - Chủ sửa đơn của ca đã đóng thì `recalculated_at` được cập nhật.
 - Mỗi tablet chỉ có một ca mở: mở ca thứ hai trên cùng tablet bị từ chối.
@@ -336,7 +340,7 @@ Toàn bộ logic nghiệp vụ phía client nằm trong `src/domain/` dưới d�
 
 ### 10.4 Cypress E2E
 
-Mỗi kịch bản bắt đầu bằng `cy.task('db:reset')` để reset và seed lại dữ liệu, kèm `cy.task('telegram:clear')`. Lệnh tùy biến: `cy.activateTablet('A')`, `cy.openShift('Lan')`, `cy.loginOwner()`, `cy.goOffline()` / `cy.goOnline()`, `cy.telegramMessages()`.
+Mỗi kịch bản bắt đầu bằng `cy.task('db:reset')` để reset và seed lại dữ liệu, kèm `cy.task('telegram:clear')`. Lệnh tùy biến: `cy.activateTablet('A')`, `cy.openShift('Lan')`, `cy.loginOwner()`, `cy.waitLive()`, `cy.telegramMessages()`.
 
 **A. Kích hoạt & phân quyền**
 1. Tablet chưa kích hoạt thì mọi đường dẫn đều chuyển về màn hình kích hoạt.
@@ -376,15 +380,15 @@ Mỗi kịch bản bắt đầu bằng `cy.task('db:reset')` để reset và see
 23. **Đếm thiếu tiền**: đóng ca nhập ít hơn kỳ vọng 20.000. Telegram báo chênh lệch `−20.000`, nhân viên không thấy.
 24. **Ghi chuyển khoản nhưng thực ra nhận tiền mặt**: tổng chuyển khoản trên dashboard chủ cao hơn thực tế, nên số liệu đối soát chuyển khoản theo ngày/điểm hiển thị đúng để chủ so với app ngân hàng.
 25. **Dùng hộp không có đơn**: đóng ca khai còn ít hộp hơn số đơn tương ứng. Báo cáo hiện chênh lệch hộp.
-26. **Xóa dữ liệu tablet trước khi sync**: tạo 3 đơn lúc offline, xóa IndexedDB của đơn thứ 2, online lại. Server phát hiện thiếu `device_seq` và Telegram nhận cảnh báo.
+26. ~~Xóa dữ liệu tablet trước khi sync~~: không còn áp dụng — tablet không giữ đơn trên máy, server cấp số thứ tự nên không có lỗ hổng số.
 27. **Gọi API trực tiếp từ tablet**: dùng `cy.request` với token tablet để đọc đơn đã thanh toán, nhận 0 dòng hoặc 401/403.
 
-**F. Offline**
+**F. Nhiều máy & mất kết nối** (đã có ở test component `TabletFlow.test.tsx` với server giả và test DB `pos-client.test.ts` với Supabase thật)
 
-28. `cy.goOffline()`, tạo 5 đơn, thanh toán 3 đơn, đóng ca: mọi thao tác đều chạy, chỉ báo đồng bộ hiện "chờ N thao tác".
-29. `cy.goOnline()`: outbox gửi hết. Server có đủ 5 đơn, đối soát ca đúng. Các tin Telegram hiện thời điểm thực hiện thật.
-30. Reload app khi đang offline: dữ liệu chưa sync vẫn còn, ca vẫn mở.
-31. Đơn đã thanh toán lúc offline vẫn **không hiện** trên tablet (nằm ẩn trong outbox), và bị xóa hẳn sau khi sync.
+28. Máy khác cùng hồ sơ mở ca ⇒ máy này tự vào hàng đợi của ca đó; không mở được ca thứ hai.
+29. Máy khác tạo / sửa / thanh toán đơn ⇒ hàng đợi và màn đơn / thanh toán đang mở trên máy này cập nhật ngay (đơn đã thanh toán ở máy khác ⇒ về hàng đợi kèm thông báo).
+30. Mất mạng: thao tác báo "mất kết nối", đơn đang soạn còn nguyên; có mạng lại bấm lại là lưu, không bị trùng.
+31. Mở app lúc mất mạng: báo cần mạng, có nút Thử lại.
 
 **G. Chủ (viewport điện thoại)**
 
@@ -393,7 +397,7 @@ Mỗi kịch bản bắt đầu bằng `cy.task('db:reset')` để reset và see
 34. Dashboard realtime: tablet thanh toán một đơn thì doanh thu trên điện thoại chủ tăng mà không cần reload.
 35. Báo cáo theo nhân viên: tỷ lệ tiền mặt/chuyển khoản/ghi nợ và số lần sửa/xóa khớp với dữ liệu seed.
 36. Nhật ký: lọc theo nhân viên và loại sự kiện ra đúng kết quả.
-37. Cài đặt hồ sơ tablet: bỏ "Cơm gà" khỏi tablet A thì tab Cơm gà biến mất trên tablet A sau khi đồng bộ.
+37. Cài đặt hồ sơ tablet: bỏ "Cơm gà" khỏi tablet A thì tab Cơm gà biến mất trên tablet A ngay (realtime).
 
 **H. Tổng kết ngày**
 

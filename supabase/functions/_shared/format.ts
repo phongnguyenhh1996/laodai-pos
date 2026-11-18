@@ -59,6 +59,7 @@ interface OrderSnap {
   dine_type: string;
   label: string | null;
   table_no: string | null;
+  address?: string | null;
   payment_method: string | null;
   customer_id: string | null;
   items: ItemSnap[];
@@ -88,6 +89,7 @@ export type Notification =
   | { kind: 'shift_open'; payload: Base & ShiftCtx }
   | { kind: 'shift_close'; payload: Base & ShiftCtx & { reconcile: Reconcile; adjusted: boolean } }
   | { kind: 'order_deleted'; payload: Base & ShiftCtx & { order: OrderSnap; reason: string; was_served: boolean } }
+  | { kind: 'delivery_order'; payload: Base & ShiftCtx & { order: OrderSnap; point_name: string | null; updated: boolean } }
   | {
       kind: 'debt_recorded';
       payload: Base &
@@ -143,6 +145,7 @@ const REJECT_REASONS: Record<string, string> = {
   shift_already_open: 'tablet đã có ca mở',
   order_not_open: 'đơn không còn mở',
   point_not_allowed: 'điểm bán không thuộc tablet',
+  address_required: 'đơn ship thiếu địa chỉ',
 };
 
 function itemLine(it: ItemSnap): string {
@@ -245,6 +248,20 @@ export function formatNotification(n: Notification, opts: FormatOptions): string
         `Trạng thái lúc xóa: ${q.was_served ? '⚠️ ĐÃ RA MÓN' : 'chưa ra món'}`,
         ...q.order.items.map(itemLine),
         `Tổng: ${vnd(q.order.total)}`,
+      ];
+      link = `${app}/owner/orders/${q.order.id}`;
+      break;
+    }
+    case 'delivery_order': {
+      const q = n.payload;
+      const head = q.updated ? 'Cập nhật đơn ship' : 'Đơn ship mới';
+      lines = [
+        `🛵 ${head} #${q.order.code}${q.point_name ? ` – ${q.point_name}` : ''}`,
+        `📍 ${q.order.address ?? '(chưa có địa chỉ)'}`,
+        ...(q.order.label ? [`Nhãn: ${q.order.label}`] : []),
+        ...q.order.items.map(itemLine),
+        `Tổng: ${vnd(q.order.total)}`,
+        ...(who(q) ? [who(q)] : []),
       ];
       link = `${app}/owner/orders/${q.order.id}`;
       break;

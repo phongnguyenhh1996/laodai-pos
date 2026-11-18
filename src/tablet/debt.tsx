@@ -2,16 +2,14 @@ import { ChevronRight, UserRound } from 'lucide-react';
 import { customerLabel, suggestCustomers } from '@/domain/debt';
 import { formatVnd } from '@/domain/money';
 import type { Customer } from '@/domain/types';
-import { localDb } from '@/lib/localdb';
-import { useLive } from '@/app/useLive';
-import { debtBook, loadDebtJournal, type DebtBook } from '@/sync';
+import { useMemo } from 'react';
+import { debtBook, type DebtBook } from '@/pos';
 import { useTablet } from './parts';
 
-/** Sổ nợ trên máy: khách + dư nợ tải về, cộng các khoản ghi / thu nợ làm trên máy chưa phản ánh. */
+/** Sổ nợ: khách + dư nợ từ server (tải lại ngay sau mỗi lần ghi / thu nợ, và khi máy khác thu nợ). */
 export function useDebtBook(): DebtBook | null {
   const { catalog } = useTablet();
-  const journal = useLive(() => loadDebtJournal(localDb), []);
-  return journal.status === 'ready' ? debtBook(catalog, journal.value) : null;
+  return useMemo(() => (catalog ? debtBook(catalog) : null), [catalog]);
 }
 
 /** Danh sách gợi ý khách khi gõ tên / mô tả (không phân biệt dấu: "dung" khớp "Dũng"). */

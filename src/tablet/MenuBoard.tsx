@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { menuBoard, tabletPoints } from '@/domain/catalog';
 import { formatVnd } from '@/domain/money';
 import type { Combo, Point, Product } from '@/domain/types';
-import type { Catalog } from '@/sync';
+import type { Catalog } from '@/pos';
 
 /**
  * Tab điểm bán + lưới combo / món của điểm đang chọn, dựng từ danh mục đã đồng bộ về máy (mục 4.2).

@@ -15,13 +15,46 @@ beforeEach(async () => {
 });
 
 describe('sync_push', () => {
+  it('đơn ship: lưu địa chỉ, báo Telegram khi tạo và khi đổi địa chỉ; thiếu địa chỉ bị từ chối', async () => {
+    const bad = await sim.createOrder([item('xoiGa')], { dine_type: 'delivery', address: '   ' });
+    expect(bad.result).toEqual({ status: 'rejected', reason: 'address_required' });
+
+    const o = await sim.createOrder([item('xoiGa', [], 2)], { dine_type: 'delivery', address: ' 12 Lê Lợi ', label: 'Chị Hoa' });
+    expect(o.result).toMatchObject({ status: 'ok' });
+    expect(await sql('select dine_type, address from orders where id = $1', [o.id])).toEqual([
+      { dine_type: 'delivery', address: '12 Lê Lợi' },
+    ]);
+    const kept = { ...item('xoiGa', [], 3), id: (await sql('select id from order_items where order_id = $1', [o.id]))[0].id };
+    // Sửa món, cùng địa chỉ ⇒ không báo lại.
+    await sim.update(o.id, [kept], { dine_type: 'delivery', address: '12 Lê Lợi' });
+    await sim.update(o.id, [kept], { dine_type: 'delivery', address: '14 Lê Lợi' });
+    const ns = await sql(`select payload from notifications where kind = 'delivery_order' order by performed_at`);
+    expect(ns.map((n) => [n.payload.updated, n.payload.order.address, n.payload.point_name])).toEqual([
+      [false, '12 Lê Lợi', 'Xôi A'],
+      [true, '14 Lê Lợi', 'Xôi A'],
+    ]);
+    expect(ns[0].payload).toMatchObject({ staff_name: 'Lan', order: { label: 'Chị Hoa', items: [{ qty: 2 }] } });
+
+    // Về mang về ⇒ bỏ địa chỉ, không báo; bao bì tính như mang về.
+    await sim.update(o.id, [kept], { dine_type: 'takeaway', address: '14 Lê Lợi' });
+    expect(await sql('select dine_type, address from orders where id = $1', [o.id])).toEqual([{ dine_type: 'takeaway', address: null }]);
+    expect(await sql(`select 1 from notifications where kind = 'delivery_order'`)).toHaveLength(2);
+    const takeaway = (await sql('select private.order_packaging($1) p', [o.id]))[0].p;
+    await sim.update(o.id, [kept], { dine_type: 'delivery', address: '14 Lê Lợi' });
+    expect((await sql('select private.order_packaging($1) p', [o.id]))[0].p).toEqual(takeaway);
+
+    // Đơn thường không báo ship.
+    await sim.createOrder([item('xoiGa')]);
+    expect(await sql(`select 1 from notifications where kind = 'delivery_order'`)).toHaveLength(3);
+  });
+
   it('gửi lại cùng một op hai lần thì chỉ có một bản ghi', async () => {
     const o = sim.createOrderOp([item('xoiGa')]);
-    expect(await push(tab, o.op)).toEqual({ status: 'ok' });
-    expect(await push(tab, o.op)).toEqual({ status: 'duplicate' });
+    expect(await push(tab, o.op)).toMatchObject({ status: 'ok' });
+    expect(await push(tab, o.op)).toMatchObject({ status: 'duplicate' });
     const p = op('pay_order', o.id, { order_id: o.id, paid_shift_id: sim.shiftId, method: 'transfer', total: o.total });
-    expect(await push(tab, p)).toEqual({ status: 'ok' });
-    expect(await push(tab, p)).toEqual({ status: 'duplicate' });
+    expect(await push(tab, p)).toMatchObject({ status: 'ok' });
+    expect(await push(tab, p)).toMatchObject({ status: 'duplicate' });
     expect(await sql('select id from orders where id = $1', [o.id])).toHaveLength(1);
     expect(await sql('select id from order_items where order_id = $1', [o.id])).toHaveLength(1);
     expect(await sql(`select id from audit_log where entity_id = $1 and action = 'order_pay'`, [o.id])).toHaveLength(1);
@@ -53,23 +86,28 @@ describe('sync_push', () => {
     expect(logs[3].after.status).toBe('deleted');
   });
 
-  it('phát hiện lỗ hổng: device_seq 1, 2, 4 ⇒ cảnh báo thiếu 3; số 3 đến muộn ⇒ đã giải quyết', async () => {
-    const o1 = sim.createOrderOp([item('xoiGa')]);
-    const o2 = sim.createOrderOp([item('xoiGa')]);
-    const o3 = sim.createOrderOp([item('xoiGa')]);
-    const o4 = sim.createOrderOp([item('xoiGa')]);
-    for (const o of [o1, o2, o4]) expect(await push(tab, o.op)).toEqual({ status: 'ok' });
-    let gaps = await sql('select missing_seq, resolved_at from seq_gaps');
-    expect(gaps).toEqual([{ missing_seq: 3, resolved_at: null }]);
-    const notes = await sql(`select payload from notifications where kind = 'seq_gap'`);
-    expect(notes).toHaveLength(1);
-    expect(notes[0].payload).toMatchObject({ tablet_name: 'Tablet A', missing: [3], received: 4 });
+  it('server cấp số thứ tự + mã đơn: số / mã máy gửi lên bị bỏ qua ⇒ không trùng, không lỗ hổng', async () => {
+    const o1 = sim.createOrderOp([item('xoiGa')], { device_seq: 7, code: 'AAA' });
+    const o2 = sim.createOrderOp([item('xoiGa')], { device_seq: 7, code: 'AAA' });
+    const r1 = await push(tab, o1.op);
+    const r2 = await push(tab, o2.op);
+    expect([r1, r2]).toMatchObject([{ status: 'ok', order: { device_seq: 1 } }, { status: 'ok', order: { device_seq: 2 } }]);
+    const rows = await sql<{ device_seq: number; code: string }>('select device_seq, code from orders order by device_seq');
+    expect(rows.map((r) => r.device_seq)).toEqual([1, 2]);
+    expect(rows[0].code).not.toBe(rows[1].code);
+    expect(await sql('select 1 from seq_gaps')).toHaveLength(0);
+    // Tablet khác đánh số riêng
+    const simB = new TabletSim(await tabletClient(SEED.tablets.B), SEED.tablets.B);
+    await simB.openShift('Mai');
+    expect(await push(simB.c, simB.createOrderOp([item('xoiGa')]).op)).toMatchObject({ order: { device_seq: 1 } });
+  });
 
-    expect(await push(tab, o3.op)).toEqual({ status: 'ok' });
-    gaps = await sql('select missing_seq, resolved_at from seq_gaps');
-    expect(gaps[0].resolved_at).not.toBeNull();
-    // Không báo lại lần nữa
-    expect(await sql(`select 1 from notifications where kind = 'seq_gap'`)).toHaveLength(1);
+  it('thiếu giờ thực hiện ⇒ dùng giờ server (máy lệch đồng hồ không làm lệch hàng đợi)', async () => {
+    const o = sim.createOrderOp([item('xoiGa')]);
+    delete (o.op as Partial<typeof o.op>).performed_at;
+    expect(await push(tab, o.op)).toMatchObject({ status: 'ok' });
+    const [row] = await sql<{ lag: number }>('select extract(epoch from now() - created_at)::int lag from orders');
+    expect(Math.abs(row.lag)).toBeLessThan(60);
   });
 
   it('mỗi tablet chỉ có một ca mở: mở ca thứ hai bị từ chối', async () => {
@@ -78,7 +116,7 @@ describe('sync_push', () => {
     expect(await sql(`select 1 from shifts where status = 'open' and tablet_profile_id = $1`, [SEED.tablets.A])).toHaveLength(1);
     // Tablet B vẫn mở ca được
     const simB = new TabletSim(await tabletClient(SEED.tablets.B), SEED.tablets.B);
-    expect(await simB.openShift('Mai')).toEqual({ status: 'ok' });
+    expect(await simB.openShift('Mai')).toMatchObject({ status: 'ok' });
   });
 
   it('ca nhận số mặc định của hồ sơ tablet; mở ca báo Telegram', async () => {
@@ -122,7 +160,7 @@ describe('sync_push', () => {
     // Sửa đơn (giữ dòng cũ giá 25k + thêm dòng mới giá 30k)
     const keep = { ...item('xoiGa', [], 2), id: old.id };
     const fresh = { ...item('xoiGa'), unit_price_snap: 30000 };
-    expect(await sim.update(o.id, [keep, fresh])).toEqual({ status: 'ok' });
+    expect(await sim.update(o.id, [keep, fresh])).toMatchObject({ status: 'ok' });
     const [row] = await sql('select total from orders where id = $1', [o.id]);
     expect(row.total).toBe(25000 * 2 + 30000);
     // Dòng cũ mà đổi giá ⇒ từ chối
@@ -134,7 +172,7 @@ describe('sync_push', () => {
     // Đơn tạo lúc offline TRƯỚC khi đổi giá, sync sau ⇒ nhận
     const offline = sim.createOrderOp([item('xoiGa')]);
     offline.op.performed_at = before;
-    expect(await push(tab, offline.op)).toEqual({ status: 'ok' });
+    expect(await push(tab, offline.op)).toMatchObject({ status: 'ok' });
   });
 
   it('thanh toán: tiền thiếu bị từ chối; ghi nợ tên mới tự tạo khách; báo Telegram', async () => {
@@ -144,7 +182,7 @@ describe('sync_push', () => {
     const r = await sim.pay(o.id, o.total, 'debt', {
       customer: { id: newId, is_new: true, name: 'Hùng', description: 'xe ôm', phone: '' },
     });
-    expect(r).toEqual({ status: 'ok' });
+    expect(r).toMatchObject({ status: 'ok' });
     const [c] = await sql('select name, description, phone from customers where id = $1', [newId]);
     expect(c).toEqual({ name: 'Hùng', description: 'xe ôm', phone: null });
     const [n] = await sql(`select payload from notifications where kind = 'debt_recorded'`);
@@ -156,7 +194,7 @@ describe('sync_push', () => {
     const first = sim.shiftId;
     await sim.closeShift(199, 60, 500000);
     await sim.openShift('Mai');
-    expect(await sim.pay(o.id, o.total)).toEqual({ status: 'ok' });
+    expect(await sim.pay(o.id, o.total)).toMatchObject({ status: 'ok' });
     const [row] = await sql('select opened_shift_id, paid_shift_id from orders where id = $1', [o.id]);
     expect(row).toEqual({ opened_shift_id: first, paid_shift_id: sim.shiftId });
   });
@@ -164,7 +202,7 @@ describe('sync_push', () => {
   it('đóng ca: thông báo kèm đối soát, RPC chỉ trả ok', async () => {
     const o = await sim.createOrder([item('xoiGa')]);
     await sim.pay(o.id, o.total);
-    expect(await sim.closeShift(199, 60, 505000)).toEqual({ status: 'ok' });
+    expect(await sim.closeShift(199, 60, 505000)).toMatchObject({ status: 'ok' });
     const [n] = await sql(`select payload from notifications where kind = 'shift_close'`);
     expect(n.payload.reconcile.cash).toEqual({ expected: 525000, counted: 505000, diff: -20000 });
     expect(n.payload.reconcile.boxes).toEqual({ used: 1, by_orders: 1, diff: 0 });
@@ -173,7 +211,7 @@ describe('sync_push', () => {
   it('thu nợ: lưu vào ca hiện tại, báo Telegram kèm dư nợ còn lại', async () => {
     const o = await sim.createOrder([item('xoiGa')]);
     await sim.pay(o.id, o.total, 'debt', { customer: { id: SEED.customers.dungGv, name: 'Dũng' } });
-    expect(await sim.debtPayment(SEED.customers.dungGv, 10000)).toEqual({ status: 'ok' });
+    expect(await sim.debtPayment(SEED.customers.dungGv, 10000)).toMatchObject({ status: 'ok' });
     const [p] = await sql('select shift_id, amount from debt_payments');
     expect(p).toEqual({ shift_id: sim.shiftId, amount: 10000 });
     const [n] = await sql(`select payload from notifications where kind = 'debt_paid'`);

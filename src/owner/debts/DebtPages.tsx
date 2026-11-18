@@ -134,7 +134,7 @@ function CustomerBody({ d, onChanged }: { d: CustomerDebt; onChanged: () => Prom
                 data-testid={`debt-pick-${h.o.id}`}
               />
               <span className="flex-1">
-                {day(h.o.paid_at)} · Ghi nợ đơn <b className="font-mono">{h.o.code}</b>
+                {day(h.o.paid_at)} · Ghi nợ <b>đơn #<span className="font-mono">{h.o.code}</span></b>
                 <span className="block text-sm text-ink-subtle">
                   {h.o.staff_name} – {h.o.tablet_name}
                 </span>

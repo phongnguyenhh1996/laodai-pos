@@ -5,7 +5,7 @@ import {
 } from '@/domain/catalog';
 import { formatVnd } from '@/domain/money';
 import { comboPrice } from '@/domain/pricing';
-import type { Combo, DineType, Menu, Point, Product, Staff, TabletProfile, Topping } from '@/domain/types';
+import type { Combo, PointDineType, Menu, Point, Product, Staff, TabletProfile, Topping } from '@/domain/types';
 import type { OwnerCatalog, SettingsTable } from './api';
 
 export type FormValue = string | boolean | string[];
@@ -300,7 +300,7 @@ const points: EntityDef = {
     const v: Omit<Point, 'id'> = {
       name: str(f, 'name').trim(),
       menu_id: str(f, 'menu_id'),
-      default_dine_type: str(f, 'default_dine_type') as DineType,
+      default_dine_type: str(f, 'default_dine_type') as PointDineType,
       sort: count(f, 'sort', 'Thứ tự'),
       active: bool(f, 'active'),
     };

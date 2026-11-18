@@ -1,14 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { Link, Navigate, Route, Routes } from 'react-router-dom';
-import { LockKeyhole, Store, UserRound } from 'lucide-react';
-import { localDb } from '@/lib/localdb';
-import { catalogRefresher, ensureSyncStarted, syncRunner } from '@/lib/sync';
-import { SyncBadge } from '@/app/SyncBadge';
+import { CloudOff, LockKeyhole, RefreshCw, Store, UserRound } from 'lucide-react';
+import { startTablet, tabletStore } from '@/lib/pos';
+import { ConnectionBadge } from '@/app/ConnectionBadge';
 import { Splash } from '@/app/ui';
-import { useCatalog } from '@/app/useCatalog';
-import { useLive } from '@/app/useLive';
-import { currentShift } from '@/sync';
-import type { Activation } from '@/sync/db';
+import type { Activation } from '@/pos';
 import { CloseShiftScreen } from './CloseShiftScreen';
 import { DebtScreen } from './DebtScreen';
 import { OpenShiftScreen } from './OpenShiftScreen';
@@ -19,26 +15,26 @@ import { TabletContext, type TabletCtx } from './parts';
 
 /**
  * Màn bán hàng của tablet (mục 7): chưa có ca ⇒ chọn tên + Mở ca; có ca ⇒ hàng đợi, đơn, thanh toán, đóng ca.
- * Mọi thao tác ghi IndexedDB + outbox trước (src/sync/localOps), bộ đồng bộ đẩy lên server sau.
+ * Dữ liệu lấy thẳng từ server và cập nhật realtime (src/pos): mọi máy dùng chung hồ sơ tablet thấy cùng ca, cùng hàng đợi.
+ * Mọi thao tác ghi thẳng lên server; mất kết nối thì không lưu được (báo rõ trên màn hình).
  */
 export function TabletHome({ activation }: { activation: Activation }) {
-  const catalog = useCatalog(localDb);
-  const shift = useLive(() => currentShift(localDb), []);
+  const snap = useSyncExternalStore(tabletStore.subscribe, tabletStore.getSnapshot);
   const [lastPointId, setLastPointId] = useState<string | null>(null);
 
-  // Đồng bộ chạy suốt vòng đời app từ lúc vào màn bán hàng (kể cả khi chuyển sang chế độ chủ): không dừng khi rời màn.
-  // Mỗi lần quay lại màn bán hàng (vd. vừa thoát chế độ chủ) thì làm mới danh mục ngay.
+  // Chạy suốt vòng đời app từ lúc vào màn bán hàng (kể cả khi chuyển sang chế độ chủ): không dừng khi rời màn.
+  // Mỗi lần quay lại màn bán hàng (vd. vừa thoát chế độ chủ) thì tải lại ngay.
   useEffect(() => {
-    ensureSyncStarted();
-    void catalogRefresher.refresh();
-  }, []);
+    startTablet(activation.tablet_profile_id);
+    void tabletStore.refresh();
+  }, [activation.tablet_profile_id]);
 
   const ctx = useMemo<TabletCtx | null>(
     () =>
-      catalog.status === 'ready' && shift.status === 'ready'
-        ? { activation, catalog: catalog.catalog, shift: shift.value, lastPointId, setLastPointId }
+      snap.open
+        ? { activation, catalog: snap.catalog, shift: snap.open.shift, orders: snap.open.orders, lastPointId, setLastPointId }
         : null,
-    [activation, catalog, shift, lastPointId],
+    [activation, snap.catalog, snap.open, lastPointId],
   );
 
   return (
@@ -57,16 +53,22 @@ export function TabletHome({ activation }: { activation: Activation }) {
               Ca của {ctx.shift.staff_name}
             </span>
           )}
-          <SyncBadge runner={syncRunner} />
+          <ConnectionBadge state={snap.conn} />
         </div>
         <Link to="/owner" className="btn btn-secondary shrink-0" data-testid="open-owner-mode">
           <LockKeyhole aria-hidden className="h-5 w-5" />
           Chế độ chủ
         </Link>
       </header>
+      {ctx && snap.conn === 'offline' && (
+        <p data-testid="offline-banner" role="alert" className="flex items-center gap-3 border-b border-danger-line bg-danger-soft px-4 py-2 text-base font-medium text-danger-strong md:px-6">
+          <CloudOff aria-hidden className="h-5 w-5 shrink-0" />
+          Mất kết nối máy chủ: đơn, thanh toán, đóng ca… sẽ không lưu được cho tới khi có mạng.
+        </p>
+      )}
       <div className="min-h-0 flex-1">
         {!ctx ? (
-          <Splash />
+          snap.error ? <LoadError /> : <Splash />
         ) : (
           <TabletContext.Provider value={ctx}>
             <TabletRoutes hasShift={!!ctx.shift} />
@@ -74,6 +76,22 @@ export function TabletHome({ activation }: { activation: Activation }) {
         )}
       </div>
     </div>
+  );
+}
+
+/** Chưa tải được ca / đơn lần nào (máy mất mạng lúc mở app). */
+function LoadError() {
+  return (
+    <main data-testid="load-error" className="flex h-full flex-col items-center justify-center gap-6 p-6 text-center">
+      <span aria-hidden className="flex h-16 w-16 items-center justify-center rounded-full bg-danger-soft text-danger">
+        <CloudOff className="h-9 w-9" />
+      </span>
+      <p className="max-w-md text-2xl font-semibold">Không kết nối được máy chủ. Cần có mạng để bán hàng.</p>
+      <button type="button" className="btn btn-secondary min-w-[200px]" onClick={() => void tabletStore.refresh()} data-testid="load-retry">
+        <RefreshCw aria-hidden className="h-5 w-5" />
+        Thử lại
+      </button>
+    </main>
   );
 }
 

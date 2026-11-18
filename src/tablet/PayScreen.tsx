@@ -1,17 +1,17 @@
-import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useRef, useState } from 'react';
+import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { Banknote, CircleCheckBig, ChevronLeft, Landmark, NotebookPen, UserPlus } from 'lucide-react';
 import { canConfirmCash, changeDue, quickCashOptions } from '@/domain/cash';
 import { itemsSummary } from '@/domain/cart';
 import { parseMoneyInput } from '@/domain/catalog';
 import { formatVnd } from '@/domain/money';
 import { customerLabel } from '@/domain/debt';
-import type { Customer, Order } from '@/domain/types';
-import { localDb } from '@/lib/localdb';
+import type { Customer } from '@/domain/types';
+import { pos } from '@/lib/pos';
 import { Splash, errorMessage } from '@/app/ui';
-import { getOpenOrder, payOrder, type PaymentInput } from '@/sync';
+import type { PaymentInput } from '@/pos';
 import { ChosenCustomer, CustomerSuggestions, useDebtBook } from './debt';
-import { Notice } from './parts';
+import { Notice, useTablet } from './parts';
 import type { QueueFlash } from './QueueScreen';
 
 type Method = 'cash' | 'transfer' | 'debt';
@@ -23,7 +23,10 @@ type Method = 'cash' | 'transfer' | 'debt';
 export function PayScreen() {
   const { orderId } = useParams();
   const navigate = useNavigate();
-  const [order, setOrder] = useState<Order | null>(null);
+  const { orders } = useTablet();
+  const order = orders.find((o) => o.id === orderId) ?? null;
+  /** Đơn đã hiện trên màn này (để biết đơn biến mất là do máy khác thanh toán / xóa). */
+  const seen = useRef(false);
   const [method, setMethod] = useState<Method>('cash');
   const [given, setGiven] = useState<number | null>(null);
   const [manual, setManual] = useState('');
@@ -37,19 +40,13 @@ export function PayScreen() {
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
 
-  useEffect(() => {
-    let alive = true;
-    void getOpenOrder(localDb, orderId ?? '').then((o) => {
-      if (!alive) return;
-      if (!o) navigate('/', { replace: true });
-      else setOrder(o);
-    });
-    return () => {
-      alive = false;
-    };
-  }, [orderId, navigate]);
-
-  if (!order) return <Splash />;
+  if (!order) {
+    // Đang thanh toán trên máy này: chờ chuyển về hàng đợi kèm thông báo.
+    if (busyRef.current) return <Splash />;
+    const flash = seen.current ? 'Đơn đã được thanh toán hoặc xóa ở máy khác' : null;
+    return <Navigate to="/" replace state={flash ? ({ flash } satisfies QueueFlash) : null} />;
+  }
+  seen.current = true;
   const o = order;
   const change = changeDue(o.total, given);
 
@@ -69,7 +66,7 @@ export function PayScreen() {
     setBusy(true);
     setError(null);
     try {
-      await payOrder(localDb, o.id, payment);
+      await pos.payOrder(o.id, payment);
       navigate('/', { replace: true, state: { flash } satisfies QueueFlash });
     } catch (e) {
       setError(errorMessage(e));
@@ -86,8 +83,8 @@ export function PayScreen() {
           Đơn
         </Link>
         <div className="text-right">
-          <p className="font-mono text-2xl font-bold tracking-wider text-ink" data-testid="pay-code">
-            {o.code}
+          <p className="text-2xl font-bold text-ink" data-testid="pay-code">
+            Đơn #<span className="font-mono tracking-wider">{o.code}</span>
             {o.label ? ` · ${o.label}` : ''}
           </p>
           <p className="text-lg text-ink-muted">{itemsSummary(o.items)}</p>

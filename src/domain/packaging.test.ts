@@ -19,6 +19,10 @@ describe('packaging', () => {
     expect(itemPackaging(buildItem('i', COM_GA, [CANH, DUA, DUI]), COM_GA, 'takeaway')).toEqual({ boxes: 3, plates: 0 });
   });
 
+  it('đơn ship tính bao bì như mang về', () => {
+    expect(itemPackaging(buildItem('i', COM_GA, [CANH, DUI], 2), COM_GA, 'delivery')).toEqual({ boxes: 4, plates: 0 });
+  });
+
   it('cơm tại chỗ: 1 dĩa, 0 hộp, kể cả khi có topping gắn cờ', () => {
     expect(itemPackaging(buildItem('i', COM_GA, [CANH, DUA]), COM_GA, 'dinein')).toEqual({ boxes: 0, plates: 1 });
   });

@@ -7,7 +7,7 @@ import { useActivation } from '@/app/useActivation';
 import { useIdleTimeout } from '@/app/useIdleTimeout';
 import { enterOwnerModeOnTablet, exitOwnerMode, signInOwner } from '@/lib/auth';
 import { decodeClaims, supabase } from '@/lib/supabase';
-import type { Activation } from '@/sync/db';
+import type { Activation } from '@/pos';
 import { OwnerContext, type OwnerSession } from './OwnerContext';
 import { OwnerHome } from './OwnerHome';
 import { SettingsRoutes } from './settings/SettingsPages';

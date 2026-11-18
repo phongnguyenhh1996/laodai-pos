@@ -33,6 +33,10 @@ const samples: Notification[] = [
   { kind: 'shift_close', payload: { ...base, ...ctx, closed_at: '2026-11-18T03:15:00Z', reconcile: rec, adjusted: false } },
   { kind: 'order_deleted', payload: { ...base, ...ctx, order, reason: 'customer_left', was_served: true } },
   {
+    kind: 'delivery_order',
+    payload: { ...base, ...ctx, order: { ...order, status: 'open', dine_type: 'delivery', address: '12 Lê Lợi, P.3 – 0909 123 456' }, point_name: 'Xôi A', updated: false },
+  },
+  {
     kind: 'debt_recorded',
     payload: { ...base, ...ctx, order_code: '7KQ', order_id: 'o2', customer_id: 'c1', amount: 35_000, customer_label: 'Dũng (giáo viên)', balance: 120_000 },
   },
@@ -76,7 +80,7 @@ describe('định dạng Telegram', () => {
 
   it('có đủ snapshot cho mọi loại tin của đặc tả', () => {
     expect(new Set(samples.map((s) => s.kind))).toEqual(
-      new Set(['tablet_login', 'owner_mode', 'shift_open', 'shift_close', 'order_deleted', 'debt_recorded', 'debt_paid',
+      new Set(['tablet_login', 'owner_mode', 'shift_open', 'shift_close', 'order_deleted', 'delivery_order', 'debt_recorded', 'debt_paid',
         'owner_edit', 'seq_gap', 'sync_rejected', 'daily_summary']),
     );
   });

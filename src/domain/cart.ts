@@ -9,13 +9,15 @@ export interface CartDraft {
   /** Nhân viên đã tự bấm Tại chỗ / Mang về ⇒ đổi điểm bán không ghi đè lựa chọn đó. */
   dine_type_touched: boolean;
   label: string;
+  /** Địa chỉ giao: chỉ dùng (và bắt buộc) khi đơn ship. */
+  address: string;
   items: OrderItem[];
 }
 
 export class CartError extends Error {}
 
 export function newDraft(point: Pick<Point, 'id' | 'default_dine_type'>): CartDraft {
-  return { point_id: point.id, dine_type: point.default_dine_type, dine_type_touched: false, label: '', items: [] };
+  return { point_id: point.id, dine_type: point.default_dine_type, dine_type_touched: false, label: '', address: '', items: [] };
 }
 
 /** Hai dòng giống hệt nhau (cùng món, cùng topping, cùng giá chụp) ⇒ gộp thành một dòng tăng số lượng. */
@@ -60,6 +62,49 @@ export function addCombo(
   return addLine(items, buildComboItem(newId, combo, products, toppings, 1));
 }
 
+/**
+ * Khách đổi món: thay dòng `lineId` bằng `line`, giữ số lượng và vị trí của dòng cũ.
+ * Món mới trùng một dòng khác đã có ⇒ gộp vào dòng đó. Trùng chính dòng cũ ⇒ không đổi gì.
+ */
+export function replaceLine(items: readonly OrderItem[], lineId: string, line: OrderItem): OrderItem[] {
+  const old = items.find((it) => it.id === lineId);
+  if (!old) throw new CartError('Không có dòng này trong đơn');
+  if (sameLine(old, line)) return [...items];
+  const next = { ...line, qty: old.qty };
+  if (items.some((it) => it.id !== lineId && sameLine(it, next))) {
+    return addLine(
+      items.filter((it) => it.id !== lineId),
+      next,
+    );
+  }
+  return items.map((it) => (it.id === lineId ? next : it));
+}
+
+export function replaceWithProduct(
+  items: readonly OrderItem[],
+  lineId: string,
+  newId: string,
+  product: Product,
+  toppings: Topping[],
+  menuId: string,
+): OrderItem[] {
+  if (product.menu_id !== menuId) throw new CartError(`Món "${product.name}" không thuộc menu của điểm bán`);
+  return replaceLine(items, lineId, buildItem(newId, product, toppings, 1));
+}
+
+export function replaceWithCombo(
+  items: readonly OrderItem[],
+  lineId: string,
+  newId: string,
+  combo: Combo,
+  products: Product[],
+  toppings: Topping[],
+  menuId: string,
+): OrderItem[] {
+  if (combo.menu_id !== menuId) throw new CartError(`Combo "${combo.name}" không thuộc menu của điểm bán`);
+  return replaceLine(items, lineId, buildComboItem(newId, combo, products, toppings, 1));
+}
+
 /** Đổi số lượng một dòng; về 0 ⇒ bỏ dòng. Số âm / không nguyên bị từ chối. */
 export function setLineQty(items: readonly OrderItem[], lineId: string, qty: number): OrderItem[] {
   if (qty === 0) return items.filter((it) => it.id !== lineId);
@@ -102,6 +147,16 @@ export function setDineType(draft: CartDraft, dine_type: DineType): CartDraft {
   return { ...draft, dine_type, dine_type_touched: true };
 }
 
+/** Địa chỉ gửi đi: chỉ đơn ship mới có, bỏ khoảng trắng thừa. */
+export function draftAddress(draft: Pick<CartDraft, 'dine_type' | 'address'>): string | null {
+  return draft.dine_type === 'delivery' ? draft.address.trim() || null : null;
+}
+
+/** Đơn ship chưa có địa chỉ ⇒ chưa được lưu. */
+export function needsAddress(draft: Pick<CartDraft, 'dine_type' | 'address'>): boolean {
+  return draft.dine_type === 'delivery' && draftAddress(draft) === null;
+}
+
 /** "2× Xôi gà (Trứng, Chả)" — tóm tắt dòng trên thẻ hàng đợi / giỏ hàng. */
 export function lineSummary(it: Pick<OrderItem, 'qty' | 'name_snap' | 'toppings_snap'>): string {
   const tops = it.toppings_snap.length ? ` (${it.toppings_snap.map((t) => t.name).join(', ')})` : '';
@@ -114,10 +169,11 @@ export function itemsSummary(items: ReadonlyArray<Pick<OrderItem, 'qty' | 'name_
 
 /** Bản nháp khác với đơn đã lưu ⇒ cần ghi `update_order`. */
 export function draftChanged(
-  draft: Pick<CartDraft, 'point_id' | 'dine_type' | 'label' | 'items'>,
-  saved: { point_id: string; dine_type: DineType; label: string | null; items: readonly OrderItem[] },
+  draft: Pick<CartDraft, 'point_id' | 'dine_type' | 'label' | 'address' | 'items'>,
+  saved: { point_id: string; dine_type: DineType; label: string | null; address: string | null; items: readonly OrderItem[] },
 ): boolean {
   if (draft.point_id !== saved.point_id || draft.dine_type !== saved.dine_type) return true;
+  if (draftAddress(draft) !== (saved.address ?? null)) return true;
   if ((draft.label.trim() || null) !== (saved.label ?? null)) return true;
   if (draft.items.length !== saved.items.length) return true;
   return draft.items.some((it, i) => {

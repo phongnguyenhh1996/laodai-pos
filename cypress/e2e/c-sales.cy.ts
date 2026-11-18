@@ -46,7 +46,7 @@ describe('C. Bán hàng', () => {
     cy.get(tid('queue-flash')).should('contain.text', '31.000');
     cy.get('[data-testid^=queue-card-]').should('not.exist');
 
-    cy.waitSynced();
+    cy.waitLive();
     serverOrders().then((os) => {
       expect(os).to.have.length(1);
       expect(os[0]).to.include({ status: 'paid', payment_method: 'cash', total: 31_000, cash_given: 31_000, point_id: SEED.points.xoiA });
@@ -75,7 +75,7 @@ describe('C. Bán hàng', () => {
     cy.get(tid('order-dine-dinein')).should('have.attr', 'aria-pressed', 'true'); // Cơm gà = Tại chỗ
     cy.get(tid('order-back')).click();
 
-    cy.waitSynced();
+    cy.waitLive();
     serverOrders().then((os) => {
       expect(os).to.have.length(1);
       expect(os[0]).to.include({ dine_type: 'takeaway', total: 28_000, status: 'open' });
@@ -100,7 +100,7 @@ describe('C. Bán hàng', () => {
     cy.get(tid('order-save')).click();
     cards().should('have.length', 3);
 
-    cy.waitSynced();
+    cy.waitLive();
     serverOrders().then((os) => {
       expect(os.map((o) => [o.point_id, o.dine_type, o.total])).to.deep.eq([
         [SEED.points.xoiA, 'takeaway', 31_000],
@@ -129,15 +129,15 @@ describe('C. Bán hàng', () => {
   });
 
   it('C14: 3 đơn, cũ nhất ở trên; 5 phút ⇒ vàng, 10 phút ⇒ đỏ; "Đã ra món" ⇒ xuống nhóm "Chờ thanh toán"', () => {
-    // Giờ giả lùi 11 phút để mọi thao tác (kể cả sau khi tua 10 phút) vẫn ở quá khứ với server.
-    // Mở ca cũng theo giờ giả: server không nhận đơn tạo trước giờ mở ca.
-    cy.clock(Date.now() - 11 * 60_000, ['Date']);
+    // Giờ tạo đơn là giờ server ⇒ lùi giờ tạo trên server (một: t0, hai: t0+1, ba: t0+2 với t0 = 2 phút trước),
+    // tablet nhận thay đổi qua realtime; rồi tua đồng hồ của trình duyệt.
     cy.openShift('Lan');
     comboOrder('xoiGaTrung', 'một');
-    cy.tick(60_000);
     comboOrder('xoiXeoChaRuoc', 'hai');
-    cy.tick(60_000);
     comboOrder('xoiGaTrung', 'ba');
+    cy.task('db:ageOrders', { một: 2, hai: 1, ba: 0 });
+    cards('serve').first().find('[data-testid^=queue-wait-]').should('contain.text', '2 phút');
+    cy.then(() => cy.clock(Date.now(), ['Date'])); // giờ lúc lệnh chạy (không phải lúc xếp lệnh)
     // (giờ = t0 + 2 phút)
     cards('serve').should('have.length', 3);
     cards('serve').then(($c) => {
@@ -160,7 +160,7 @@ describe('C. Bán hàng', () => {
     cards('pay').first().should('have.attr', 'data-position', '3');
     cy.clock().invoke('restore');
 
-    cy.waitSynced();
+    cy.waitLive();
     serverOrders().then((os) => {
       expect(os.map((o) => [o.label, o.status, o.served])).to.deep.eq([
         ['một', 'served', true],
@@ -195,7 +195,7 @@ describe('C. Bán hàng', () => {
     });
     cy.get('[data-testid^=queue-pos-]').then(($p) => expect([...$p].map((p) => p.textContent)).to.deep.eq(['1', '2']));
 
-    cy.waitSynced();
+    cy.waitLive();
     serverOrders().then((os) => {
       expect(os.every((o) => CODE.test(o.code))).to.eq(true);
       expect(os[1]).to.include({ label: 'hai', status: 'paid', cash_given: 50_000 });
@@ -225,24 +225,68 @@ describe('C. Bán hàng', () => {
       // Không có link / nút nào dẫn tới lịch sử đơn
       cy.get('a[href*=history], a[href*=paid], [data-testid*=history]').should('not.exist');
 
-      cy.waitSynced();
+      cy.waitLive();
       serverOrders().then((os) => expect(os[0]).to.include({ id, status: 'paid', payment_method: 'transfer' }));
-      // Đã sync ⇒ đơn bị xóa hẳn khỏi IndexedDB của tablet
-      cy.window().then(
-        (win) =>
-          new Cypress.Promise<number>((resolve, reject) => {
-            const req = win.indexedDB.open('laodai-pos');
-            req.onerror = () => reject(req.error);
-            req.onsuccess = () => {
-              const db = req.result;
-              const count = db.transaction('orders').objectStore('orders').count();
-              count.onsuccess = () => {
-                db.close();
-                resolve(count.result);
-              };
-            };
-          }),
-      ).should('eq', 0);
+      // Tablet không giữ dữ liệu đơn nào trên máy (không còn IndexedDB của bản offline)
+      cy.window().then((win) => win.indexedDB.databases()).should((dbs) => expect(dbs.map((d) => d.name)).not.to.include('laodai-pos'));
+    });
+  });
+
+  it('C17: khách đổi món: bấm dòng trong đơn để chọn, bấm món / combo khác ⇒ thay đúng dòng đó, giữ số lượng; server nhận đơn đã đổi', () => {
+    const P = SEED.products;
+    const T = SEED.toppings;
+    const line = (productId: string) => cy.get(`[data-testid^=cart-line-][data-product="${productId}"]`);
+    cy.openShift('Lan');
+    cy.get(tid('new-order')).click();
+    for (const p of [P.xoiGa, P.xoiGa, P.xoiXeo]) {
+      cy.get(tid(`menu-product-${p}`)).click();
+      cy.get(tid('topping-add')).click();
+    }
+    cy.get(tid('order-total')).should('have.text', '65.000'); // 2 × 25.000 + 15.000
+    cy.get(tid('order-save')).click();
+    cy.get('[data-testid^=queue-open-]').click();
+
+    // Chọn rồi bấm lại ⇒ thôi, không đổi gì
+    line(P.xoiGa).find('[data-testid$=-pick]').click();
+    cy.get(tid('swap-banner')).should('contain.text', '2× Xôi gà');
+    line(P.xoiGa).should('have.attr', 'data-swapping', 'true');
+    line(P.xoiGa).find('[data-testid$=-pick]').click();
+    cy.get(tid('swap-banner')).should('not.exist');
+
+    // 2× Xôi gà ⇒ 2× Xôi pate (Trứng): vẫn ở dòng đầu, vẫn 2 phần
+    line(P.xoiGa).find('[data-testid$=-pick]').click();
+    cy.get(tid(`menu-product-${P.xoiPate}`)).click();
+    cy.get(tid(`topping-option-${T.trung}`)).click();
+    cy.get(tid('topping-add')).should('contain.text', 'Đổi').and('contain.text', '26.000').click();
+    cy.get(tid('swap-banner')).should('not.exist');
+    line(P.xoiGa).should('not.exist');
+    cy.get(`${tid('cart-lines')} > li`).should('have.length', 2).first().should('have.attr', 'data-product', P.xoiPate);
+    line(P.xoiPate).find('[data-testid$=-qty]').should('have.text', '2');
+
+    // Đổi topping của chính món đó: bảng topping mở sẵn Trứng
+    line(P.xoiPate).find('[data-testid$=-pick]').click();
+    cy.get(tid(`menu-product-${P.xoiPate}`)).click();
+    cy.get(tid(`topping-option-${T.trung}`)).should('have.attr', 'aria-pressed', 'true');
+    cy.get(tid('topping-cancel')).click();
+    cy.get(tid('swap-cancel')).click();
+
+    // 1× Xôi xéo ⇒ combo Xôi xéo chả ruốc (1 chạm)
+    line(P.xoiXeo).find('[data-testid$=-pick]').click();
+    cy.get(tid(`menu-combo-${SEED.combos.xoiXeoChaRuoc}`)).click();
+    cy.get(`${tid('cart-lines')} > li`).should('have.length', 2);
+    cy.get(tid('order-total')).should('have.text', '80.000'); // 2 × 26.000 + 28.000
+    cy.get(tid('order-autosave')).should('have.attr', 'data-state', 'saved');
+    cy.get(tid('order-back')).click();
+    cy.get(tid('queue-screen')).should('be.visible');
+
+    cy.waitLive();
+    serverOrders().then((os) => {
+      expect(os).to.have.length(1);
+      expect(os[0]).to.include({ status: 'open', total: 80_000 });
+      expect(os[0].items.map((i) => [i.product_id, i.qty, i.toppings.map((t) => t.id).sort().join()])).to.deep.eq([
+        [P.xoiPate, 2, T.trung],
+        [P.xoiXeo, 1, [T.cha, T.ruoc].sort().join()],
+      ]);
     });
   });
 });

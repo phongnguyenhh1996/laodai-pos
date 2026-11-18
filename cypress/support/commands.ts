@@ -1,8 +1,7 @@
 /// <reference types="cypress" />
 import { SEED } from '../../tests/support/seed-ids';
 
-// Lệnh tùy biến theo mục 10.4. Các lệnh cần UI của bước sau (goOffline...)
-// được bổ sung ở bước tương ứng của mục 8.
+// Lệnh tùy biến theo mục 10.4.
 
 type TabletKey = keyof typeof SEED.tablets;
 type StaffKey = keyof typeof SEED.staff;
@@ -15,9 +14,7 @@ declare global {
       telegramMessages(): Chainable<Array<{ chat_id: string; text: string; at: string }>>;
       /** Chờ tin Telegram chứa `text` (tối đa 15 giây). */
       telegramWaitFor(text: string): Chainable<{ chat_id: string; text: string; at: string }>;
-      /** Xóa IndexedDB của app (giả lập tablet chưa kích hoạt / dữ liệu bị xóa). */
-      clearLocalDb(): Chainable<null>;
-      /** Mở trang như trên một máy mới tinh: không IndexedDB, không phiên đăng nhập. */
+      /** Mở trang như trên một máy mới tinh: không dữ liệu kích hoạt, không phiên đăng nhập. */
       visitFresh(path: string): Chainable<Cypress.AUTWindow>;
       /** Kích hoạt máy hiện tại thành tablet A/B qua giao diện (chủ đăng nhập → chọn hồ sơ). */
       activateTablet(tablet: TabletKey): Chainable<null>;
@@ -27,8 +24,8 @@ declare global {
       storedAccessToken(): Chainable<string>;
       /** Trên màn mở ca của tablet: chọn tên → Mở ca ⇒ hàng đợi. */
       openShift(staff: StaffKey): Chainable<null>;
-      /** Chờ outbox của tablet gửi hết lên server (chỉ báo "Đã đồng bộ"). */
-      waitSynced(): Chainable<null>;
+      /** Tablet đang kết nối realtime với server (chỉ báo "Đã kết nối"). Mọi thao tác đã hiện trên màn đều đã nằm trên server. */
+      waitLive(): Chainable<null>;
     }
   }
 }
@@ -42,21 +39,11 @@ Cypress.Commands.add('telegramMessages', () => cy.task('telegram:messages'));
 
 Cypress.Commands.add('telegramWaitFor', (text: string) => cy.task('telegram:waitFor', text, { timeout: 30_000 }));
 
-Cypress.Commands.add('clearLocalDb', () =>
-  cy.window().then(
-    (win) =>
-      new Cypress.Promise<null>((resolve) => {
-        const req = win.indexedDB.deleteDatabase('laodai-pos');
-        req.onsuccess = req.onerror = req.onblocked = () => resolve(null);
-      }),
-  ),
-);
-
 Cypress.Commands.add('visitFresh', (path: string) =>
   cy.visit(path, {
     onBeforeLoad(win) {
       win.localStorage.clear();
-      win.indexedDB.deleteDatabase('laodai-pos');
+      win.indexedDB.deleteDatabase('laodai-pos'); // dữ liệu của bản offline cũ (nếu có)
     },
   }),
 );
@@ -98,8 +85,8 @@ Cypress.Commands.add('openShift', (staff: StaffKey) => {
   return cy.wrap(null, { log: false });
 });
 
-Cypress.Commands.add('waitSynced', () => {
-  cy.get('[data-testid=sync-status]', { timeout: 20_000 }).should('have.attr', 'data-state', 'synced').and('have.attr', 'data-pending', '0');
+Cypress.Commands.add('waitLive', () => {
+  cy.get('[data-testid=conn-status]', { timeout: 20_000 }).should('have.attr', 'data-state', 'live');
   return cy.wrap(null, { log: false });
 });
 

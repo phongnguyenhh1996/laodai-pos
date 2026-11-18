@@ -2,7 +2,11 @@
 // Tiền là số nguyên VND.
 
 export type Money = number;
-export type DineType = 'dinein' | 'takeaway';
+export type DineType = 'dinein' | 'takeaway' | 'delivery';
+/** Mặc định của điểm bán chỉ là Tại chỗ / Mang về; Ship do nhân viên chọn từng đơn. */
+export type PointDineType = Exclude<DineType, 'delivery'>;
+
+export const DINE_LABELS: Record<DineType, string> = { dinein: 'Tại chỗ', takeaway: 'Mang về', delivery: 'Ship' };
 export type OrderStatus = 'open' | 'served' | 'paid' | 'deleted';
 export type PaymentMethod = 'cash' | 'transfer' | 'debt';
 export type AdjustmentKind = 'boxes' | 'plates' | 'cash';
@@ -26,7 +30,7 @@ export interface Point {
   menu_id: string;
   active: boolean;
   /** Mặc định Tại chỗ / Mang về khi tạo đơn ở điểm này. */
-  default_dine_type: DineType;
+  default_dine_type: PointDineType;
   sort: number;
 }
 
@@ -103,6 +107,8 @@ export interface Order {
   label: string | null;
   table_no: string | null;
   dine_type: DineType;
+  /** Địa chỉ giao (chỉ đơn ship, bắt buộc). */
+  address: string | null;
   status: OrderStatus;
   opened_shift_id: string;
   paid_shift_id: string | null;

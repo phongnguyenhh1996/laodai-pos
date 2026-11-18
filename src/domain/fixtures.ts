@@ -63,6 +63,7 @@ export function order(o: Partial<Order> = {}): Order {
     label: null,
     table_no: null,
     dine_type: 'takeaway',
+    address: null,
     status: 'open',
     opened_shift_id: 's1',
     paid_shift_id: null,

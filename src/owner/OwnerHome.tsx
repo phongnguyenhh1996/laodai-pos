@@ -162,7 +162,7 @@ function DashboardPanel() {
             className={`flex items-center justify-between gap-3 rounded-xl border border-l-4 px-3 py-2 ${o.color === 'red' ? 'border-danger-line border-l-danger bg-danger-soft text-danger-strong' : 'border-warning-line border-l-warning bg-warning-soft text-warning-strong'}`}
           >
             <span className="min-w-0">
-              <b className="font-mono">{o.code}</b> {o.label ? `· ${o.label} ` : ''}· {o.point_name} · {o.tablet_name}
+              <b>Đơn #<span className="font-mono">{o.code}</span></b> {o.label ? `· ${o.label} ` : ''}· {o.point_name} · {o.tablet_name}
             </span>
             <span className="num flex shrink-0 items-center gap-1 font-semibold">
               <Timer aria-hidden className="h-4 w-4" />

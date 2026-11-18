@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { Activation } from '@/sync/db';
+import type { Activation } from '@/pos';
 import { loadTabletActivation } from '@/lib/auth';
 
 export type ActivationState = { status: 'loading' } | { status: 'none' } | { status: 'active'; activation: Activation };

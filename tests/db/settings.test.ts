@@ -1,36 +1,33 @@
 // Bước 4 — cài đặt của chủ: ghi qua đúng module giao diện dùng (src/owner/settings/api.ts) với RLS thật,
-// và tablet nhận thay đổi qua danh mục đồng bộ (src/sync/catalog.ts). Dữ liệu phía server cho E2E G32, G37.
-import 'fake-indexeddb/auto';
+// và tablet nhận thay đổi qua danh mục (src/pos, báo realtime qua live_pulse). Dữ liệu phía server cho E2E G32, G37.
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { menuBoard, tabletPoints } from '@/domain/catalog';
 import { buildItem, setItemQty } from '@/domain/pricing';
-import type { TabletProfile } from '@/domain/types';
 import { loadOwnerCatalog, loadPriceHistory, saveSetting } from '@/owner/settings/api';
-import {
-  LaodaiDB, META, createOrder, createRpcTransport, createSupabaseCatalogSource, flushOutbox, loadCatalog, openShift,
-  refreshCatalog, setMeta, updateOrder, type Catalog,
-} from '@/sync';
+import { createSupabaseCatalogSource, type Catalog } from '@/pos';
 import { ownerClient, resetDb, sql, tabletClient } from '../support/db';
 import { SEED } from '../support/seed-ids';
+import { liveTablet, type LiveTablet } from '../support/tablet';
 
 let owner: SupabaseClient;
 let tab: SupabaseClient;
-let db: LaodaiDB;
-let n = 0;
+let t: LiveTablet;
 
 beforeEach(async () => {
   await resetDb();
   [owner, tab] = await Promise.all([ownerClient(), tabletClient(SEED.tablets.A)]);
-  db = new LaodaiDB(`db-settings-${++n}`);
-  await setMeta(db, META.activation, { tablet_profile_id: SEED.tablets.A, tablet_name: 'Tablet A', activated_at: '', owner_email: '' });
+  t = await liveTablet(tab, SEED.tablets.A);
 });
 
-afterEach(async () => {
-  await db.delete();
+afterEach(() => {
+  t.stop();
 });
 
-const syncCatalog = () => refreshCatalog(db, createSupabaseCatalogSource(tab));
+const syncCatalog = async () => {
+  await t.store.refreshCatalog();
+  return t.store.getSnapshot().catalog!;
+};
 const product = (c: Catalog, id: string) => c.products.find((p) => p.id === id)!;
 
 describe('chủ sửa cài đặt', () => {
@@ -100,7 +97,7 @@ describe('chủ sửa cài đặt', () => {
   });
 });
 
-describe('tablet nhận cài đặt qua danh mục đồng bộ', () => {
+describe('tablet nhận cài đặt qua danh mục', () => {
   it('danh mục tải bằng phiên tablet: đủ menu / nhân viên / cấu hình, chỉ hồ sơ của chính mình', async () => {
     const c = await syncCatalog();
     expect(c.profile).toMatchObject({ id: SEED.tablets.A, point_ids: [SEED.points.xoiA, SEED.points.com], default_boxes: 200 });
@@ -112,31 +109,29 @@ describe('tablet nhận cài đặt qua danh mục đồng bộ', () => {
     await expect(createSupabaseCatalogSource(tab)(SEED.tablets.B)).rejects.toThrow('phiên tablet không hợp lệ');
   });
 
-  it('G37 (dữ liệu): bỏ Cơm gà khỏi tablet A ⇒ sau khi đồng bộ, tab Cơm gà biến mất trên tablet A', async () => {
-    let c = await syncCatalog();
+  it('G37 (dữ liệu): bỏ Cơm gà khỏi tablet A ⇒ tablet A nhận ngay qua realtime, tab Cơm gà biến mất', async () => {
+    const rt = await liveTablet(tab, SEED.tablets.A, { realtime: true });
+    let c = rt.store.getSnapshot().catalog!;
     expect(tabletPoints(c.profile, c.points).map((p) => p.name)).toEqual(['Xôi A', 'Cơm gà']);
+    await vi.waitFor(() => expect(rt.store.getSnapshot().conn).toBe('live'), { timeout: 10_000 });
 
     await saveSetting(owner, 'tablet_profiles', SEED.tablets.A, { point_ids: [SEED.points.xoiA] });
-    // Chưa đồng bộ: tablet vẫn dùng danh mục cũ (offline vẫn bán được)
-    c = (await loadCatalog(db))!;
-    expect(tabletPoints(c.profile, c.points).map((p) => p.name)).toEqual(['Xôi A', 'Cơm gà']);
-
-    c = await syncCatalog();
+    // Không cần tải lại tay: server báo qua live_pulse
+    await vi.waitFor(() => expect(rt.store.getSnapshot().catalog!.profile.point_ids).toEqual([SEED.points.xoiA]), { timeout: 10_000 });
+    c = rt.store.getSnapshot().catalog!;
     expect(tabletPoints(c.profile, c.points).map((p) => p.name)).toEqual(['Xôi A']);
+    rt.stop();
     // Tablet B không bị ảnh hưởng
     const tabB = await tabletClient(SEED.tablets.B);
     expect((await createSupabaseCatalogSource(tabB)(SEED.tablets.B)).profile.point_ids).toEqual([SEED.points.xoiB]);
   });
 
   it('G32 (dữ liệu): đổi giá ⇒ đơn đang mở trên tablet giữ giá cũ, đơn mới dùng giá mới, có lịch sử giá', async () => {
-    const transport = createRpcTransport(tab);
     let c = await syncCatalog();
-    const profile: TabletProfile = c.profile;
-    await openShift(db, { staff_id: SEED.staff.Lan, staff_name: 'Lan', profile });
-    const open = await createOrder(db, {
+    await t.pos.openShift({ staff_id: SEED.staff.Lan });
+    const open = await t.pos.createOrder({
       point_id: SEED.points.xoiA, dine_type: 'takeaway', items: [buildItem('a0000000-0000-7000-8000-000000000001', product(c, SEED.products.xoiGa), [])],
     });
-    expect(await flushOutbox(db, transport)).toMatchObject({ rejected: 0, remaining: 0, error: null });
 
     // Chủ đổi giá Xôi gà 25.000 → 28.000
     await saveSetting(owner, 'products', SEED.products.xoiGa, { price: 28000 });
@@ -148,15 +143,15 @@ describe('tablet nhận cài đặt qua danh mục đồng bộ', () => {
     expect(product(c, SEED.products.xoiGa).price).toBe(28000);
 
     // Đơn đang mở giữ giá cũ, kể cả khi sửa số lượng sau khi đổi giá
-    const local = (await db.orders.get(open.id))!;
-    expect(local.items[0].unit_price_snap).toBe(25000);
-    await updateOrder(db, open.id, { items: [setItemQty(local.items[0], 2)] });
+    await t.store.refreshOpen();
+    const live = t.store.getSnapshot().open!.orders.find((o) => o.id === open.id)!;
+    expect(live.items[0].unit_price_snap).toBe(25000);
+    await t.pos.updateOrder(open.id, { items: [setItemQty(live.items[0], 2)] });
     // Đơn mới dựng từ danh mục mới ⇒ giá mới
-    const fresh = await createOrder(db, {
+    const fresh = await t.pos.createOrder({
       point_id: SEED.points.xoiA, dine_type: 'takeaway', items: [buildItem('a0000000-0000-7000-8000-000000000002', product(c, SEED.products.xoiGa), [])],
     });
     expect(fresh.total).toBe(28000);
-    expect(await flushOutbox(db, transport)).toMatchObject({ rejected: 0, remaining: 0, error: null });
 
     const rows = await sql<{ id: string; total: number; unit_price_snap: number; qty: number }>(
       `select o.id, o.total, i.unit_price_snap, i.qty from orders o join order_items i on i.order_id = o.id and i.removed_at is null`,

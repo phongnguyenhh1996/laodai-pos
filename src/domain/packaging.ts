@@ -9,7 +9,7 @@ export type PackagingNorms = Pick<Product, 'id' | 'boxes_takeaway' | 'boxes_dine
 
 /**
  * Định mức bao bì cho một dòng đơn.
- * - Mang về: qty × (boxes_takeaway + số topping có cờ extra_box)
+ * - Mang về / Ship: qty × (boxes_takeaway + số topping có cờ extra_box)
  * - Tại chỗ:  qty × boxes_dinein hộp, qty × plates_dinein dĩa (topping có cờ không tính)
  */
 export function itemPackaging(
@@ -17,7 +17,7 @@ export function itemPackaging(
   norms: PackagingNorms,
   dineType: DineType,
 ): Packaging {
-  if (dineType === 'takeaway') {
+  if (dineType !== 'dinein') {
     const extra = item.toppings_snap.filter((t) => t.extra_box).length;
     return { boxes: item.qty * (norms.boxes_takeaway + extra), plates: 0 };
   }

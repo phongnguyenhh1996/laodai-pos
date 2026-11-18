@@ -1,11 +1,9 @@
-// Tablet giả cho test component: hồ sơ kích hoạt + danh mục đặt sẵn trong IndexedDB, không gọi server.
-import { vi } from 'vitest';
+// Tablet giả cho test component: hồ sơ kích hoạt trên máy + server giả trong bộ nhớ (FakeServer).
 import { COMBOS, COM_MENU, PRODUCTS, TOPPINGS, XOI_MENU } from '@/domain/fixtures';
-import { localDb } from '@/lib/localdb';
-import { catalogRefresher } from '@/lib/sync';
-import type { Catalog } from '@/sync/catalog';
-import { META, setMeta, type Activation } from '@/sync/db';
+import { pos, tabletStore } from '@/lib/pos';
+import { writeActivation, type Activation, type Catalog, type CatalogData } from '@/pos';
 import { storeSession } from './auth';
+import { FakeServer } from './fakeServer';
 
 export const ACT: Activation = { tablet_profile_id: 'tab-a', tablet_name: 'Tablet A', activated_at: '', owner_email: 'owner@x.vn' };
 
@@ -35,22 +33,28 @@ export const CATALOG: Catalog = {
   balances: { 'c-gv': 0, 'c-pb': 120_000, 'c-hoa': 30_000 },
 };
 
-/** Không gọi server: danh mục được đặt sẵn trong IndexedDB như sau một lần đồng bộ. */
-export function stubCatalog(): void {
-  vi.spyOn(catalogRefresher, 'start').mockImplementation(() => undefined);
-  vi.spyOn(catalogRefresher, 'refresh').mockResolvedValue(false);
+/** Server giả dùng cho test hiện tại (đặt lại ở mỗi `useFakeServer`). */
+export let server: FakeServer;
+
+/** Tablet của app dùng server giả (gọi trong beforeEach). Không gửi lại khi lỗi mạng để test chạy nhanh. */
+export function useFakeServer(catalog: CatalogData = CATALOG): FakeServer {
+  server = new FakeServer(catalog);
+  tabletStore.reset(server.device());
+  pos.reset();
+  pos.retryDelaysMs = [];
+  return server;
 }
 
-export async function activateDevice(
+/** Máy đã kích hoạt cho hồ sơ Tablet A (hồ sơ kích hoạt + phiên vai trò tablet). */
+export function activateDevice(
   session: Parameters<typeof storeSession>[0] | null = { role: 'tablet', tablet_profile_id: 'tab-a' },
-  catalog: Catalog = CATALOG,
-): Promise<void> {
-  await setMeta(localDb, META.activation, ACT);
-  await setMeta(localDb, META.catalog, catalog);
+): void {
+  writeActivation(ACT);
   if (session) storeSession(session);
 }
 
-/** Xóa sạch dữ liệu tablet giữa các test. */
-export async function clearLocalDb(): Promise<void> {
-  await Promise.all([localDb.meta.clear(), localDb.outbox.clear(), localDb.orders.clear(), localDb.usedCodes.clear(), localDb.rejected.clear()]);
+/** Dọn giữa các test. */
+export function resetTablet(): void {
+  tabletStore.reset();
+  pos.reset();
 }

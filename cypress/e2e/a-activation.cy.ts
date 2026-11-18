@@ -128,9 +128,9 @@ describe('A. Kích hoạt & phân quyền', () => {
     cy.get('[data-testid=activate-error]').should('be.visible');
     cy.get('[data-testid=activate-profiles]').should('not.exist');
 
-    // Chép được dữ liệu kích hoạt (IndexedDB) nhưng không có phiên tablet: vẫn không vào được
+    // Chép được dữ liệu kích hoạt nhưng không có phiên tablet: vẫn không vào được
     cy.activateTablet('A');
-    cy.window().then((win) => win.localStorage.clear());
+    cy.window().then((win) => win.localStorage.removeItem('laodai-auth'));
     cy.visit('/queue');
     cy.get('[data-testid=activate-screen]').should('be.visible');
     cy.get('[data-testid=tablet-home]').should('not.exist');

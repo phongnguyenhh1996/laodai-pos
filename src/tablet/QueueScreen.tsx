@@ -1,14 +1,14 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { ChefHat, Clock, HandCoins, Plus, Power, Wallet } from 'lucide-react';
+import { ChefHat, Clock, HandCoins, MapPin, Plus, Power, Wallet } from 'lucide-react';
 import { itemsSummary } from '@/domain/cart';
 import { formatVnd } from '@/domain/money';
 import { buildQueue, type QueueCard, type WaitColor } from '@/domain/queue';
 import { hhmm } from '@/domain/time';
-import { localDb } from '@/lib/localdb';
+import { DINE_LABELS } from '@/domain/types';
+import { pos } from '@/lib/pos';
 import { errorMessage } from '@/app/ui';
-import { useLive, useNow } from '@/app/useLive';
-import { serveOrder, visibleOrders } from '@/sync';
+import { useNow } from '@/app/useLive';
 import { Notice, useTablet } from './parts';
 
 const DEFAULT_WAIT = { wait_yellow_min: 5, wait_red_min: 10 };
@@ -37,10 +37,9 @@ export interface QueueFlash {
  * cũ nhất ở trên, số thứ tự đánh liên tục. Không có gì về doanh thu hay số đơn đã bán.
  */
 export function QueueScreen() {
-  const { catalog } = useTablet();
+  const { catalog, orders } = useTablet();
   const navigate = useNavigate();
   const location = useLocation();
-  const orders = useLive(() => visibleOrders(localDb), []);
   const now = useNow(1000);
   const [error, setError] = useState<string | null>(null);
   const [flash, setFlash] = useState<string | null>((location.state as QueueFlash | null)?.flash ?? null);
@@ -52,14 +51,14 @@ export function QueueScreen() {
   }, [flash]);
 
   const settings = catalog?.config ?? DEFAULT_WAIT;
-  const queue = orders.status === 'ready' ? buildQueue(orders.value, now, settings) : null;
+  const queue = buildQueue(orders, now, settings);
   const pointName = (id: string) => catalog?.points.find((p) => p.id === id)?.name ?? '';
   const multiPoint = (catalog?.profile.point_ids.length ?? 0) > 1;
 
   async function serve(id: string) {
     setError(null);
     try {
-      await serveOrder(localDb, id);
+      await pos.serveOrder(id);
     } catch (e) {
       setError(errorMessage(e));
     }
@@ -153,8 +152,11 @@ function Card({
         </span>
         <span className="flex min-w-0 flex-col">
           <span className="flex flex-wrap items-baseline gap-x-3">
-            <span className="font-mono text-2xl font-bold tracking-wider text-ink" data-testid={`queue-code-${id}`}>
-              {o.code}
+            <span className="text-2xl font-bold text-ink">
+              Đơn #
+              <span className="font-mono tracking-wider" data-testid={`queue-code-${id}`}>
+                {o.code}
+              </span>
             </span>
             {o.label && (
               <span className="badge bg-brand-soft text-lg font-semibold text-brand-deep" data-testid={`queue-label-${id}`}>
@@ -162,8 +164,19 @@ function Card({
               </span>
             )}
             {pointName && <span className="badge bg-info-soft text-info">{pointName}</span>}
-            <span className="badge bg-surface-sunken text-ink-muted">{o.dine_type === 'dinein' ? 'Tại chỗ' : 'Mang về'}</span>
+            <span
+              className={`badge ${o.dine_type === 'delivery' ? 'bg-warning-soft text-warning-strong' : 'bg-surface-sunken text-ink-muted'}`}
+              data-testid={`queue-dine-${id}`}
+            >
+              {DINE_LABELS[o.dine_type]}
+            </span>
           </span>
+          {o.dine_type === 'delivery' && o.address && (
+            <span className="flex items-center gap-1.5 truncate text-base text-ink-muted" data-testid={`queue-address-${id}`}>
+              <MapPin aria-hidden className="h-4 w-4 shrink-0" />
+              <span className="truncate">{o.address}</span>
+            </span>
+          )}
           <span className="mt-0.5 truncate text-lg text-ink" data-testid={`queue-items-${id}`}>
             {itemsSummary(o.items)}
           </span>

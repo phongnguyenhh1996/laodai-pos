@@ -48,7 +48,8 @@ async function simSell(a: SellArgs) {
     const customer = a.customer ? { customer: { id: SEED.customers[a.customer], name: 'Dũng' } } : {};
     ok('thanh toán', await sim.pay(o.id, o.total, a.method, customer));
   }
-  return { id: o.id, total: o.total, code: (o.op.payload.order as { code: string }).code };
+  // Mã đơn do server cấp (mã máy gửi lên bị bỏ qua).
+  return { id: o.id, total: o.total, code: (o.result as { order?: { code: string } }).order!.code };
 }
 
 export default defineConfig({
@@ -161,6 +162,13 @@ export default defineConfig({
           };
         },
         /** Các ca của tablet trên server (cũ trước), kèm tên nhân viên. */
+        /** Lùi giờ tạo đơn trên server (theo nhãn đơn, số phút trước bây giờ): giờ tạo đơn là giờ server. */
+        'db:ageOrders': async (ages: Record<string, number>) => {
+          for (const [label, mins] of Object.entries(ages)) {
+            await sql('update orders set created_at = now() - make_interval(mins => $2) where label = $1', [label, mins]);
+          }
+          return null;
+        },
         'db:shifts': (tablet: keyof typeof SEED.tablets) =>
           sql(
             `select s.id, st.name as staff_name, s.status, s.open_boxes, s.open_plates, s.open_float,

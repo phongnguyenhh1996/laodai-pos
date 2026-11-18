@@ -1,13 +1,15 @@
 import { createContext, useContext, type ReactNode } from 'react';
 import { CircleAlert, CircleCheckBig, Info } from 'lucide-react';
-import type { Catalog } from '@/sync';
-import type { Activation, LocalShift } from '@/sync/db';
+import type { Order } from '@/domain/types';
+import type { Activation, Catalog, TabletShift } from '@/pos';
 
-/** Dữ liệu chung của màn bán hàng: máy, danh mục trên máy, ca đang mở. */
+/** Dữ liệu chung của màn bán hàng (lấy từ server, cập nhật realtime): máy, danh mục, ca đang mở, đơn đang mở. */
 export interface TabletCtx {
   activation: Activation;
   catalog: Catalog | undefined;
-  shift: LocalShift | null;
+  shift: TabletShift | null;
+  /** Đơn đang mở của hồ sơ tablet (chung cho mọi máy dùng hồ sơ này). */
+  orders: Order[];
   /** Điểm bán của đơn gần nhất: đơn mới mở đúng tab đang bán (vd. trưa bán cơm gà). */
   lastPointId: string | null;
   setLastPointId(id: string): void;

@@ -50,7 +50,7 @@ describe('B. Ca', () => {
     cy.get(`${tid('open-shift-screen')} input`).should('not.exist'); // không nhập gì thêm
     cy.openShift('Lan');
 
-    cy.waitSynced();
+    cy.waitLive();
     cy.task<DbShift[]>('db:shifts', 'A').then((shifts) => {
       expect(shifts).to.have.length(1);
       cy.task<Record<string, number>>('db:profileDefaults', 'A').then((d) => {
@@ -76,7 +76,7 @@ describe('B. Ca', () => {
     cy.activateTablet('A');
     cy.openShift('Lan');
     sellCombo('xoiGaTrung'); // 31.000 tiền mặt, 1 hộp
-    cy.waitSynced();
+    cy.waitLive();
 
     cy.task<DbShift[]>('db:shifts', 'A').then(([shift]) => {
       cy.loginOwner();
@@ -146,7 +146,7 @@ describe('B. Ca', () => {
     cy.get(tid('cash-quick-50000')).click();
     cy.get(tid('pay-confirm')).click();
     cy.get(tid('queue-empty')).should('be.visible');
-    cy.waitSynced();
+    cy.waitLive();
 
     cy.task<DbShift[]>('db:shifts', 'A').then(([lan, mai]) => {
       expect(lan).to.include({ staff_name: 'Lan', status: 'closed' });
@@ -193,7 +193,7 @@ describe('B. Ca', () => {
     // Không có gì để mở ra xem lại: về màn chọn nhân viên
     cy.get(tid('shift-closed-done')).click();
     cy.get(tid('staff-picker')).should('be.visible');
-    cy.waitSynced();
+    cy.waitLive();
     cy.task<DbShift[]>('db:shifts', 'A').its(0).should('include', { status: 'closed', close_cash_counted: 540_000, close_boxes_left: 198 });
     // Chênh lệch chỉ tới tay chủ
     cy.telegramWaitFor('Đóng ca – Lan').its('text').should('contain', 'đếm 540.000 / kỳ vọng 559.000 → −19.000');
@@ -206,7 +206,7 @@ describe('B. Ca', () => {
     cy.get(tid('order-label')).type('còn mở');
     cy.get(tid(`menu-combo-${SEED.combos.xoiGaTrung}`)).click();
     cy.get(tid('order-serve')).click();
-    cy.waitSynced();
+    cy.waitLive();
 
     // Chủ kích hoạt lại trên máy trống
     cy.activateTablet('A');
@@ -224,7 +224,7 @@ describe('B. Ca', () => {
     cy.get(tid('close-review')).click();
     cy.get(tid('close-confirm')).click();
     cy.get(tid('shift-closed')).should('be.visible');
-    cy.waitSynced();
+    cy.waitLive();
     cy.task<DbShift[]>('db:shifts', 'A').then((shifts) => {
       expect(shifts).to.have.length(1);
       expect(shifts[0]).to.include({ staff_name: 'Lan', status: 'closed', close_cash_counted: 531_000 });

@@ -80,7 +80,7 @@ export class TabletSim {
 
   async createOrder(items: TestItem[], extra: Record<string, unknown> = {}) {
     const o = this.createOrderOp(items, extra);
-    const r = await push(this.c, o.op);
+    const r = (await push(this.c, o.op)) as Awaited<ReturnType<typeof push>> & { order?: { code: string; device_seq: number } };
     return { ...o, result: r };
   }
 

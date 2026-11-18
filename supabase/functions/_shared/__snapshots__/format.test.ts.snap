@@ -30,6 +30,15 @@ Dư nợ: 120.000
 🔗 https://pos.laodai.vn/owner/debts/c1"
 `;
 
+exports[`định dạng Telegram > delivery_order 1`] = `
+"🛵 Đơn ship mới #3F5 – Xôi A
+📍 12 Lê Lợi, P.3 – 0909 123 456
+• 2× Xôi gà (+Trứng) — 62.000
+Tổng: 62.000
+Lan – Tablet A
+🔗 https://pos.laodai.vn/owner/orders/o1"
+`;
+
 exports[`định dạng Telegram > order_deleted 1`] = `
 "🗑 Xóa đơn 3F5 – Lan – Tablet A
 Lý do: Khách bỏ về

@@ -71,7 +71,7 @@ describe('E. Kịch bản gian lận', () => {
       cy.get(tid('order-delete')).click();
       cy.get(tid('delete-reason-customer_left')).click();
       cy.get(tid('queue-empty')).should('be.visible');
-      cy.waitSynced();
+      cy.waitLive();
 
       // Telegram ngay khi xóa: nội dung đơn + trạng thái lúc xóa + link mở thẳng chi tiết đơn
       cy.telegramWaitFor(`🗑 Xóa đơn ${code}`).then((m) => {
@@ -114,9 +114,9 @@ describe('E. Kịch bản gian lận', () => {
     cy.get('[data-testid^=queue-open-]').click();
     cy.get('[data-testid$=-minus]').click();
     cy.get(tid('order-total')).should('have.text', '31.000');
-    cy.get(tid('order-save')).click();
+    cy.get(tid('order-back')).click(); // đơn đã lưu tự lưu khi rời màn
     cy.get(tid('queue-screen')).should('be.visible');
-    cy.waitSynced();
+    cy.waitLive();
     // Sửa món chỉ ghi nhật ký, không báo Telegram
     cy.telegramMessages().then((ms) => expect(ms.map((m) => m.text).join('\n')).not.to.contain('Sửa'));
 
@@ -160,7 +160,7 @@ describe('E. Kịch bản gian lận', () => {
     cy.get('body').invoke('text').then((text) => {
       for (const n of ['559.000', '20.000', '−']) expect(text).not.to.contain(n);
     });
-    cy.waitSynced();
+    cy.waitLive();
     // Kể cả gọi API trực tiếp bằng token tablet cũng không đọc được kỳ vọng / chênh lệch
     cy.storedAccessToken().then((token) => {
       cy.task<Array<{ id: string }>>('db:shifts', 'A').then(([shift]) => {
@@ -188,7 +188,7 @@ describe('E. Kịch bản gian lận', () => {
     sellAsTransfer('xoiGaTrung'); // 31.000: khách đưa tiền mặt, Lan bấm "chuyển khoản"
     sell({ combo: 'xoiXeoChaRuoc' }); // 28.000 tiền mặt
     sellAsTransfer('comGaCanh', 'com'); // 40.000 chuyển khoản thật
-    cy.waitSynced();
+    cy.waitLive();
 
     // Chủ: dashboard tách CK theo điểm
     cy.loginOwner();
@@ -223,7 +223,7 @@ describe('E. Kịch bản gian lận', () => {
     // 200 hộp đầu ca, theo đơn chỉ dùng 2 nhưng còn 190 ⇒ dùng 10, thừa 8 hộp không có đơn
     closeShift(190, 59, '594.000'); // tiền đủ: 500.000 + 31.000 + 28.000 + 35.000
     cy.get('body').should('not.contain.text', 'theo đơn');
-    cy.waitSynced();
+    cy.waitLive();
 
     cy.telegramWaitFor('Đóng ca – Lan').its('text').should('contain', 'Hộp: dùng 10 / theo đơn 2 → +8').and('contain', 'Dĩa: dùng 1 / theo đơn 1');
     ownerOpensOnlyShift();

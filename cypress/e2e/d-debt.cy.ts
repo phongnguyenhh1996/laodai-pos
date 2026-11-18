@@ -40,7 +40,7 @@ describe('D. Ghi nợ & thu nợ', () => {
     cy.get(tid('queue-flash')).should('contain.text', 'Đã ghi nợ 31.000 – Dũng (giáo viên)');
     cy.get('[data-testid^=queue-card-]').should('not.exist');
 
-    cy.waitSynced();
+    cy.waitLive();
     cy.telegramWaitFor('📒 Ghi nợ 31.000 – Dũng (giáo viên)').its('text').should('contain', 'Dư nợ: 31.000').and('contain', 'Lan');
     cy.task<DbOrder[]>('db:orders', 'A').its(0).should('include', { status: 'paid', payment_method: 'debt', total: 31_000 });
     cy.task('db:balance', GV).should('eq', 31_000);
@@ -63,7 +63,7 @@ describe('D. Ghi nợ & thu nợ', () => {
     cy.get(tid('debt-search')).type('tu');
     cy.get('[data-testid^=customer-suggest-]').should('have.length', 1).and('contain.text', 'Tú (bán vé số)').and('contain.text', '31.000');
 
-    cy.waitSynced();
+    cy.waitLive();
     cy.task<Array<{ id: string; name: string; description: string | null; phone: string | null; created_by_shift_id: string | null }>>('db:customers').then((cs) => {
       expect(cs).to.have.length(3);
       const tu = cs.find((c) => c.name === 'Tú')!;
@@ -83,7 +83,7 @@ describe('D. Ghi nợ & thu nợ', () => {
     ]);
     cy.activateTablet('A');
     cy.openShift('Lan');
-    cy.waitSynced();
+    cy.waitLive();
     cy.task<Array<{ id: string }>>('db:shifts', 'A').then(([shift]) => {
       cy.task<{ cash: { expected: number } }>('db:reconcile', shift.id).its('cash.expected').should('eq', 500_000);
 
@@ -96,7 +96,7 @@ describe('D. Ghi nợ & thu nợ', () => {
       cy.get(tid('debt-done')).should('contain.text', 'Đã thu nợ 50.000 (tiền mặt)');
       cy.get(tid('customer-balance')).should('have.text', '35.000');
 
-      cy.waitSynced();
+      cy.waitLive();
       cy.task('db:balance', GV).should('eq', 35_000);
       cy.task<{ cash: { expected: number }; debt_collected: { cash: number } }>('db:reconcile', shift.id).then((r) => {
         expect(r.cash.expected).to.eq(550_000);

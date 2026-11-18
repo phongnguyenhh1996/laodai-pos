@@ -1,24 +1,21 @@
-import { useState } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 import { CircleAlert, LogIn, UserRound } from 'lucide-react';
 import { activeStaff } from '@/domain/catalog';
-import { localDb } from '@/lib/localdb';
+import { pos, tabletStore } from '@/lib/pos';
 import { errorMessage } from '@/app/ui';
-import { useCatalogStatus } from '@/app/useCatalog';
-import { catalogRefresher } from '@/lib/sync';
-import { openShift } from '@/sync';
 import { Notice, useTablet } from './parts';
 
 /** Mở ca (mục 4.1): chọn tên → Mở ca. Không nhập gì thêm; số đầu ca lấy từ hồ sơ tablet. */
 export function OpenShiftScreen() {
   const { catalog } = useTablet();
-  const catalogStatus = useCatalogStatus(catalogRefresher);
+  const snap = useSyncExternalStore(tabletStore.subscribe, tabletStore.getSnapshot);
   const [staffId, setStaffId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const staff = catalog ? activeStaff(catalog.staff) : null;
-  // Chưa từng tải được danh mục (lần đầu cần mạng) và lần tải gần nhất lỗi.
-  const loadError = !catalog && catalogStatus.lastError && !catalogStatus.loading;
+  // Chưa tải được danh mục (cần mạng) và lần tải gần nhất lỗi.
+  const loadError = !catalog && !!snap.error;
   const chosen = staff?.find((s) => s.id === staffId);
 
   async function open() {
@@ -26,8 +23,8 @@ export function OpenShiftScreen() {
     setBusy(true);
     setError(null);
     try {
-      // Ca mới ⇒ màn hình tự chuyển sang hàng đợi (liveQuery ca hiện tại).
-      await openShift(localDb, { staff_id: chosen.id, staff_name: chosen.name, profile: catalog.profile });
+      // Ca mới ⇒ màn hình tự chuyển sang hàng đợi (mọi máy cùng hồ sơ cũng chuyển theo).
+      await pos.openShift({ staff_id: chosen.id });
     } catch (e) {
       setError(errorMessage(e));
       setBusy(false);
@@ -39,7 +36,7 @@ export function OpenShiftScreen() {
       {loadError && (
         <p data-testid="catalog-error" role="alert" className="flex items-start gap-3 rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-lg text-danger-strong">
           <CircleAlert aria-hidden className="mt-1 h-5 w-5 shrink-0" />
-          Chưa tải được menu và danh sách nhân viên. Cần có mạng cho lần đầu.
+          Chưa tải được menu và danh sách nhân viên. Cần có mạng.
         </p>
       )}
 

@@ -1,7 +1,9 @@
 // Nhật ký (audit_log): nhãn, nhóm lọc và mô tả trước/sau cho màn Nhật ký và chi tiết đơn của chủ.
 import { itemsSummary } from './cart';
 import { formatVnd } from './money';
-import type { DeleteReason, OrderItem, OrderStatus, PaymentMethod } from './types';
+import { DINE_LABELS, type DeleteReason, type DineType, type OrderItem, type OrderStatus, type PaymentMethod } from './types';
+
+const dineLabel = (t: DineType | undefined) => (t ? (DINE_LABELS[t] ?? t) : '—');
 
 export interface AuditEntry {
   id: string;
@@ -74,7 +76,8 @@ type OrderSnap = {
   code?: string;
   status?: OrderStatus;
   total?: number;
-  dine_type?: string;
+  dine_type?: DineType;
+  address?: string | null;
   label?: string | null;
   payment_method?: PaymentMethod | null;
   items?: Array<Pick<OrderItem, 'qty' | 'name_snap' | 'toppings_snap'>>;
@@ -102,7 +105,8 @@ export function describeAudit(e: Pick<AuditEntry, 'action' | 'before' | 'after' 
     if (b && a && (b.payment_method ?? null) !== (a.payment_method ?? null) && a.payment_method) {
       lines.push(`Hình thức: ${b.payment_method ? METHOD[b.payment_method] : '—'} → ${METHOD[a.payment_method]}`);
     }
-    if (b && a && b.dine_type !== a.dine_type) lines.push(`${b.dine_type === 'dinein' ? 'Tại chỗ' : 'Mang về'} → ${a.dine_type === 'dinein' ? 'Tại chỗ' : 'Mang về'}`);
+    if (b && a && b.dine_type !== a.dine_type) lines.push(`${dineLabel(b.dine_type)} → ${dineLabel(a.dine_type)}`);
+    if (b && a && (b.address ?? null) !== (a.address ?? null)) lines.push(`Địa chỉ: ${b.address ?? '—'} → ${a.address ?? '—'}`);
     if (b && a && (b.label ?? null) !== (a.label ?? null)) lines.push(`Nhãn: ${b.label ?? '—'} → ${a.label ?? '—'}`);
     const cb = (e.before as { customer_id?: string } | null)?.customer_id;
     const ca = (e.after as { customer_id?: string } | null)?.customer_id;

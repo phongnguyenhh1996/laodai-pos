@@ -5,7 +5,7 @@ import { ACTION_GROUPS, ACTION_LABELS, DELETE_REASON_LABELS, actionLabel, descri
 import { lineSummary } from '@/domain/cart';
 import { formatVnd } from '@/domain/money';
 import { hhmm } from '@/domain/time';
-import type { DeleteReason } from '@/domain/types';
+import { DINE_LABELS, type DeleteReason } from '@/domain/types';
 import { useOwner } from '../OwnerContext';
 import { OwnerLayout } from '../OwnerLayout';
 import { PAGE_SIZE, loadLog, loadLogNames, loadOrderDetail, type LogNames, type OrderDetail } from './api';
@@ -168,8 +168,8 @@ function LogRow({ e, names }: { e: AuditEntry; names: LogNames }) {
           {code && e.entity === 'order' && (
             <>
               {' '}
-              <Link to={`/owner/orders/${e.entity_id}`} className="font-mono underline" data-testid="log-row-order">
-                {code}
+              <Link to={`/owner/orders/${e.entity_id}`} className="underline" data-testid="log-row-order">
+                Đơn #<span className="font-mono">{code}</span>
               </Link>
             </>
           )}
@@ -214,7 +214,7 @@ export function OrderDetailPage() {
 
   const o = order;
   return (
-    <OwnerLayout title={o ? `Đơn ${o.code}` : 'Đơn'} back="/owner/orders" testId="order-detail">
+    <OwnerLayout title={o ? `Đơn #${o.code}` : 'Đơn'} back="/owner/orders" testId="order-detail">
       <ErrorText testId="order-detail-error">{error ?? log.error}</ErrorText>
       {saved && (
         <p className="rounded-lg bg-success-soft px-4 py-3 text-success-strong" data-testid="order-edit-saved">
@@ -235,9 +235,14 @@ export function OrderDetailPage() {
             </b>
           </p>
           <p className="text-ink-muted">
-            {o.point_name} · {o.tablet_name} · {o.dine_type === 'dinein' ? 'Tại chỗ' : 'Mang về'}
+            {o.point_name} · {o.tablet_name} · {DINE_LABELS[o.dine_type]}
             {o.label ? ` · ${o.label}` : ''}
           </p>
+          {o.address && (
+            <p className="text-ink-muted" data-testid="order-detail-address">
+              Giao đến: {o.address}
+            </p>
+          )}
           {o.items.map((it, i) => (
             <p key={i} data-testid="order-detail-item">
               {lineSummary(it)} — {formatVnd((it.unit_price_snap + it.toppings_snap.reduce((s, t) => s + t.price, 0)) * it.qty)}

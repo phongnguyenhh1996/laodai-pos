@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { META, createSupabaseRestoreSource, restoreOpenState, setMeta, seedDeviceSeq, type Activation } from '@/sync';
+import { readActivation, writeActivation, type Activation } from '@/pos';
+import { readLegacy } from '@/pos/legacy';
 import { createEphemeralClient, decodeClaims, storedClaims, supabase } from './supabase';
-import { getActivation, localDb } from './localdb';
 
 export type AuthErrorCode = 'bad_credentials' | 'not_owner' | 'offline' | 'server';
 
@@ -74,7 +74,6 @@ export async function listTabletProfiles(owner: SupabaseClient): Promise<TabletP
 interface ActivateResponse {
   session: { access_token: string; refresh_token: string };
   profile: { id: string; name: string };
-  last_device_seq: number;
 }
 
 /**
@@ -108,20 +107,22 @@ export async function activateTablet(owner: SupabaseClient, profileId: string, n
     activated_at: now().toISOString(),
     owner_email: ownerEmail,
   };
-  await setMeta(localDb, META.activation, activation);
-  await seedDeviceSeq(localDb, res.last_device_seq);
-  // Server còn ca đang mở của hồ sơ này (máy mới / dữ liệu bị xóa) ⇒ lấy lại ca + đơn đang mở để đóng được ca.
-  // Lỗi mạng ở bước này không chặn kích hoạt: máy vẫn bán được, nhưng chủ sẽ thấy ca cũ chưa đóng.
-  await restoreOpenState(localDb, createSupabaseRestoreSource(supabase)).catch((e: unknown) => console.warn('Không khôi phục được ca đang mở', e));
+  // Ca + đơn đang mở nằm trên server: máy mới kích hoạt (kể cả máy thứ hai của cùng hồ sơ) thấy ngay.
+  writeActivation(activation);
   return activation;
 }
 
 /**
- * Máy này có phải tablet đã kích hoạt không: phải có cả hồ sơ kích hoạt trong IndexedDB
- * lẫn phiên vai trò `tablet` của đúng hồ sơ đó. Chép IndexedDB sang máy khác không đủ để vào màn bán hàng.
+ * Máy này có phải tablet đã kích hoạt không: phải có cả hồ sơ kích hoạt trên máy
+ * lẫn phiên vai trò `tablet` của đúng hồ sơ đó. Chép hồ sơ kích hoạt sang máy khác không đủ để vào màn bán hàng.
+ * Máy đang chạy bản offline cũ: lấy hồ sơ kích hoạt từ IndexedDB cũ sang.
  */
 export async function loadTabletActivation(): Promise<Activation | null> {
-  const a = await getActivation();
+  let a = readActivation();
+  if (!a) {
+    a = (await readLegacy().catch(() => null))?.activation ?? null;
+    if (a) writeActivation(a);
+  }
   if (!a) return null;
   const c = storedClaims();
   if (c?.role !== 'tablet' || c.tablet_profile_id !== a.tablet_profile_id) return null;
@@ -139,7 +140,7 @@ export async function enterOwnerModeOnTablet(activation: Activation, password: s
   return owner;
 }
 
-/** Thoát chế độ chủ: thu hồi phiên tạm; không chờ mạng (offline vẫn thoát được ngay). */
+/** Thoát chế độ chủ: thu hồi phiên tạm; không chờ mạng (mất mạng vẫn thoát được ngay). */
 export function exitOwnerMode(owner: SupabaseClient): void {
   void owner.auth.signOut({ scope: 'local' }).catch(() => undefined);
 }

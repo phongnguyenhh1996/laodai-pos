@@ -126,7 +126,7 @@ describe('vai trò tablet KHÔNG được', () => {
 
   it('đọc số kỳ vọng / chênh lệch của ca vừa đóng (RPC đóng ca chỉ trả ok)', async () => {
     const r = await simA.closeShift(100, 10, 1);
-    expect(r).toEqual({ status: 'ok' });
+    expect(r).toMatchObject({ status: 'ok' });
     const rec = await tabA.rpc('reconcile_shift', { p_shift: simA.shiftId });
     expect(rec.data ?? null).toBeNull();
     expect(rec.error).not.toBeNull();

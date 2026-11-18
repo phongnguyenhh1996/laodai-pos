@@ -3,9 +3,8 @@ import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { CircleCheckBig, Power, TriangleAlert } from 'lucide-react';
 import { parseCountInput, parseMoneyInput } from '@/domain/catalog';
 import { formatVnd } from '@/domain/money';
-import { localDb } from '@/lib/localdb';
-import { TextField, errorMessage } from '@/app/ui';
-import { closeShift } from '@/sync';
+import { pos } from '@/lib/pos';
+import { Splash, TextField, errorMessage } from '@/app/ui';
 import { Notice, useTablet } from './parts';
 
 /**
@@ -37,7 +36,8 @@ export function CloseShiftScreen() {
       </main>
     );
   }
-  if (!shift) return <Navigate to="/" replace />;
+  // Đang gửi đóng ca: ca vừa đóng trên server (store đã bỏ ca) nhưng chưa chuyển sang "Đã đóng ca".
+  if (!shift) return busy ? <Splash /> : <Navigate to="/" replace />;
 
   const boxesN = parseCountInput(boxes);
   const platesN = parseCountInput(plates);
@@ -58,7 +58,7 @@ export function CloseShiftScreen() {
     if (!valid || busy) return;
     setBusy(true);
     try {
-      await closeShift(localDb, { boxes_left: boxesN, plates_left: platesN, cash_counted: cashN });
+      await pos.closeShift({ boxes_left: boxesN, plates_left: platesN, cash_counted: cashN });
       setDone(true);
     } catch (e) {
       setError(errorMessage(e));

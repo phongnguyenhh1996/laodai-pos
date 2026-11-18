@@ -39,7 +39,7 @@ describe('H. Tổng kết ngày', () => {
     cy.get(tid('close-cash')).type('521000'); // kỳ vọng 531.000
     cy.get(tid('close-review')).click();
     cy.get(tid('close-confirm')).click();
-    cy.waitSynced();
+    cy.waitLive();
 
     // Chưa tới giờ: không gửi. Tới giờ: gửi đúng một lần.
     cy.task('cron:tick', '23:58').should('eq', null);

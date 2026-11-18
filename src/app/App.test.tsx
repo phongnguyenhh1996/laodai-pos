@@ -4,14 +4,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { App } from './App';
-import { localDb } from '@/lib/localdb';
-import { catalogRefresher, syncRunner } from '@/lib/sync';
+import { tabletStore } from '@/lib/pos';
 import { AuthError, enterOwnerModeOnTablet, exitOwnerMode } from '@/lib/auth';
 import { OWNER_IDLE_MS } from '@/owner/OwnerGate';
-import { META, setMeta } from '@/sync/db';
 import { COMBO_XOI_FULL, COM_GA, PRODUCTS, XOI_GA } from '@/domain/fixtures';
 import { storeSession } from '@/test-utils/auth';
-import { ACT, CATALOG, activateDevice, clearLocalDb, stubCatalog } from '@/test-utils/tablet';
+import { ACT, CATALOG, activateDevice, resetTablet, server, useFakeServer } from '@/test-utils/tablet';
 
 vi.mock('@/lib/auth', async (orig) => ({
   ...(await orig<typeof import('@/lib/auth')>()),
@@ -24,12 +22,14 @@ function go(path: string) {
   render(<App />);
 }
 
-beforeEach(stubCatalog);
+beforeEach(() => {
+  useFakeServer();
+});
 
-afterEach(async () => {
+afterEach(() => {
   vi.useRealTimers();
   vi.clearAllMocks();
-  await clearLocalDb();
+  resetTablet();
   localStorage.clear();
   window.history.pushState({}, '', '/');
 });
@@ -53,17 +53,17 @@ describe('cổng tablet', () => {
   });
 
   it('tablet đã kích hoạt (hồ sơ + phiên tablet): vào màn chọn nhân viên', async () => {
-    await activateDevice();
+    activateDevice();
     go('/');
     expect(await screen.findByTestId('tablet-home')).toHaveTextContent('Tablet A');
     expect(await screen.findByTestId('staff-s1')).toHaveTextContent('Lan');
-    // Bộ đồng bộ chạy từ lúc vào màn bán hàng, có chỉ báo trạng thái
-    expect(screen.getByTestId('sync-status')).toHaveAttribute('data-state', 'synced');
-    expect(syncRunner.isStarted).toBe(true);
+    // Nghe server từ lúc vào màn bán hàng, có chỉ báo kết nối
+    await waitFor(() => expect(screen.getByTestId('conn-status')).toHaveAttribute('data-state', 'live'));
+    expect(tabletStore.started).toBe(true);
   });
 
-  it('danh mục trên máy: chỉ nhân viên còn làm, tab theo hồ sơ tablet, bảng giá theo điểm', async () => {
-    await activateDevice();
+  it('danh mục từ server: chỉ nhân viên còn làm, tab theo hồ sơ tablet, bảng giá theo điểm; chủ đổi ⇒ cập nhật ngay', async () => {
+    activateDevice();
     go('/');
     expect(await screen.findByTestId('staff-s1')).toBeInTheDocument();
     expect(screen.queryByTestId('staff-s9')).not.toBeInTheDocument();
@@ -82,24 +82,22 @@ describe('cổng tablet', () => {
     expect(screen.getByTestId('menu-panel')).toHaveAttribute('data-point', 'com');
     expect(screen.getByTestId(`menu-product-${COM_GA.id}`)).toBeInTheDocument();
     expect(screen.queryByTestId(`menu-product-${XOI_GA.id}`)).not.toBeInTheDocument();
-    expect(catalogRefresher.refresh).toHaveBeenCalled();
 
-    // Chủ bỏ Cơm gà khỏi tablet A, đổi giá: danh mục mới ghi xuống máy ⇒ màn hình cập nhật ngay
-    await act(() =>
-      setMeta(localDb, META.catalog, {
-        ...CATALOG,
-        profile: { ...CATALOG.profile, point_ids: ['xoi-a'] },
-        products: PRODUCTS.map((p) => (p.id === XOI_GA.id ? { ...p, price: 28_000 } : p)),
-      }),
-    );
+    // Chủ bỏ Cơm gà khỏi tablet A, đổi giá: server báo qua realtime ⇒ màn hình cập nhật ngay
+    server.catalog = {
+      ...CATALOG,
+      profile: { ...CATALOG.profile, point_ids: ['xoi-a'] },
+      products: PRODUCTS.map((p) => (p.id === XOI_GA.id ? { ...p, price: 28_000 } : p)),
+    };
+    act(() => server.pulse('catalog'));
     await waitFor(() => expect(screen.queryByTestId('point-tab-com')).not.toBeInTheDocument());
     expect(screen.getByTestId('menu-panel')).toHaveAttribute('data-point', 'xoi-a');
     expect(screen.getByTestId(`menu-product-${XOI_GA.id}-price`)).toHaveTextContent('28.000');
   });
 
   it('hồ sơ không còn điểm bán nào: báo nhờ chủ cài đặt', async () => {
-    await activateDevice();
-    await setMeta(localDb, META.catalog, { ...CATALOG, profile: { ...CATALOG.profile, point_ids: [] } });
+    server.catalog = { ...CATALOG, profile: { ...CATALOG.profile, point_ids: [] } };
+    activateDevice();
     go('/');
     fireEvent.click(await screen.findByTestId('staff-s1'));
     fireEvent.click(screen.getByTestId('open-shift'));
@@ -107,29 +105,28 @@ describe('cổng tablet', () => {
     expect(await screen.findByTestId('menu-no-points')).toBeInTheDocument();
   });
 
-  it('chưa từng tải được danh mục và lần tải lỗi: báo cần mạng', async () => {
-    await activateDevice();
-    await localDb.meta.delete(META.catalog);
-    vi.spyOn(catalogRefresher, 'getStatus').mockReturnValue({ loading: false, lastError: 'offline', lastFetchedAt: null });
+  it('chưa tải được danh mục (lỗi): báo cần mạng', async () => {
+    server.catalogFails = true;
+    activateDevice();
     go('/');
     expect(await screen.findByTestId('catalog-error')).toBeInTheDocument();
     expect(screen.queryByTestId('menu-board')).not.toBeInTheDocument();
   });
 
-  it('có hồ sơ kích hoạt nhưng không có phiên tablet (chép IndexedDB sang máy khác): về màn kích hoạt', async () => {
-    await activateDevice(null);
+  it('có hồ sơ kích hoạt nhưng không có phiên tablet (chép dữ liệu máy sang máy khác): về màn kích hoạt', async () => {
+    activateDevice(null);
     go('/');
     expect(await screen.findByTestId('activate-screen')).toBeInTheDocument();
   });
 
   it('phiên của hồ sơ khác hoặc phiên chủ không thay được phiên tablet', async () => {
-    await activateDevice({ role: 'tablet', tablet_profile_id: 'tab-b' });
+    activateDevice({ role: 'tablet', tablet_profile_id: 'tab-b' });
     go('/');
     expect(await screen.findByTestId('activate-screen')).toBeInTheDocument();
   });
 
   it('tablet đã kích hoạt vào /activate ⇒ về màn bán hàng', async () => {
-    await activateDevice();
+    activateDevice();
     go('/activate');
     expect(await screen.findByTestId('tablet-home')).toBeInTheDocument();
     expect(window.location.pathname).toBe('/');
@@ -138,7 +135,7 @@ describe('cổng tablet', () => {
 
 describe('chế độ chủ trên tablet', () => {
   it('/owner/... trên tablet chỉ hỏi mật khẩu chủ', async () => {
-    await activateDevice();
+    activateDevice();
     go('/owner/shifts');
     expect(await screen.findByTestId('owner-unlock')).toBeInTheDocument();
     expect(screen.queryByTestId('owner-email')).not.toBeInTheDocument();
@@ -147,7 +144,7 @@ describe('chế độ chủ trên tablet', () => {
 
   it('sai mật khẩu: báo lỗi, vẫn khóa', async () => {
     vi.mocked(enterOwnerModeOnTablet).mockRejectedValue(new AuthError('bad_credentials'));
-    await activateDevice();
+    activateDevice();
     go('/owner');
     fireEvent.change(await screen.findByTestId('owner-password'), { target: { value: 'sai' } });
     fireEvent.click(screen.getByTestId('owner-unlock-submit'));
@@ -159,7 +156,7 @@ describe('chế độ chủ trên tablet', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true, toFake: ['setTimeout', 'clearTimeout'] });
     const fakeOwner = fakeOwnerClient();
     vi.mocked(enterOwnerModeOnTablet).mockResolvedValue(fakeOwner);
-    await activateDevice();
+    activateDevice();
     go('/owner');
     fireEvent.change(await screen.findByTestId('owner-password'), { target: { value: 'pw' } });
     fireEvent.click(screen.getByTestId('owner-unlock-submit'));
@@ -181,7 +178,7 @@ describe('chế độ chủ trên tablet', () => {
   it('nút Thoát về bán hàng ngay', async () => {
     const fakeOwner = fakeOwnerClient();
     vi.mocked(enterOwnerModeOnTablet).mockResolvedValue(fakeOwner);
-    await activateDevice();
+    activateDevice();
     go('/owner');
     fireEvent.change(await screen.findByTestId('owner-password'), { target: { value: 'pw' } });
     fireEvent.click(screen.getByTestId('owner-unlock-submit'));

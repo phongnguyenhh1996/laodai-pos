@@ -189,8 +189,8 @@ function OrderLine({ o }: { o: ShiftOrderRow }) {
     <div data-testid={`shift-order-${o.id}`} data-status={o.status} className="flex flex-col border-t border-line py-2">
       <p className="flex flex-wrap items-baseline justify-between gap-2">
         <span>
-          <Link to={`/owner/orders/${o.id}`} className="font-mono font-bold underline">
-            {o.code}
+          <Link to={`/owner/orders/${o.id}`} className="font-bold underline">
+            Đơn #<span className="font-mono">{o.code}</span>
           </Link> {o.label ? `· ${o.label} ` : ''}· {hhmm(o.created_at)} ·{' '}
           <span className={o.status === 'deleted' ? 'text-danger-strong' : ''}>{STATUS_LABEL[o.status]}</span>
           {o.payment_method && ` · ${METHOD_LABEL[o.payment_method]}`}

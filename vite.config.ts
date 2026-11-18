@@ -41,8 +41,8 @@ export default defineConfig({
     setupFiles: ['./src/test-setup.ts'],
     coverage: {
       provider: 'v8',
-      include: ['src/domain/**', 'src/sync/**'],
-      exclude: ['**/*.test.ts', '**/index.ts', 'src/domain/types.ts', 'src/domain/fixtures.ts'],
+      include: ['src/domain/**', 'src/pos/**'],
+      exclude: ['**/*.test.ts', '**/index.ts', 'src/domain/types.ts', 'src/domain/fixtures.ts', 'src/pos/types.ts'],
       thresholds: { lines: 90, branches: 90 },
     },
   },

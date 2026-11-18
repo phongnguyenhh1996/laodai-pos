@@ -74,6 +74,7 @@ export interface OrderDetail extends Omit<ShiftOrderRow, 'items'> {
   tablet_name: string;
   customer_label: string | null;
   cash_given: number | null;
+  address: string | null;
   items: Array<Pick<OrderItem, 'name_snap' | 'qty' | 'unit_price_snap' | 'toppings_snap'>>;
 }
 
@@ -81,7 +82,7 @@ export async function loadOrderDetail(client: SupabaseClient, orderId: string): 
   const { data, error } = await client
     .from('orders')
     .select(
-      'id,code,label,dine_type,status,total,payment_method,cash_given,created_at,served_at,paid_at,deleted_at,delete_reason,' +
+      'id,code,label,dine_type,address,status,total,payment_method,cash_given,created_at,served_at,paid_at,deleted_at,delete_reason,' +
         'owner_edited,opened_shift_id,paid_shift_id,points(name),tablet_profiles(name),customers(name,description),' +
         'opened:shifts!orders_opened_shift_id_fkey(staff(name)),paid:shifts!orders_paid_shift_id_fkey(staff(name)),' +
         'order_items(name_snap,qty,unit_price_snap,toppings_snap,sort,removed_at)',

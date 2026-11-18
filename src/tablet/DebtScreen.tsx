@@ -5,9 +5,8 @@ import { parseMoneyInput } from '@/domain/catalog';
 import { customerLabel, debtPaymentProblem } from '@/domain/debt';
 import { formatVnd } from '@/domain/money';
 import type { Customer } from '@/domain/types';
-import { localDb } from '@/lib/localdb';
+import { pos } from '@/lib/pos';
 import { Splash, errorMessage } from '@/app/ui';
-import { recordDebtPayment } from '@/sync';
 import { ChosenCustomer, CustomerSuggestions, useDebtBook } from './debt';
 import { Notice } from './parts';
 
@@ -46,7 +45,7 @@ export function DebtScreen() {
     busy.current = true;
     setError(null);
     try {
-      await recordDebtPayment(localDb, { customer_id: customer.id, amount: parsed!, method });
+      await pos.recordDebtPayment({ customer_id: customer.id, amount: parsed!, method });
       setDone(`Đã thu nợ ${formatVnd(parsed!)} (${method === 'cash' ? 'tiền mặt' : 'chuyển khoản'}) – ${customerLabel(customer)}`);
       setAmount('');
     } catch (e) {

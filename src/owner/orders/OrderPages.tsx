@@ -8,7 +8,7 @@ import { formatSigned, formatVnd } from '@/domain/money';
 import { editDraftFrom, editPayload, editProblem, editSummary, setEditCustomer, setEditMethod, type OwnerEditDraft } from '@/domain/ownerEdit';
 import { lineTotal, selectableCombos, selectableProducts, selectableToppings } from '@/domain/pricing';
 import { businessDate, hhmm } from '@/domain/time';
-import type { OrderStatus, PaymentMethod, Product } from '@/domain/types';
+import { DINE_LABELS, type OrderStatus, type PaymentMethod, type Product } from '@/domain/types';
 import { OrderDetailPage } from '../log/LogPages';
 import { useOwner } from '../OwnerContext';
 import { OwnerLayout } from '../OwnerLayout';
@@ -160,7 +160,7 @@ function OrderRow({ o }: { o: OrderListRow }) {
       <Link to={`/owner/orders/${o.id}`} className="flex flex-col gap-0.5 px-4 py-3 active:bg-surface-muted">
         <span className="flex items-baseline justify-between gap-2">
           <span>
-            <b className="font-mono">{o.code}</b> · {hhmm(o.at)} · <span className={deleted ? 'text-danger-strong' : ''}>{STATUS_LABEL[o.status]}</span>
+            <b>Đơn #<span className="font-mono">{o.code}</span></b> · {hhmm(o.at)} · <span className={deleted ? 'text-danger-strong' : ''}>{STATUS_LABEL[o.status]}</span>
             {o.payment_method && ` · ${METHOD_SHORT[o.payment_method]}`}
             {o.owner_edited && (
               <span className="ml-2 rounded bg-warning-soft px-1.5 text-sm text-warning-strong" data-testid="orders-row-edited">
@@ -211,7 +211,7 @@ function OrderEditPage() {
   }, [client, orderId]);
 
   return (
-    <OwnerLayout title={order ? `Sửa đơn ${order.code}` : 'Sửa đơn'} back={`/owner/orders/${orderId}`} testId="order-edit">
+    <OwnerLayout title={order ? `Sửa đơn #${order.code}` : 'Sửa đơn'} back={`/owner/orders/${orderId}`} testId="order-edit">
       <ErrorText testId="edit-load-error">{error}</ErrorText>
       {(order === undefined || (order && !cat)) && !error && <Splash />}
       {order === null && <p className="text-ink-subtle">Không có đơn này.</p>}
@@ -264,7 +264,7 @@ function EditForm({ order, cat }: { order: EditableOrder; cat: EditCatalog }) {
   return (
     <div className="flex flex-col gap-4" data-testid="edit-form">
       <p className="text-ink-muted">
-        {order.point_name} · {order.tablet_name} · {order.dine_type === 'dinein' ? 'Tại chỗ' : 'Mang về'}
+        {order.point_name} · {order.tablet_name} · {DINE_LABELS[order.dine_type]}
       </p>
       {order.closed_shift_ids.length > 0 && (
         <p className="rounded-lg bg-warning-soft px-4 py-3 text-warning-strong" data-testid="edit-recalc-note">
