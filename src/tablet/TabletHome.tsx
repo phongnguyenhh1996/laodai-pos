@@ -3,6 +3,7 @@ import { Link, Navigate, Route, Routes } from 'react-router-dom';
 import { CloudOff, LockKeyhole, RefreshCw, Store, UserRound } from 'lucide-react';
 import { startTablet, tabletStore } from '@/lib/pos';
 import { ConnectionBadge } from '@/app/ConnectionBadge';
+import { APP_VERSION } from '@/app/version';
 import { Splash } from '@/app/ui';
 import type { Activation } from '@/pos';
 import { CloseShiftScreen } from './CloseShiftScreen';
@@ -54,6 +55,9 @@ export function TabletHome({ activation }: { activation: Activation }) {
             </span>
           )}
           <ConnectionBadge state={snap.conn} />
+          <span className="text-xs text-ink-subtle" data-testid="app-version" title="Phiên bản app">
+            v{APP_VERSION}
+          </span>
         </div>
         <Link to="/owner" className="btn btn-secondary shrink-0" data-testid="open-owner-mode">
           <LockKeyhole aria-hidden className="h-5 w-5" />
