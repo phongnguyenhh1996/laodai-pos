@@ -1,5 +1,5 @@
 import { createContext, useContext, type ReactNode } from 'react';
-import { CircleAlert, CircleCheckBig, Info } from 'lucide-react';
+import { CircleAlert, CircleCheckBig, Info, X } from 'lucide-react';
 import type { Order } from '@/domain/types';
 import type { Activation, Catalog, TabletShift } from '@/pos';
 
@@ -23,12 +23,41 @@ export function useTablet(): TabletCtx {
   return c;
 }
 
-/** Bảng chọn nổi ở giữa màn hình (topping, lý do xóa, xác nhận). */
-export function Sheet({ testId, title, children }: { testId: string; title: string; children: ReactNode }) {
+/**
+ * Bảng chọn (topping, lý do xóa, xác nhận). Điện thoại: tấm trượt từ đáy lên; tablet: hộp giữa màn hình (Makaryo).
+ */
+export function Sheet({
+  testId,
+  title,
+  subtitle,
+  onClose,
+  children,
+}: {
+  testId: string;
+  title: string;
+  subtitle?: ReactNode;
+  /** Có ⇒ hiện nút X ở góc. */
+  onClose?: () => void;
+  children: ReactNode;
+}) {
   return (
-    <div className="fixed inset-0 z-20 flex items-center justify-center bg-ink/50 p-4 backdrop-blur-[2px]" role="dialog" aria-modal aria-label={title}>
-      <div data-testid={testId} className="flex max-h-full w-full max-w-xl flex-col gap-5 overflow-y-auto rounded-3xl border border-line bg-surface p-6 shadow-raised">
-        <h2 className="text-2xl font-bold">{title}</h2>
+    <div className="fixed inset-0 z-20 flex items-end justify-center bg-black/45 md:items-center md:p-4" role="dialog" aria-modal aria-label={title}>
+      <div
+        data-testid={testId}
+        className="flex max-h-[92%] w-full flex-col gap-4 overflow-y-auto rounded-t-3xl bg-surface px-5 pb-[max(24px,env(safe-area-inset-bottom))] pt-3 shadow-raised md:max-h-full md:max-w-[520px] md:gap-[18px] md:rounded-[20px] md:p-6"
+      >
+        <span aria-hidden className="mx-auto h-1 w-10 shrink-0 rounded-full bg-line-strong md:hidden" />
+        <div className="flex items-start gap-3">
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
+            <h2 className="text-[22px] font-bold leading-tight">{title}</h2>
+            {subtitle && <p className="text-sm text-ink-subtle">{subtitle}</p>}
+          </div>
+          {onClose && (
+            <button type="button" className="btn btn-secondary h-11 min-h-0 w-11 min-w-0 shrink-0 px-0" onClick={onClose} aria-label="Đóng">
+              <X aria-hidden className="h-5 w-5 text-ink-muted" />
+            </button>
+          )}
+        </div>
         {children}
       </div>
     </div>

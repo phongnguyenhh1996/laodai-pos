@@ -1,36 +1,38 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { ChefHat, Clock, HandCoins, MapPin, Plus, Power, Wallet } from 'lucide-react';
+import { Bike, ChefHat, Clock, Inbox, MapPin, Plus, ShoppingBag, UtensilsCrossed, Wallet, type LucideIcon } from 'lucide-react';
 import { itemsSummary } from '@/domain/cart';
 import { formatVnd } from '@/domain/money';
 import { buildQueue, type QueueCard, type WaitColor } from '@/domain/queue';
 import { hhmm } from '@/domain/time';
-import { DINE_LABELS } from '@/domain/types';
+import { DINE_LABELS, type DineType } from '@/domain/types';
 import { pos } from '@/lib/pos';
 import { errorMessage } from '@/app/ui';
 import { useNow } from '@/app/useLive';
 import { Notice, useTablet } from './parts';
 
-/** Thu nợ / Đóng ca: điện thoại là ô nhỏ (biểu tượng trên, chữ dưới) cạnh "Đơn mới"; tablet là nút dài. */
-const SIDE_BTN = 'btn btn-secondary w-[72px] flex-col gap-0.5 px-1 text-sm md:w-auto md:flex-row md:justify-start md:gap-2 md:px-4 md:text-lg';
-
-/** Nút trên thẻ đơn: điện thoại thấp hơn, nằm dưới nội dung; tablet là cột bên phải như cũ. */
-const CARD_BTN = 'min-h-[48px] w-full text-base md:min-h-tap md:w-auto md:shrink-0 md:px-6 md:text-lg';
-
 const DEFAULT_WAIT = { wait_yellow_min: 5, wait_red_min: 10 };
 
+/** Thẻ đơn (Makaryo): nền trắng; đơn chờ lâu viền vàng / đỏ. */
 const CARD_STYLE: Record<WaitColor, string> = {
-  none: 'border-line border-l-line-strong bg-surface',
-  normal: 'border-line border-l-success bg-surface',
-  yellow: 'border-warning-line border-l-warning bg-warning-soft',
-  red: 'border-danger-line border-l-danger bg-danger-soft',
+  none: 'border-line',
+  normal: 'border-line',
+  yellow: 'border-warning-line ring-1 ring-inset ring-warning-line',
+  red: 'border-danger-line ring-1 ring-inset ring-danger-line',
 };
 
+/** Ô số thứ tự + nhãn "Chờ … phút" cùng màu theo thời gian chờ. */
 const POS_STYLE: Record<WaitColor, string> = {
-  none: 'bg-ink text-white',
-  normal: 'bg-ink text-white',
-  yellow: 'bg-warning text-white',
-  red: 'bg-danger text-white',
+  none: 'bg-surface-sunken text-ink',
+  normal: 'bg-success-soft text-success-strong',
+  yellow: 'bg-warning-tint text-warning-strong',
+  red: 'bg-danger-soft text-danger-strong',
+};
+const WAIT_STYLE: Record<WaitColor, string> = {
+  none: 'bg-surface-sunken text-ink-muted',
+  normal: 'bg-success-soft text-success-strong',
+  yellow: 'bg-warning-soft text-warning-strong',
+  red: 'bg-danger-soft text-danger-strong',
 };
 
 /** Thông báo ngắn sau khi thanh toán / xóa đơn, truyền qua state của điều hướng. */
@@ -81,58 +83,76 @@ export function QueueScreen() {
     />
   );
 
+  const serveCount = queue?.serve.length ?? 0;
+  const payCount = queue?.pay.length ?? 0;
+  const empty = !!queue && serveCount + payCount === 0;
+
   return (
-    // Điện thoại: hàng đợi cuộn, thanh "Đơn mới" luôn nằm dưới đáy (trong tầm ngón cái). Tablet: cột nút bên phải.
-    <main data-testid="queue-screen" className="flex h-full flex-col md:flex-row md:gap-6 md:p-6">
-      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 md:min-w-0 md:p-0 md:pr-1">
+    // Tablet: thanh trên (tiêu đề + Đơn mới), số liệu, lưới thẻ đơn. Điện thoại: danh sách cuộn, chừa chỗ cho thanh đáy (TabletHome).
+    <main data-testid="queue-screen" className="flex h-full flex-col">
+      <div className="hidden h-[76px] shrink-0 items-center gap-2.5 border-b border-line bg-surface px-6 md:flex">
+        <h2 className="text-2xl font-bold">Hàng đợi</h2>
+        <span className="num text-base text-ink-subtle">({serveCount + payCount} đơn)</span>
+        <span className="flex-1" />
+        <Link to="/order/new" className="btn btn-primary min-h-[48px] px-5 text-[17px]">
+          <Plus aria-hidden className="h-5 w-5" strokeWidth={2.5} />
+          Đơn mới
+        </Link>
+      </div>
+
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 pb-[120px] md:gap-5 md:p-6">
+        <div className="grid grid-cols-2 gap-2.5 md:gap-4">
+          <Stat icon={ChefHat} tone="warning" label="Chờ ra món" value={serveCount} />
+          <Stat icon={Wallet} tone="brand" label="Chờ thanh toán" value={payCount} />
+        </div>
         <Notice testId="queue-flash" tone="ok">
           {flash}
         </Notice>
         <Notice testId="queue-error" tone="error">
           {error}
         </Notice>
-        <section data-testid="queue-serve" className="flex flex-col gap-3">
-          <SectionTitle icon={<ChefHat className="h-5 w-5" />} count={queue?.serve.length ?? 0}>
-            Chờ ra món
-          </SectionTitle>
-          {queue?.serve.map(renderCard)}
+        <section data-testid="queue-serve" className={`${empty ? 'hidden' : 'flex'} flex-col gap-3`}>
+          <SectionTitle count={serveCount}>Chờ ra món</SectionTitle>
+          <div className="grid gap-3 md:grid-cols-2 md:gap-4 lg:grid-cols-3">{queue?.serve.map(renderCard)}</div>
         </section>
-        <section data-testid="queue-pay" className="mt-2 flex flex-col gap-3">
-          <SectionTitle icon={<Wallet className="h-5 w-5" />} count={queue?.pay.length ?? 0}>
-            Chờ thanh toán
-          </SectionTitle>
-          {queue?.pay.map(renderCard)}
+        <section data-testid="queue-pay" className={`${empty ? 'hidden' : 'flex'} flex-col gap-3`}>
+          <SectionTitle count={payCount}>Chờ thanh toán</SectionTitle>
+          <div className="grid gap-3 md:grid-cols-2 md:gap-4 lg:grid-cols-3">{queue?.pay.map(renderCard)}</div>
         </section>
-        {queue && queue.serve.length + queue.pay.length === 0 && (
-          <p data-testid="queue-empty" className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-line-strong py-12 text-center text-xl text-ink-subtle">
-            <ChefHat aria-hidden className="h-10 w-10 opacity-60" />
-            Chưa có đơn nào đang chờ.
-          </p>
+        {empty && (
+          <div data-testid="queue-empty" className="card flex flex-1 flex-col items-center justify-center gap-3 px-6 py-12 text-center">
+            <span aria-hidden className="icon-tile h-16 w-16 rounded-full bg-brand-soft text-brand md:h-[72px] md:w-[72px]">
+              <Inbox className="h-8 w-8" />
+            </span>
+            <p className="text-xl font-semibold">Chưa có đơn nào đang chờ.</p>
+            <p className="max-w-[420px] text-base text-ink-subtle">Bấm “Đơn mới” để bắt đầu bán. Đơn chờ ra món / chờ thanh toán sẽ hiện ở đây.</p>
+          </div>
         )}
       </div>
-
-      <aside className="flex shrink-0 gap-2 border-t border-line bg-surface p-3 shadow-raised md:w-64 md:flex-col md:gap-3 md:border-0 md:bg-transparent md:p-0 md:shadow-none">
-        <Link
-          to="/order/new"
-          className="btn btn-primary order-last min-h-[64px] flex-1 rounded-2xl text-2xl shadow-card md:order-none md:min-h-[140px] md:flex-none md:flex-col md:text-3xl"
-          data-testid="new-order"
-        >
-          <Plus aria-hidden className="h-8 w-8 md:h-10 md:w-10" strokeWidth={2.5} />
-          Đơn mới
-        </Link>
-        <div className="hidden flex-1 md:block" />
-        <Link to="/debt" className={SIDE_BTN} data-testid="open-debt">
-          <HandCoins aria-hidden className="h-5 w-5 text-ink-muted" />
-          Thu nợ
-        </Link>
-        <Link to="/shift/close" className={SIDE_BTN} data-testid="open-close-shift">
-          <Power aria-hidden className="h-5 w-5 text-ink-muted" />
-          Đóng ca
-        </Link>
-      </aside>
     </main>
   );
 }
+
+const STAT_TONE = {
+  warning: 'bg-warning-soft text-warning',
+  brand: 'bg-brand-soft text-brand',
+} as const;
+
+function Stat({ icon: Icon, tone, label, value }: { icon: LucideIcon; tone: keyof typeof STAT_TONE; label: string; value: number }) {
+  return (
+    <div className="flex items-center gap-2 rounded-2xl border border-line bg-surface px-2.5 py-3 md:gap-3.5 md:px-[18px] md:py-4">
+      <span aria-hidden className={`icon-tile h-9 w-9 rounded-full md:h-12 md:w-12 ${STAT_TONE[tone]}`}>
+        <Icon className="h-5 w-5 md:h-6 md:w-6" />
+      </span>
+      <span className="flex min-w-0 flex-col">
+        <span className="truncate text-[13px] text-ink-subtle md:text-sm">{label}</span>
+        <span className="num text-[22px] font-bold leading-tight md:text-[26px]">{value}</span>
+      </span>
+    </div>
+  );
+}
+
+const DINE_ICON: Record<DineType, LucideIcon> = { dinein: UtensilsCrossed, takeaway: ShoppingBag, delivery: Bike };
 
 function Card({
   card,
@@ -149,67 +169,71 @@ function Card({
 }) {
   const o = card.order;
   const id = o.id;
-  // Điện thoại: nút thao tác xuống hàng dưới, rộng hết thẻ, để chữ của đơn không bị ép hẹp.
+  const DineIcon = DINE_ICON[o.dine_type];
   return (
     <article
       data-testid={`queue-card-${id}`}
       data-group={card.group}
       data-color={card.color}
       data-position={card.position}
-      className={`flex flex-col gap-2 rounded-2xl border border-l-[6px] p-3 shadow-card md:flex-row md:items-stretch md:gap-3 ${CARD_STYLE[card.color]}`}
+      className={`flex flex-col gap-3 rounded-2xl border bg-surface p-4 ${CARD_STYLE[card.color]}`}
     >
-      <button type="button" onClick={onOpen} className="flex min-w-0 flex-1 items-center gap-3 text-left md:gap-4" data-testid={`queue-open-${id}`}>
-        <span
-          className={`num flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-xl font-bold md:h-14 md:w-14 md:rounded-2xl md:text-2xl ${POS_STYLE[card.color]}`}
-          data-testid={`queue-pos-${id}`}
-        >
-          {card.position}
-        </span>
-        <span className="flex min-w-0 flex-col">
-          <span className="flex flex-wrap items-baseline gap-x-2 md:gap-x-3">
-            <span className="text-xl font-bold text-ink md:text-2xl">
-              Đơn #
-              <span className="font-mono tracking-wider" data-testid={`queue-code-${id}`}>
-                {o.code}
-              </span>
-            </span>
-            {o.label && (
-              <span className="badge bg-brand-soft text-lg font-semibold text-brand-deep" data-testid={`queue-label-${id}`}>
-                {o.label}
-              </span>
-            )}
-            {pointName && <span className="badge bg-info-soft text-info">{pointName}</span>}
-            <span
-              className={`badge ${o.dine_type === 'delivery' ? 'bg-warning-soft text-warning-strong' : 'bg-surface-sunken text-ink-muted'}`}
-              data-testid={`queue-dine-${id}`}
-            >
-              {DINE_LABELS[o.dine_type]}
+      <button type="button" onClick={onOpen} className="flex min-w-0 flex-col gap-3 rounded-lg text-left" data-testid={`queue-open-${id}`}>
+        <span className="flex w-full items-center gap-2.5">
+          <span className={`icon-tile num h-9 w-9 text-base font-bold ${POS_STYLE[card.color]}`} data-testid={`queue-pos-${id}`}>
+            {card.position}
+          </span>
+          <span className="min-w-0 flex-1 truncate text-lg font-bold text-ink">
+            Đơn #
+            <span className="font-mono tracking-wider" data-testid={`queue-code-${id}`}>
+              {o.code}
             </span>
           </span>
-          {o.dine_type === 'delivery' && o.address && (
-            <span className="flex items-center gap-1.5 truncate text-base text-ink-muted" data-testid={`queue-address-${id}`}>
-              <MapPin aria-hidden className="h-4 w-4 shrink-0" />
-              <span className="truncate">{o.address}</span>
+          <span className="num shrink-0 text-sm text-ink-subtle">{hhmm(o.created_at)}</span>
+        </span>
+        <span className="flex flex-wrap items-center gap-1.5">
+          {o.label && (
+            <span className="badge rounded-md bg-brand-soft text-[15px] font-semibold text-brand-deep" data-testid={`queue-label-${id}`}>
+              {o.label}
             </span>
           )}
-          <span className="mt-0.5 line-clamp-2 text-base text-ink md:truncate md:text-lg" data-testid={`queue-items-${id}`}>
-            {itemsSummary(o.items)}
-          </span>
-          <span className="num flex flex-wrap items-center gap-x-1.5 text-sm text-ink-subtle md:text-base">
-            <Clock aria-hidden className="h-4 w-4" />
-            {hhmm(o.created_at)} · chờ <b data-testid={`queue-wait-${id}`}>{card.waitMinutes} phút</b> ·{' '}
-            <b className="text-ink" data-testid={`queue-total-${id}`}>
-              {formatVnd(o.total)}
-            </b>
+          {pointName && <span className="badge rounded-md bg-warning-soft text-warning-strong">{pointName}</span>}
+          <span
+            className={`badge rounded-md ${o.dine_type === 'delivery' ? 'bg-warning-soft text-warning-strong' : 'bg-info-soft text-info-strong'}`}
+            data-testid={`queue-dine-${id}`}
+          >
+            <DineIcon aria-hidden className="h-3.5 w-3.5" />
+            {DINE_LABELS[o.dine_type]}
           </span>
         </span>
+        {o.dine_type === 'delivery' && o.address && (
+          <span className="flex items-center gap-1.5 truncate text-base text-ink-muted" data-testid={`queue-address-${id}`}>
+            <MapPin aria-hidden className="h-4 w-4 shrink-0" />
+            <span className="truncate">{o.address}</span>
+          </span>
+        )}
+        <span className="line-clamp-2 text-base text-ink" data-testid={`queue-items-${id}`}>
+          {itemsSummary(o.items)}
+        </span>
       </button>
+      <div className="flex items-center gap-2 border-t border-line pt-3">
+        <span className={`badge num rounded-md text-[13px] ${WAIT_STYLE[card.color]}`}>
+          <Clock aria-hidden className="h-3.5 w-3.5" />
+          Chờ <span data-testid={`queue-wait-${id}`}>{card.waitMinutes} phút</span>
+        </span>
+        <span className="flex-1" />
+        <b className="num text-xl font-bold text-ink" data-testid={`queue-total-${id}`}>
+          {formatVnd(o.total)}
+        </b>
+      </div>
       {card.group === 'serve' ? (
-        <button type="button" onClick={onServe} className={`btn btn-success ${CARD_BTN}`} data-testid={`queue-serve-btn-${id}`}>
+        <button type="button" onClick={onServe} className="btn btn-success min-h-[48px] w-full text-base" data-testid={`queue-serve-btn-${id}`}>
+          <ChefHat aria-hidden className="h-5 w-5" />
           Đã ra món
         </button>
       ) : (
-        <button type="button" onClick={onPay} className={`btn btn-primary ${CARD_BTN}`} data-testid={`queue-pay-btn-${id}`}>
+        <button type="button" onClick={onPay} className="btn btn-primary min-h-[48px] w-full text-base" data-testid={`queue-pay-btn-${id}`}>
+          <Wallet aria-hidden className="h-5 w-5" />
           Thanh toán
         </button>
       )}
@@ -217,14 +241,11 @@ function Card({
   );
 }
 
-function SectionTitle({ icon, count, children }: { icon: ReactNode; count: number; children: ReactNode }) {
+function SectionTitle({ count, children }: { count: number; children: ReactNode }) {
   return (
-    <h2 className="flex items-center gap-2 text-lg font-semibold text-ink-muted">
-      <span aria-hidden className="text-ink-subtle">
-        {icon}
-      </span>
+    <h2 className="flex items-baseline gap-2 text-lg font-bold md:text-xl">
       {children}
-      <span className="badge num bg-surface-sunken text-base text-ink">{count}</span>
+      <span className="num text-base font-normal text-ink-subtle">({count})</span>
     </h2>
   );
 }

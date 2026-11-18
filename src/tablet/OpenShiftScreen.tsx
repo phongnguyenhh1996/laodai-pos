@@ -32,7 +32,7 @@ export function OpenShiftScreen() {
   }
 
   return (
-    <main data-testid="open-shift-screen" className="mx-auto flex h-full max-w-4xl flex-col gap-6 overflow-y-auto p-6">
+    <main data-testid="open-shift-screen" className="mx-auto flex h-full max-w-4xl flex-col gap-5 overflow-y-auto p-4 md:gap-6 md:p-6">
       {loadError && (
         <p data-testid="catalog-error" role="alert" className="flex items-start gap-3 rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-lg text-danger-strong">
           <CircleAlert aria-hidden className="mt-1 h-5 w-5 shrink-0" />
@@ -40,10 +40,15 @@ export function OpenShiftScreen() {
         </p>
       )}
 
-      <section data-testid="staff-picker" className="card flex flex-col gap-4 p-6">
-        <div>
-          <p className="eyebrow">Mở ca</p>
-          <h2 className="text-3xl font-bold">Ai đứng ca?</h2>
+      <section data-testid="staff-picker" className="card flex flex-col gap-5 p-5 md:p-7">
+        <div className="flex items-center gap-3">
+          <span aria-hidden className="icon-tile h-12 w-12 rounded-full bg-brand-soft text-brand">
+            <LogIn className="h-6 w-6" />
+          </span>
+          <div>
+            <p className="text-sm text-ink-subtle">Mở ca</p>
+            <h2 className="text-2xl font-bold md:text-3xl">Ai đứng ca?</h2>
+          </div>
         </div>
         {!staff && !loadError && <p className="text-ink-subtle">Đang tải…</p>}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -53,10 +58,12 @@ export function OpenShiftScreen() {
               type="button"
               aria-pressed={s.id === staffId}
               onClick={() => setStaffId(s.id)}
-              className="btn btn-choice min-h-[88px] text-2xl"
+              className="btn btn-choice min-h-[80px] justify-start gap-3 px-4 text-xl"
               data-testid={`staff-${s.id}`}
             >
-              <UserRound aria-hidden className="h-6 w-6 opacity-70" />
+              <span aria-hidden className="icon-tile h-10 w-10 rounded-full bg-brand-tint text-brand-deep">
+                <UserRound className="h-5 w-5" />
+              </span>
               {s.name}
             </button>
           ))}
@@ -69,7 +76,7 @@ export function OpenShiftScreen() {
 
       <button
         type="button"
-        className="btn btn-success min-h-[80px] text-2xl"
+        className="btn btn-success min-h-[64px] text-xl"
         disabled={!chosen || busy}
         onClick={() => void open()}
         data-testid="open-shift"
