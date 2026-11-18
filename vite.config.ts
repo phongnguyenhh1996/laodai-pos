@@ -13,7 +13,7 @@ export default defineConfig({
     VitePWA({
       // 'prompt': bản mới chờ sẵn, nhân viên bấm "Tải lại" trên banner (UpdateBanner) — không tự reload giữa lúc lên đơn.
       registerType: 'prompt',
-      includeAssets: ['icon.svg'],
+      includeAssets: ['icon.svg', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png'],
       manifest: {
         name: 'Laodai POS',
         short_name: 'Laodai',
@@ -23,7 +23,12 @@ export default defineConfig({
         orientation: 'any',
         background_color: '#f3f5f8',
         theme_color: '#c2410c',
-        icons: [{ src: 'icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any maskable' }],
+        icons: [
+          { src: 'icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
+          { src: 'icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+          { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+        ],
       },
       workbox: { navigateFallback: '/index.html', globPatterns: ['**/*.{js,css,html,svg,woff2}'] },
     }),
