@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { useState, type FormEvent } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
-import { ChevronRight, TabletSmartphone } from 'lucide-react';
+import { ChevronRight, Store } from 'lucide-react';
 import { ErrorText, Splash, TextField, errorMessage } from '@/app/ui';
 import { useActivation } from '@/app/useActivation';
 import { activateTablet, listTabletProfiles, signInOwnerEphemeral, type TabletProfileOption } from '@/lib/auth';
@@ -9,8 +9,8 @@ import { activateTablet, listTabletProfiles, signInOwnerEphemeral, type TabletPr
 type Step = { kind: 'login' } | { kind: 'pick'; owner: SupabaseClient; profiles: TabletProfileOption[] };
 
 /**
- * Kích hoạt tablet (mục 7, màn 1): chủ đăng nhập → chọn hồ sơ tablet.
- * Phiên chủ chỉ nằm trong bộ nhớ và bị hủy ngay sau khi kích hoạt.
+ * Màn vào app, giống nhau trên mọi thiết bị: chủ đăng nhập một lần → chọn quầy (hồ sơ tablet).
+ * Phiên chủ chỉ nằm trong bộ nhớ và bị hủy ngay sau khi chọn quầy; máy giữ phiên quầy.
  */
 export function ActivateScreen() {
   const act = useActivation();
@@ -56,13 +56,13 @@ export function ActivateScreen() {
     <main data-testid="activate-screen" className="mx-auto flex h-full max-w-md flex-col justify-center gap-6 p-6">
       <header className="flex flex-col gap-3">
         <span aria-hidden className="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-strong text-white shadow-card">
-          <TabletSmartphone className="h-7 w-7" />
+          <Store className="h-7 w-7" />
         </span>
-        <h1 className="text-3xl font-bold">Kích hoạt tablet</h1>
+        <h1 className="text-3xl font-bold">{step.kind === 'login' ? 'Đăng nhập' : 'Chọn quầy'}</h1>
         <p className="text-lg text-ink-muted">
           {step.kind === 'login'
-            ? 'Chủ đăng nhập một lần để gắn máy này với một hồ sơ tablet.'
-            : 'Chọn hồ sơ cho máy này.'}
+            ? 'Chủ đăng nhập một lần trên máy này, sau đó chọn quầy bán hàng.'
+            : 'Máy này sẽ bán hàng ở quầy được chọn.'}
         </p>
       </header>
 
@@ -106,7 +106,7 @@ export function ActivateScreen() {
               <ChevronRight aria-hidden className="h-6 w-6 text-ink-subtle" />
             </button>
           ))}
-          {step.profiles.length === 0 && <p className="text-ink-subtle">Chưa có hồ sơ tablet nào trong Cài đặt.</p>}
+          {step.profiles.length === 0 && <p className="text-ink-subtle">Chưa có quầy nào trong Cài đặt.</p>}
           <ErrorText testId="activate-error">{error}</ErrorText>
         </div>
       )}

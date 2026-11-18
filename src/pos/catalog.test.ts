@@ -73,7 +73,7 @@ describe('createSupabaseCatalogSource', () => {
 
   it('không đọc được hồ sơ (phiên hết hạn / anon ⇒ RLS trả 0 dòng): báo lỗi, không trả danh mục rỗng', async () => {
     const { client } = fakeClient({ ...tables(), tablet_profiles: ok([]) }, ok(d.config));
-    await expect(createSupabaseCatalogSource(client)('tab-a')).rejects.toThrow('phiên tablet không hợp lệ');
+    await expect(createSupabaseCatalogSource(client)('tab-a')).rejects.toThrow('phiên của máy không hợp lệ');
     const nul = fakeClient({ ...tables(), tablet_profiles: ok(null) }, ok(d.config));
     await expect(createSupabaseCatalogSource(nul.client)('tab-a')).rejects.toBeInstanceOf(CatalogFetchError);
   });

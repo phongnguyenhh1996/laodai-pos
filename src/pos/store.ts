@@ -291,7 +291,7 @@ export class TabletStore {
     try {
       const data = await this.backend.loadCatalog(profileId);
       if (this.profileId !== profileId) return;
-      if (data.profile.id !== profileId) throw new PosNetworkError('Hồ sơ tablet không khớp');
+      if (data.profile.id !== profileId) throw new PosNetworkError('Quầy không khớp');
       this.emit({ catalog: { ...data, fetched_at }, error: null });
     } catch (e) {
       if (this.profileId === profileId) this.emit({ error: errText(e) });

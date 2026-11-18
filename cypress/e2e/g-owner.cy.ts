@@ -106,7 +106,7 @@ describe('G. Chủ', () => {
     cy.get(tid(`point-tab-${SEED.points.com}`)).should('not.exist');
   });
 
-  it('G37 (điện thoại): chủ sửa hồ sơ tablet trên điện thoại; hồ sơ phải còn ít nhất một điểm bán', () => {
+  it('G37 (điện thoại): chủ sửa quầy trên điện thoại; quầy phải còn ít nhất một điểm bán', () => {
     cy.loginOwner();
     openSettings('profiles', SEED.tablets.A);
     cy.get(tid(`field-point_ids-${SEED.points.xoiA}`)).uncheck();
@@ -178,9 +178,9 @@ describe('G. Chủ', () => {
         cy.task('db:reconcile', shiftId).its('cash').should('deep.equal', { expected: 515_000, counted: 565_000, diff: 50_000 });
 
         // Danh sách đơn + báo cáo cũng thấy
-        cy.visit('/owner/orders');
+        cy.ownerVisit('/owner/orders');
         cy.get(`[data-testid=orders-row][data-id="${big.id}"]`).should('have.attr', 'data-method', 'transfer').find(tid('orders-row-edited')).should('exist');
-        cy.visit('/owner/reports');
+        cy.ownerVisit('/owner/reports');
         cy.get(tid(`report-shift-${shiftId}-adjusted`)).should('be.visible');
         cy.get(tid(`report-shift-${shiftId}-cash-diff`)).should('have.text', 'Tiền mặt +50.000');
       });
@@ -258,7 +258,7 @@ describe('G. Chủ', () => {
     cy.get(staff('Lan', 'total')).should('have.text', '60.000');
 
     // Màn Đơn lọc theo nhân viên + hình thức cùng số liệu
-    cy.visit(`/owner/orders?staff=${SEED.staff.Lan}&status=paid`);
+    cy.ownerVisit(`/owner/orders?staff=${SEED.staff.Lan}&status=paid`);
     cy.get(tid('orders-row')).should('have.length', 3);
     cy.get(tid('orders-sum')).should('have.text', '60.000');
     cy.get(tid('orders-filter-method')).select('transfer');

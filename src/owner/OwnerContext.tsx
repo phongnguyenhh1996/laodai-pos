@@ -2,13 +2,12 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { createContext, useContext } from 'react';
 
 export interface OwnerSession {
-  /** Client mang phiên chủ: điện thoại = client chính; tablet = client tạm trong bộ nhớ. */
+  /** Client mang phiên chủ tạm (chỉ trong bộ nhớ, tự thoát sau 2 phút không thao tác). */
   client: SupabaseClient;
   email: string;
-  /** `tablet`: chế độ chủ tạm trên tablet (tự thoát sau 2 phút); `phone`: thiết bị của chủ. */
-  device: 'tablet' | 'phone';
-  tabletName?: string;
-  /** Thoát chế độ chủ (tablet) hoặc đăng xuất (điện thoại). */
+  /** Tên quầy của máy đang vào chế độ chủ. */
+  tabletName: string;
+  /** Thoát chế độ chủ, về màn bán hàng. */
   leave(): void;
 }
 

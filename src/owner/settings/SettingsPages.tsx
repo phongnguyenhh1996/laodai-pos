@@ -48,7 +48,7 @@ function SettingsHome() {
         ))}
       </NavList>
       <p className="text-sm text-ink-subtle">
-        Không có xóa: món, topping, combo ngừng bán hoặc nhân viên nghỉ thì bỏ chọn “Đang bán” / “Đang làm”. Tablet nhận thay đổi ở lần
+        Không có xóa: món, topping, combo ngừng bán hoặc nhân viên nghỉ thì bỏ chọn “Đang bán” / “Đang làm”. Các máy bán hàng nhận thay đổi ở lần
         đồng bộ kế tiếp (khi mở lại màn bán hàng, khi có mạng lại, hoặc sau vài phút).
       </p>
     </OwnerLayout>
@@ -171,7 +171,7 @@ function EntityForm({
     <form className="flex flex-col gap-4" onSubmit={submit} data-testid={`settings-form-${def.key}`}>
       {saved && !dirty && (
         <p data-testid="settings-saved" role="status" className="rounded-lg bg-success-soft px-4 py-3 text-success-strong">
-          Đã lưu. Tablet nhận thay đổi ở lần đồng bộ kế tiếp.
+          Đã lưu. Các máy bán hàng nhận thay đổi ở lần đồng bộ kế tiếp.
         </p>
       )}
       {def.fields.map((f) => (

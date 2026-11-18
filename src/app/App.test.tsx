@@ -188,18 +188,19 @@ describe('chế độ chủ trên tablet', () => {
   });
 });
 
-describe('điện thoại chủ (máy chưa kích hoạt)', () => {
-  it('chưa đăng nhập: /owner hiện form email + mật khẩu', async () => {
-    go('/owner');
-    expect(await screen.findByTestId('owner-login')).toBeInTheDocument();
-    expect(screen.getByTestId('owner-email')).toBeInTheDocument();
+describe('máy chưa đăng nhập + chọn quầy (kể cả điện thoại chủ)', () => {
+  it('/owner/... chuyển về màn đăng nhập, không có form đăng nhập chủ riêng', async () => {
+    go('/owner/reports');
+    expect(await screen.findByTestId('activate-screen')).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/activate');
+    expect(screen.queryByTestId('owner-home')).not.toBeInTheDocument();
   });
 
-  it('đã có phiên chủ: vào thẳng màn chủ', async () => {
+  it('phiên chủ lưu từ bản cũ không còn vào thẳng màn chủ', async () => {
     storeSession({ role: 'owner', email: 'owner@x.vn' });
     go('/owner');
-    expect(await screen.findByTestId('owner-home')).toHaveTextContent('owner@x.vn');
-    expect(screen.getByTestId('owner-logout')).toBeInTheDocument();
+    expect(await screen.findByTestId('activate-screen')).toBeInTheDocument();
+    expect(screen.queryByTestId('owner-home')).not.toBeInTheDocument();
   });
 
   it('phiên chủ không mở được màn bán hàng', async () => {

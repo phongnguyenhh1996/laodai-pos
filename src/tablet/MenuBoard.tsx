@@ -29,7 +29,7 @@ export function MenuBoard({
   if (points.length === 0) {
     return (
       <p data-testid="menu-no-points" className="text-ink-subtle">
-        Hồ sơ tablet chưa có điểm bán nào. Nhờ chủ chọn điểm bán trong Cài đặt.
+        Quầy này chưa có điểm bán nào. Nhờ chủ chọn điểm bán trong Cài đặt.
       </p>
     );
   }

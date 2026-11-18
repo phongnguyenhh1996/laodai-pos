@@ -58,10 +58,10 @@ export function createSupabaseCatalogSource(client: SupabaseClient): CatalogSour
     };
     const profileQuery = async (): Promise<TabletProfile> => {
       const { data, error } = await client.from('tablet_profiles').select(PROFILE_COLUMNS).eq('id', profileId);
-      if (error) throw new CatalogFetchError(`Không tải được hồ sơ tablet: ${error.message}`);
+      if (error) throw new CatalogFetchError(`Không tải được thông tin quầy: ${error.message}`);
       // RLS: phiên không phải tablet của hồ sơ này (hết phiên, anon) ⇒ 0 dòng. Không được lưu danh mục rỗng.
       const p = (data as TabletProfile[] | null)?.[0];
-      if (!p) throw new CatalogFetchError('Không đọc được hồ sơ tablet (phiên tablet không hợp lệ)');
+      if (!p) throw new CatalogFetchError('Không đọc được thông tin quầy (phiên của máy không hợp lệ)');
       return p;
     };
     const configQuery = async (): Promise<TabletConfig> => {

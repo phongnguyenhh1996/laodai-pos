@@ -26,7 +26,7 @@ export function OwnerHome() {
           to="/owner/settings"
           testId="owner-nav-settings" icon={Settings}
           title="Cài đặt"
-          subtitle="Menu, món, topping, combo, giá · nhân viên · điểm bán · hồ sơ tablet"
+          subtitle="Menu, món, topping, combo, giá · nhân viên · điểm bán · quầy"
         />
       </NavList>
     </OwnerLayout>

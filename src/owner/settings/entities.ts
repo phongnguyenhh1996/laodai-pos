@@ -312,8 +312,8 @@ const points: EntityDef = {
 const profiles: EntityDef = {
   key: 'profiles',
   table: 'tablet_profiles',
-  title: 'Hồ sơ tablet',
-  noun: 'hồ sơ tablet',
+  title: 'Quầy',
+  noun: 'quầy',
   rows: (c) => c.profiles,
   summary: (r, c) => {
     const p = r as TabletProfile;
@@ -321,10 +321,10 @@ const profiles: EntityDef = {
     return `${names.join(', ') || 'chưa có điểm bán'} · đầu ca ${p.default_boxes} hộp, ${p.default_plates} dĩa, ${formatVnd(p.default_float)} tiền lẻ`;
   },
   fields: [
-    { key: 'name', label: 'Tên hồ sơ', kind: 'text' },
+    { key: 'name', label: 'Tên quầy', kind: 'text' },
     {
       key: 'point_ids',
-      label: 'Điểm bán trên tablet này (thành tab khi tạo đơn)',
+      label: 'Điểm bán ở quầy này (thành tab khi tạo đơn)',
       kind: 'multi',
       options: (_f, c) => c.points.map((p) => ({ value: p.id, label: inactive(p.name, p.active) })),
     },

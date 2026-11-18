@@ -1,9 +1,9 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, LogOut, X, type LucideIcon } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, type LucideIcon } from 'lucide-react';
 import { useOwner } from './OwnerContext';
 
-/** Khung trang chế độ chủ: nút quay lại, tiêu đề, Thoát (tablet) / Đăng xuất (điện thoại, ở trang đầu). */
+/** Khung trang chế độ chủ: nút quay lại, tiêu đề, nút Thoát về màn bán hàng. */
 export function OwnerLayout({
   title,
   back,
@@ -33,23 +33,14 @@ export function OwnerLayout({
           <div className="min-w-0">
             <h1 className="truncate text-2xl font-bold">{title}</h1>
             <p className="truncate text-sm text-ink-subtle" data-testid="owner-device">
-              {owner.device === 'tablet' ? `Trên ${owner.tabletName} · tự thoát sau 2 phút không thao tác` : owner.email}
+              Trên {owner.tabletName} · tự thoát sau 2 phút không thao tác
             </p>
           </div>
         </div>
-        {owner.device === 'tablet' ? (
-          <button type="button" className="btn btn-dark shrink-0" onClick={owner.leave} data-testid="owner-exit">
-            <X aria-hidden className="h-5 w-5" />
-            Thoát
-          </button>
-        ) : (
-          !back && (
-            <button type="button" className="btn btn-secondary shrink-0" onClick={owner.leave} data-testid="owner-logout">
-              <LogOut aria-hidden className="h-5 w-5" />
-              Đăng xuất
-            </button>
-          )
-        )}
+        <button type="button" className="btn btn-dark shrink-0" onClick={owner.leave} data-testid="owner-exit">
+          <X aria-hidden className="h-5 w-5" />
+          Thoát
+        </button>
       </header>
       {children}
     </main>

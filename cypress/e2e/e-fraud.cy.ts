@@ -87,7 +87,7 @@ describe('E. Kịch bản gian lận', () => {
 
         // Chủ mở link trong tin: chi tiết đơn + nhật ký của đơn
         cy.loginOwner();
-        cy.visit(path);
+        cy.ownerVisit(path);
         cy.get(tid('order-detail-status')).should('have.text', 'Đã xóa');
         cy.get(tid('order-detail-times')).should('contain.text', 'Khách bỏ về').and('contain.text', 'Ra món');
         cy.get('[data-testid=log-row][data-action=order_delete]').should('contain.text', 'Lý do: Khách bỏ về · lúc xóa ⚠️ ĐÃ RA MÓN');
@@ -95,7 +95,7 @@ describe('E. Kịch bản gian lận', () => {
 
         // Báo cáo ca: mục bao bì của đơn bị xóa sau khi ra món
         cy.task<Array<{ id: string }>>('db:shifts', 'A').then(([shift]) => {
-          cy.visit(`/owner/shifts/${shift.id}`);
+          cy.ownerVisit(`/owner/shifts/${shift.id}`);
           cy.get(tid('rep-deleted')).should('have.text', '1 (1 đã ra món)');
           cy.get(tid('rep-deleted-after-served')).should('have.text', `${code} (1 hộp)`);
         });
@@ -122,7 +122,7 @@ describe('E. Kịch bản gian lận', () => {
 
     cy.task<Array<{ id: string }>>('db:shifts', 'A').then(([shift]) => {
       cy.loginOwner();
-      cy.visit(`/owner/shifts/${shift.id}`);
+      cy.ownerVisit(`/owner/shifts/${shift.id}`);
       cy.get(tid('rep-edits')).should('have.text', '1 lần').click();
       // Nhật ký lọc sẵn: sửa & xóa của Lan
       cy.location('search').should('contain', 'type=edits').and('contain', `staff=${SEED.staff.Lan}`);
@@ -207,7 +207,7 @@ describe('E. Kịch bản gian lận', () => {
     cy.get(tid(`report-staff-${SEED.staff.Lan}-shares`)).should('have.text', 'TM 28% · CK 72% · Nợ 0%');
 
     // App ngân hàng chỉ có 40.000 ⇒ chủ lọc đơn CK của Xôi A hôm nay: ra đúng đơn bị ghi sai và người thu
-    cy.visit(`/owner/orders?method=transfer&point=${SEED.points.xoiA}`);
+    cy.ownerVisit(`/owner/orders?method=transfer&point=${SEED.points.xoiA}`);
     cy.get(tid('orders-row')).should('have.length', 1).first().as('row');
     cy.get('@row').find(tid('orders-row-total')).should('have.text', '31.000');
     cy.get('@row').find(tid('orders-row-who')).should('contain.text', 'Thu: Lan');

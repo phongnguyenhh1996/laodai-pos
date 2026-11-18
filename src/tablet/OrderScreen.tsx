@@ -184,7 +184,7 @@ export function OrderScreen() {
     return (
       <main className="p-6">
         <p data-testid="menu-no-points" className="text-ink-subtle">
-          Hồ sơ tablet chưa có điểm bán nào. Nhờ chủ chọn điểm bán trong Cài đặt.
+          Quầy này chưa có điểm bán nào. Nhờ chủ chọn điểm bán trong Cài đặt.
         </p>
       </main>
     );

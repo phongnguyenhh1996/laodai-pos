@@ -1,12 +1,11 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Route, Routes, useNavigate } from 'react-router-dom';
-import { LockKeyhole, Store } from 'lucide-react';
+import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
+import { LockKeyhole } from 'lucide-react';
 import { ErrorText, Splash, TextField, errorMessage } from '@/app/ui';
 import { useActivation } from '@/app/useActivation';
 import { useIdleTimeout } from '@/app/useIdleTimeout';
-import { enterOwnerModeOnTablet, exitOwnerMode, signInOwner } from '@/lib/auth';
-import { decodeClaims, supabase } from '@/lib/supabase';
+import { enterOwnerModeOnTablet, exitOwnerMode } from '@/lib/auth';
 import type { Activation } from '@/pos';
 import { OwnerContext, type OwnerSession } from './OwnerContext';
 import { OwnerHome } from './OwnerHome';
@@ -17,7 +16,7 @@ import { LogPage } from './log/LogPages';
 import { OrderRoutes } from './orders/OrderPages';
 import { ReportPage } from './reports/ReportPage';
 
-/** Chế độ chủ trên tablet tự thoát sau 2 phút không thao tác (mục 1.2). */
+/** Chế độ chủ tự thoát sau 2 phút không thao tác (mục 1.2). */
 export const OWNER_IDLE_MS = 2 * 60_000;
 
 function OwnerRoutes() {
@@ -35,19 +34,17 @@ function OwnerRoutes() {
 }
 
 /**
- * `/owner/*`: trên tablet đã kích hoạt ⇒ nhập lại mật khẩu chủ (phiên tạm);
- * trên thiết bị khác (điện thoại chủ) ⇒ đăng nhập email + mật khẩu, phiên lưu trên máy.
+ * `/owner/*`: mọi thiết bị như nhau. Máy chưa đăng nhập + chọn quầy ⇒ về màn đăng nhập;
+ * đã chọn quầy ⇒ nhập lại mật khẩu chủ (phiên chủ tạm trong bộ nhớ, tự thoát sau 2 phút).
  */
 export function OwnerGate() {
   const act = useActivation();
   if (act.status === 'loading') return <Splash />;
-  if (act.status === 'active') return <TabletOwnerMode activation={act.activation} />;
-  return <PhoneOwner />;
+  if (act.status === 'none') return <Navigate to="/activate" replace />;
+  return <OwnerMode activation={act.activation} />;
 }
 
-// ---------------------------------------------------------------- tablet
-
-function TabletOwnerMode({ activation }: { activation: Activation }) {
+function OwnerMode({ activation }: { activation: Activation }) {
   const navigate = useNavigate();
   const [owner, setOwner] = useState<SupabaseClient | null>(null);
 
@@ -59,7 +56,6 @@ function TabletOwnerMode({ activation }: { activation: Activation }) {
       owner && {
         client: owner,
         email: activation.owner_email,
-        device: 'tablet',
         tabletName: activation.tablet_name,
         leave: () => navigate('/', { replace: true }),
       },
@@ -131,114 +127,6 @@ function OwnerUnlock({
             {busy ? 'Đang kiểm tra…' : 'Vào'}
           </button>
         </div>
-      </form>
-    </main>
-  );
-}
-
-// ---------------------------------------------------------------- điện thoại chủ
-
-type PhoneState = { kind: 'loading' } | { kind: 'out' } | { kind: 'in'; email: string };
-
-function ownerEmailOf(accessToken: string | undefined): string | null {
-  const c = accessToken ? decodeClaims(accessToken) : null;
-  return c?.role === 'owner' ? (c.email ?? '') : null;
-}
-
-function PhoneOwner() {
-  const [state, setState] = useState<PhoneState>({ kind: 'loading' });
-
-  useEffect(() => {
-    let alive = true;
-    const apply = (token: string | undefined) => {
-      if (!alive) return;
-      const email = ownerEmailOf(token);
-      setState(email === null ? { kind: 'out' } : { kind: 'in', email });
-    };
-    supabase.auth
-      .getSession()
-      .then(({ data }) => apply(data.session?.access_token))
-      .catch(() => apply(undefined));
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => apply(s?.access_token));
-    return () => {
-      alive = false;
-      sub.subscription.unsubscribe();
-    };
-  }, []);
-
-  const session = useMemo<OwnerSession | null>(
-    () =>
-      state.kind === 'in'
-        ? {
-            client: supabase,
-            email: state.email,
-            device: 'phone',
-            leave: () => void supabase.auth.signOut({ scope: 'local' }).catch(() => undefined),
-          }
-        : null,
-    [state],
-  );
-
-  if (state.kind === 'loading') return <Splash />;
-  if (!session) return <OwnerLogin />;
-  return (
-    <OwnerContext.Provider value={session}>
-      <OwnerRoutes />
-    </OwnerContext.Provider>
-  );
-}
-
-function OwnerLogin() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function submit(e: FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setError(null);
-    try {
-      // Thành công ⇒ onAuthStateChange chuyển sang màn chủ.
-      await signInOwner(supabase, email, password);
-    } catch (err) {
-      setError(errorMessage(err));
-      setBusy(false);
-    }
-  }
-
-  return (
-    <main data-testid="owner-login" className="mx-auto flex h-full max-w-md flex-col justify-center gap-6 p-6">
-      <header className="flex flex-col gap-3">
-        <span aria-hidden className="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-strong text-white shadow-card">
-          <Store className="h-7 w-7" />
-        </span>
-        <h1 className="text-3xl font-bold">Đăng nhập chủ</h1>
-        <p className="text-lg text-ink-muted">Laodai POS · quản lý quán</p>
-      </header>
-      <form className="card flex flex-col gap-4 p-6" onSubmit={submit}>
-        <TextField
-          label="Email"
-          type="email"
-          autoComplete="username"
-          required
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          data-testid="owner-email"
-        />
-        <TextField
-          label="Mật khẩu"
-          type="password"
-          autoComplete="current-password"
-          required
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          data-testid="owner-password"
-        />
-        <ErrorText testId="owner-error">{error}</ErrorText>
-        <button type="submit" className="btn btn-primary" disabled={busy} data-testid="owner-login-submit">
-          {busy ? 'Đang đăng nhập…' : 'Đăng nhập'}
-        </button>
       </form>
     </main>
   );

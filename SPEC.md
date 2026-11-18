@@ -29,10 +29,10 @@ Chi phí vận hành dự kiến: 0đ/tháng (gói free).
 
 ### 1.2 Đăng nhập & phân quyền
 - **Chủ**: 1 tài khoản (email + mật khẩu), dùng trên nhiều thiết bị.
-- **Kích hoạt tablet**: chủ đăng nhập 1 lần trên tablet → chọn **hồ sơ tablet** (vd. "Tablet A") → Edge Function cấp **phiên vai trò `tablet`** và hủy phiên chủ trên máy đó. Báo Telegram: "Tablet A vừa được đăng nhập".
+- **Mọi thiết bị cùng một luồng** (tablet hay điện thoại chủ như nhau): vào app → chủ **đăng nhập 1 lần** → chọn **quầy** (trong dữ liệu là `tablet_profiles`, vd. "Tablet A") → Edge Function cấp **phiên vai trò `tablet`** và hủy phiên chủ trên máy đó. Báo Telegram: "Tablet A vừa được đăng nhập". Không có form đăng nhập chủ riêng cho điện thoại.
   - Vai trò `tablet` bị RLS giới hạn: chỉ đọc menu/nhân viên/khách nợ, chỉ thao tác **đơn đang mở** của hồ sơ tablet mình, không đọc được đơn đã thanh toán, ca đã đóng, báo cáo, nhật ký.
   - ⇒ "Nhân viên không thấy doanh thu" được đảm bảo ở **tầng dữ liệu**, không chỉ ẩn giao diện.
-- **Chế độ chủ trên tablet**: nhập lại mật khẩu chủ → phiên chủ tạm thời, **tự thoát sau 2 phút** không thao tác, trở lại phiên `tablet`. Mỗi lần vào đều báo Telegram.
+- **Chế độ chủ** (mọi thiết bị): nhập lại mật khẩu chủ → phiên chủ tạm thời (chỉ trong bộ nhớ, tải lại trang là mất), **tự thoát sau 2 phút** không thao tác, trở lại phiên `tablet`. Mỗi lần vào đều báo Telegram.
 - Nhân viên: **chọn tên**, không PIN.
 
 ---
@@ -194,7 +194,7 @@ Mỗi tin có link mở thẳng chi tiết trong app chủ.
 ## 7. Màn hình
 
 ### Tablet (chế độ bán hàng)
-1. **Kích hoạt**: đăng nhập chủ → chọn hồ sơ tablet (chỉ một lần).
+1. **Đăng nhập**: đăng nhập chủ → chọn quầy (chỉ một lần).
 2. **Mở ca**: danh sách tên nhân viên → Mở ca.
 3. **Hàng đợi** (màn hình chính): hai nhóm đơn, nút lớn **+ Đơn mới**, menu phụ: Thu nợ · Đóng ca · Chế độ chủ.
 4. **Đơn**: tab điểm bán, combo, món, topping, Tại chỗ/Mang về, nhãn → Lưu / Đã ra món / Thanh toán / Xóa.
@@ -204,7 +204,7 @@ Mỗi tin có link mở thẳng chi tiết trong app chủ.
 
 Thiết kế: nút ≥ 56px, chữ to, tối đa 2–3 chạm cho một đơn combo, hiện trạng thái kết nối (đã kết nối / đang kết nối / mất kết nối; mất kết nối thì có dải báo đỏ).
 
-### Điện thoại (chế độ chủ)
+### Chế độ chủ (vào bằng mật khẩu chủ trên bất kỳ máy nào đã chọn quầy; giao diện tối ưu cho điện thoại)
 1. **Tổng quan** (realtime): doanh thu hôm nay theo điểm; các ca đang mở; đơn đang chờ lâu.
 2. **Ca**: danh sách ca → chi tiết đối soát (mục 5), đơn của ca, bổ sung hộp/dĩa/tiền giữa ca.
 3. **Đơn**: lọc theo ngày/điểm/nhân viên/hình thức/trạng thái (bao gồm đã xóa); sửa đơn đã thanh toán.

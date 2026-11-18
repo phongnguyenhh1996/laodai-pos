@@ -177,7 +177,7 @@ describe('TabletStore', () => {
     store.start('tab-a');
     await backend.answer(undefined, { ...CATALOG, profile: { ...CATALOG.profile, id: 'tab-b' } });
     expect(store.getSnapshot().catalog).toBeUndefined();
-    expect(store.getSnapshot().error).toBe('Hồ sơ tablet không khớp');
+    expect(store.getSnapshot().error).toBe('Quầy không khớp');
   });
 
   it('kết quả thao tác vào ngay; đơn đã thanh toán / đã xóa rời hàng đợi', async () => {

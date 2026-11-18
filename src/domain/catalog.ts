@@ -169,9 +169,9 @@ export function checkTabletProfile(
   ctx: { points: readonly Point[]; profiles: readonly TabletProfile[] },
   selfId: string | null = null,
 ): void {
-  checkName(p.name, 'hồ sơ tablet');
-  checkUnique(p.name, ctx.profiles, selfId, 'hồ sơ tablet');
-  if (p.point_ids.length === 0) throw new CatalogError('Hồ sơ tablet cần ít nhất một điểm bán');
+  checkName(p.name, 'quầy');
+  checkUnique(p.name, ctx.profiles, selfId, 'quầy');
+  if (p.point_ids.length === 0) throw new CatalogError('Quầy cần ít nhất một điểm bán');
   if (new Set(p.point_ids).size !== p.point_ids.length) throw new CatalogError('Điểm bán bị chọn trùng');
   for (const id of p.point_ids) {
     if (!ctx.points.some((x) => x.id === id)) throw new CatalogError('Điểm bán không tồn tại');

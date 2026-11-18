@@ -24,7 +24,7 @@ describe('A. Kích hoạt & phân quyền', () => {
     cy.get('[data-testid=activate-email]').type(SEED.owner.email);
     cy.get('[data-testid=activate-password]').type(SEED.owner.password, { log: false });
     cy.get('[data-testid=activate-login]').click();
-    // Chủ thấy đủ hồ sơ tablet để chọn
+    // Chủ thấy đủ quầy để chọn
     cy.get(`[data-testid=activate-profile-${SEED.tablets.A}]`).should('be.visible');
     cy.get(`[data-testid=activate-profile-${SEED.tablets.B}]`).should('be.visible');
     cy.get(`[data-testid=activate-profile-${SEED.tablets.A}]`).click();
@@ -136,16 +136,21 @@ describe('A. Kích hoạt & phân quyền', () => {
     cy.get('[data-testid=tablet-home]').should('not.exist');
   });
 
-  it('chủ đăng nhập trên điện thoại: phiên được giữ, điện thoại không phải máy bán hàng', () => {
-    cy.loginOwner();
-    cy.get('[data-testid=owner-device]').should('contain.text', SEED.owner.email);
-    cy.reload();
-    cy.get('[data-testid=owner-home]').should('be.visible');
-    cy.visit('/');
+  it('điện thoại chủ đi cùng luồng với tablet: đăng nhập → chọn quầy; chế độ chủ luôn hỏi mật khẩu', () => {
+    cy.viewport(390, 844);
+    // Máy mới vào thẳng /owner: không có form đăng nhập riêng, về màn đăng nhập + chọn quầy
+    cy.visitFresh('/owner');
+    cy.location('pathname').should('eq', '/activate');
     cy.get('[data-testid=activate-screen]').should('be.visible');
-    cy.visit('/owner');
-    cy.get('[data-testid=owner-logout]').click();
-    cy.get('[data-testid=owner-login]').should('be.visible');
+
+    cy.loginOwner();
+    cy.get('[data-testid=owner-device]').should('contain.text', 'Tablet B');
+    // Tải lại: vẫn là máy của quầy B nhưng chế độ chủ phải nhập lại mật khẩu
+    cy.reload();
+    cy.get('[data-testid=owner-unlock]').should('be.visible');
+    cy.get('[data-testid=owner-email]').should('not.exist');
+    cy.visit('/');
+    cy.get('[data-testid=tablet-name]').should('contain.text', 'Tablet B');
   });
 
   it('Telegram mock sẵn sàng và rỗng sau reset', () => {

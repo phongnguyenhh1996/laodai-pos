@@ -108,7 +108,7 @@ describe('B. Ca', () => {
 
       // Cuối ca còn 248 hộp: dùng 250 − 248 = 2, theo đơn 1 ⇒ +1
       cy.task('sim:closeShift', { tablet: 'A', boxes: 248, plates: 60, cash: 731_000 });
-      cy.reload();
+      cy.ownerReload();
       cy.get(tid('shift-report')).should('have.attr', 'data-status', 'closed');
       cy.get(tid('rep-boxes-supply')).should('have.text', '200 + 50 = 250');
       cy.get(tid('rep-boxes-left')).should('have.text', '248');
