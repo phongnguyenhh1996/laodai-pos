@@ -9,3 +9,6 @@ cypress/screenshots
 supabase/.temp
 supabase/.branches
 *.tsbuildinfo
+.vercel
+.env*
+!.env.example

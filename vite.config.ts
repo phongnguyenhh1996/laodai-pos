@@ -11,7 +11,8 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // 'prompt': bản mới chờ sẵn, nhân viên bấm "Tải lại" trên banner (UpdateBanner) — không tự reload giữa lúc lên đơn.
+      registerType: 'prompt',
       includeAssets: ['icon.svg'],
       manifest: {
         name: 'Laodai POS',
