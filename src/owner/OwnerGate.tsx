@@ -105,7 +105,7 @@ function OwnerUnlock({
           <LockKeyhole className="h-7 w-7" />
         </span>
         <h1 className="text-3xl font-bold">Chế độ chủ</h1>
-        <p className="text-lg text-ink-muted">Nhập mật khẩu chủ. Mỗi lần vào đều được báo cho chủ.</p>
+        <p className="text-lg text-ink-muted">Nhập mật khẩu chủ. Lần đầu vào trên máy này sẽ được báo cho chủ.</p>
       </header>
       <form className="card flex flex-col gap-4 p-6" onSubmit={submit}>
         <TextField

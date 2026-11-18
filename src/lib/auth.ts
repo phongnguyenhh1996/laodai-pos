@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { readActivation, writeActivation, type Activation } from '@/pos';
+import { deviceId, readActivation, writeActivation, type Activation } from '@/pos';
 import { readLegacy } from '@/pos/legacy';
 import { createEphemeralClient, decodeClaims, storedClaims, supabase } from './supabase';
 
@@ -129,10 +129,16 @@ export async function loadTabletActivation(): Promise<Activation | null> {
   return a;
 }
 
-/** Vào chế độ chủ trên tablet: nhập lại mật khẩu chủ ⇒ phiên chủ tạm (bộ nhớ) + ghi nhật ký + báo Telegram. */
+/**
+ * Vào chế độ chủ trên tablet: nhập lại mật khẩu chủ ⇒ phiên chủ tạm (bộ nhớ) + ghi nhật ký;
+ * báo Telegram chỉ lần đầu trên máy này (server nhớ mã thiết bị).
+ */
 export async function enterOwnerModeOnTablet(activation: Activation, password: string): Promise<SupabaseClient> {
   const owner = await signInOwnerEphemeral(activation.owner_email, password);
-  const { error } = await owner.rpc('owner_mode_entered', { p_profile: activation.tablet_profile_id });
+  const { error } = await owner.rpc('owner_mode_entered', {
+    p_profile: activation.tablet_profile_id,
+    p_device: deviceId(),
+  });
   if (error) {
     await owner.auth.signOut({ scope: 'local' }).catch(() => undefined);
     throw toAuthError(error);

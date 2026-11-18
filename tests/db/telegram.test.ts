@@ -112,6 +112,20 @@ describe('Telegram qua Edge Function', () => {
     expect(m.text).toMatch(/👑 Vào chế độ chủ trên Tablet A – \d\d:\d\d/);
   });
 
+  it('vào chế độ chủ: chỉ báo lần đầu trên mỗi thiết bị, nhật ký vẫn ghi mọi lần', async () => {
+    const owner = await ownerClient();
+    const enter = async (device: string) => {
+      const { data, error } = await owner.rpc('owner_mode_entered', { p_profile: SEED.tablets.A, p_device: device });
+      expect(error).toBeNull();
+      return data;
+    };
+    expect(await enter('device-aaaa-1111')).toBe(true);
+    expect(await enter('device-aaaa-1111')).toBe(false);
+    expect(await enter('device-bbbb-2222')).toBe(true);
+    expect(await sql(`select 1 from audit_log where action = 'owner_mode'`)).toHaveLength(3);
+    expect(await sql(`select 1 from notifications where kind = 'owner_mode'`)).toHaveLength(2);
+  });
+
   it('tổng kết ngày gọi thẳng endpoint: Telegram nhận đủ doanh thu theo điểm', async () => {
     const sim = new TabletSim(await tabletClient(SEED.tablets.A), SEED.tablets.A);
     await sim.openShift('Lan');

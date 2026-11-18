@@ -21,3 +21,21 @@ export function writeActivation(a: Activation, storage: Storage | undefined = gl
 export function clearActivation(storage: Storage | undefined = globalThis.localStorage): void {
   storage?.removeItem(ACTIVATION_KEY);
 }
+
+/** Khóa localStorage giữ mã thiết bị (không xóa khi đăng xuất / đổi quầy). */
+export const DEVICE_ID_KEY = 'laodai-device-id';
+
+/** Mã ngẫu nhiên nhận diện máy này: sinh lần đầu rồi giữ lại. Không dùng được localStorage ⇒ null. */
+export function deviceId(storage: Storage | undefined = globalThis.localStorage): string | null {
+  try {
+    if (!storage) return null;
+    let id = storage.getItem(DEVICE_ID_KEY);
+    if (!id) {
+      id = crypto.randomUUID();
+      storage.setItem(DEVICE_ID_KEY, id);
+    }
+    return id;
+  } catch {
+    return null;
+  }
+}
