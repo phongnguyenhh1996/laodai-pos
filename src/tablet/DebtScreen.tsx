@@ -7,7 +7,7 @@ import { formatVnd } from '@/domain/money';
 import type { Customer } from '@/domain/types';
 import { pos } from '@/lib/pos';
 import { Splash, errorMessage } from '@/app/ui';
-import { ChosenCustomer, CustomerSuggestions, useDebtBook } from './debt';
+import { ChosenCustomer, CustomerSuggestions, DebtDetails, useDebtBook } from './debt';
 import { Notice } from './parts';
 
 /**
@@ -139,6 +139,7 @@ export function DebtScreen() {
                 </button>
               </div>
             )}
+            <DebtDetails customerId={customer.id} balance={balance} />
           </>
         ) : (
           <>

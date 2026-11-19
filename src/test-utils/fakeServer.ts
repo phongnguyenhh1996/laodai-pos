@@ -24,6 +24,7 @@ export class FakeServer {
   catalog: CatalogData;
   shifts: ServerShift[] = [];
   orders: Order[] = [];
+  debtPayments: Array<{ id: string; customer_id: string; amount: number; method: 'cash' | 'transfer'; at: string }> = [];
   /** Thao tác server đã nhận (không tính lần gửi lại), theo thứ tự. */
   ops: WireOp[] = [];
   /** Mất mạng: mọi lời gọi ném lỗi mạng. */
@@ -51,6 +52,23 @@ export class FakeServer {
       loadOpenState: async () => {
         this.net();
         return this.openState(profileId);
+      },
+      loadDebtHistory: async (customerId) => {
+        this.net();
+        return clone({
+          orders: this.orders
+            .filter((o) => o.status === 'paid' && o.payment_method === 'debt' && o.customer_id === customerId)
+            .map((o) => ({
+              id: o.id,
+              code: o.code,
+              paid_at: o.paid_at!,
+              total: o.total,
+              items: o.items.map((i) => ({ name: i.name_snap, qty: i.qty, toppings: i.toppings_snap.map((t) => t.name) })),
+            })),
+          payments: this.debtPayments
+            .filter((p) => p.customer_id === customerId)
+            .map(({ id, at, amount, method }) => ({ id, at, amount, method })),
+        });
       },
       subscribe: (pid, onPulse, onStatus: (s: ChannelStatus) => void) => {
         const l = { profileId: pid, onPulse };
@@ -300,6 +318,7 @@ export class FakeServer {
         const id = p.customer_id as string;
         if (!this.catalog.customers.some((c) => c.id === id)) throw new Reject('bad_customer');
         this.catalog.balances[id] = (this.catalog.balances[id] ?? 0) - (p.amount as number);
+        this.debtPayments.push({ id: p.id as string, customer_id: id, amount: p.amount as number, method: p.method as 'cash' | 'transfer', at: new Date().toISOString() });
         return { catalog: true };
       }
     }

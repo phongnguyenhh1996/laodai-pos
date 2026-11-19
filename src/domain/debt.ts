@@ -114,3 +114,58 @@ export function debtPaymentProblem(amount: Money | null, balance: Money): string
   if (amount > balance) return 'Số tiền lớn hơn dư nợ';
   return null;
 }
+
+/** Một dòng món trong khoản nợ: tên + số lượng + tên topping. */
+export interface DebtItem {
+  name: string;
+  qty: number;
+  toppings: string[];
+}
+
+/** Đơn ghi nợ (khoản nợ) kèm món. */
+export interface DebtHistoryOrder {
+  id: string;
+  code: string;
+  paid_at: string;
+  total: Money;
+  items: DebtItem[];
+}
+
+export interface DebtHistoryPayment {
+  id: string;
+  at: string;
+  amount: Money;
+  method: 'cash' | 'transfer';
+}
+
+export interface DebtHistory {
+  orders: DebtHistoryOrder[];
+  payments: DebtHistoryPayment[];
+}
+
+/** "2 Xôi gà (trứng, chả), 1 Trà đá". */
+export function debtItemsText(items: DebtItem[]): string {
+  return items
+    .map((i) => `${i.qty} ${i.name}${i.toppings.length ? ` (${i.toppings.join(', ')})` : ''}`)
+    .join(', ');
+}
+
+export interface OpenDebtOrder extends DebtHistoryOrder {
+  /** Phần còn nợ của đơn này (≤ total). */
+  remaining: Money;
+}
+
+/**
+ * Các khoản nợ còn chưa trả: tiền khách đã trả trừ dần vào đơn cũ nhất trước.
+ * Trả mới nhất ở trên.
+ */
+export function openDebtOrders(orders: DebtHistoryOrder[], paidTotal: Money): OpenDebtOrder[] {
+  let paid = Math.max(0, paidTotal);
+  const out: OpenDebtOrder[] = [];
+  for (const o of [...orders].sort((a, b) => a.paid_at.localeCompare(b.paid_at))) {
+    const used = Math.min(paid, o.total);
+    paid -= used;
+    if (o.total - used > 0) out.push({ ...o, remaining: o.total - used });
+  }
+  return out.reverse();
+}

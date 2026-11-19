@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { customerBalance, customerLabel, debtPaymentProblem, debtBalances, rootCustomerId, suggestCustomers, totalDebt, transferDebt, type DebtOrder } from './debt';
+import { customerBalance, customerLabel, debtItemsText, openDebtOrders, debtPaymentProblem, debtBalances, rootCustomerId, suggestCustomers, totalDebt, transferDebt, type DebtOrder } from './debt';
 import { foldVietnamese } from './text';
 import type { Customer } from './types';
 
@@ -91,5 +91,18 @@ describe('debt', () => {
     expect(debtPaymentProblem(0, 120_000)).toMatch('Nhập số tiền');
     expect(debtPaymentProblem(1.5, 120_000)).toMatch('Nhập số tiền');
     expect(debtPaymentProblem(10_000, 0)).toMatch('không còn nợ');
+  });
+});
+
+describe('khoản còn nợ', () => {
+  const o = (id: string, paid_at: string, total: number) => ({ id, code: id.toUpperCase(), paid_at, total, items: [] });
+  it('tiền đã trả trừ vào đơn cũ nhất trước; mới nhất ở trên', () => {
+    const orders = [o('b', '2026-11-18T01:00:00Z', 30_000), o('a', '2026-11-17T01:00:00Z', 20_000), o('c', '2026-11-19T01:00:00Z', 10_000)];
+    expect(openDebtOrders(orders, 0).map((x) => [x.id, x.remaining])).toEqual([['c', 10_000], ['b', 30_000], ['a', 20_000]]);
+    expect(openDebtOrders(orders, 25_000).map((x) => [x.id, x.remaining])).toEqual([['c', 10_000], ['b', 25_000]]);
+    expect(openDebtOrders(orders, 60_000)).toEqual([]);
+  });
+  it('món: số lượng + tên + topping', () => {
+    expect(debtItemsText([{ name: 'Xôi gà', qty: 2, toppings: ['trứng', 'chả'] }, { name: 'Trà đá', qty: 1, toppings: [] }])).toBe('2 Xôi gà (trứng, chả), 1 Trà đá');
   });
 });

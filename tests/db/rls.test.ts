@@ -168,6 +168,18 @@ describe('vai trò tablet ĐƯỢC', () => {
     expect(cfg.data).toEqual({ wait_yellow_min: 5, wait_red_min: 10, timezone: 'Asia/Ho_Chi_Minh' });
   });
 
+  it('xem lịch sử nợ của khách: ngày, mã đơn, món (dù không đọc được đơn đã thanh toán)', async () => {
+    const o = await simA.createOrder([item('xoiGa', [], 2)]);
+    await simA.pay(o.id, o.total, 'debt', { customer: { id: SEED.customers.dungPhuongB, name: 'Dũng' } });
+    const { data, error } = await tabA.rpc('customer_debt_history', { p_customer: SEED.customers.dungPhuongB });
+    expect(error).toBeNull();
+    const row = (data as { orders: Array<{ id: string; code: string; paid_at: string; total: number; items: unknown[] }> }).orders.find((x) => x.id === o.id);
+    expect(row).toMatchObject({ total: o.total, items: [{ qty: 2, toppings: [] }] });
+    expect(row!.code).toMatch(/^[A-Z0-9]{3}$/);
+    expect(row!.paid_at).toBeTruthy();
+    expect((await anonClient().rpc('customer_debt_history', { p_customer: SEED.customers.dungPhuongB })).error).not.toBeNull();
+  });
+
   it('tạo, sửa, xóa mềm đơn đang mở của mình; mở/đóng ca; thu nợ', async () => {
     const o = await simA.createOrder([item('xoiGa')]);
     expect(o.result.status).toBe('ok');

@@ -1,9 +1,12 @@
-import { Check, ChevronRight, HandCoins, UserRound } from 'lucide-react';
-import { customerLabel, suggestCustomers } from '@/domain/debt';
+import { Check, ChevronRight, HandCoins, ReceiptText, UserRound } from 'lucide-react';
+import { customerLabel, debtItemsText, openDebtOrders, suggestCustomers, type DebtHistory } from '@/domain/debt';
 import { formatVnd } from '@/domain/money';
-import type { Customer } from '@/domain/types';
-import { useMemo } from 'react';
+import { dayTime } from '@/domain/time';
+import type { Customer, Money } from '@/domain/types';
+import { useEffect, useMemo, useState } from 'react';
 import { debtBook, type DebtBook } from '@/pos';
+import { tabletStore } from '@/lib/pos';
+import { errorMessage } from '@/app/ui';
 import { useTablet } from './parts';
 
 /** Sổ nợ: khách + dư nợ từ server (tải lại ngay sau mỗi lần ghi / thu nợ, và khi máy khác thu nợ). */
@@ -96,5 +99,64 @@ export function ChosenCustomer({ book, customer, onClear }: { book: DebtBook; cu
         Đổi khách
       </button>
     </div>
+  );
+}
+
+/**
+ * Khách đang nợ những khoản nào: ngày ghi nợ, mã đơn, món, số tiền (tiền đã trả trừ vào đơn cũ nhất trước).
+ * Tải lại khi dư nợ đổi (vừa thu nợ / máy khác ghi nợ).
+ */
+export function DebtDetails({ customerId, balance }: { customerId: string; balance: Money }) {
+  const [history, setHistory] = useState<DebtHistory | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    setError(null);
+    tabletStore.api
+      .loadDebtHistory(customerId)
+      .then((h) => alive && setHistory(h))
+      .catch((e: unknown) => alive && setError(errorMessage(e)));
+    return () => {
+      alive = false;
+    };
+  }, [customerId, balance]);
+
+  if (error) return <p className="text-[15px] text-danger-strong" data-testid="debt-history-error">{error}</p>;
+  if (!history) return <p className="text-[15px] text-ink-subtle">Đang tải các khoản nợ…</p>;
+
+  const paid = history.payments.reduce((s, p) => s + p.amount, 0);
+  const open = openDebtOrders(history.orders, paid);
+  const lastPay = history.payments.at(-1);
+  if (open.length === 0 && !lastPay) return null;
+
+  return (
+    <section className="card flex flex-col p-4 md:p-5" data-testid="debt-history">
+      <h3 className="mb-1 text-base font-semibold text-ink-muted">Các khoản còn nợ</h3>
+      {open.length === 0 && <p className="py-2 text-ink-subtle">Không còn khoản nào.</p>}
+      <ul className="flex flex-col">
+        {open.map((o) => (
+          <li key={o.id} className="flex items-start gap-3 border-t border-line py-3 first:border-t-0" data-testid={`debt-open-${o.id}`}>
+            <span aria-hidden className="icon-tile mt-0.5 h-9 w-9 rounded-full bg-warning-soft text-warning-strong">
+              <ReceiptText className="h-5 w-5" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-base font-semibold">
+                {dayTime(o.paid_at)} <span className="font-normal text-ink-subtle">· đơn #<span className="font-mono">{o.code}</span></span>
+              </span>
+              <span className="block text-[15px] text-ink-muted">{debtItemsText(o.items) || '—'}</span>
+            </span>
+            <span className="num shrink-0 text-right text-base font-bold">
+              {formatVnd(o.remaining)}
+              {o.remaining < o.total && <span className="block text-[13px] font-normal text-ink-subtle">/ {formatVnd(o.total)}</span>}
+            </span>
+          </li>
+        ))}
+      </ul>
+      {lastPay && (
+        <p className="border-t border-line pt-3 text-[15px] text-ink-muted" data-testid="debt-last-payment">
+          Lần trả gần nhất: {dayTime(lastPay.at)} · {formatVnd(lastPay.amount)} ({lastPay.method === 'cash' ? 'tiền mặt' : 'chuyển khoản'})
+        </p>
+      )}
+    </section>
   );
 }

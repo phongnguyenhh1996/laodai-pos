@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { App } from '@/app/App';
 import { CANH, CHA, COMBO_XOI_FULL, COM_GA, DUA, TRUNG, XOI_GA, XOI_XEO } from '@/domain/fixtures';
+import { dayTime } from '@/domain/time';
 import { Pos, TabletStore } from '@/pos';
 import { activateDevice, resetTablet, server, useFakeServer } from '@/test-utils/tablet';
 
@@ -643,6 +644,30 @@ describe('ghi nợ & thu nợ', () => {
     click('open-debt');
     fireEvent.change(await screen.findByTestId('debt-search'), { target: { value: 'hung' } });
     expect(await screen.findByTestId(`customer-suggest-${c.id}`)).toHaveTextContent('nợ 39.000');
+  });
+
+  it('D19b: Thu nợ hiện từng khoản còn nợ: ngày giờ, mã đơn, món; trả một phần ⇒ trừ vào đơn cũ nhất', async () => {
+    await startShift();
+    await payByDebt();
+    fireEvent.change(tid('debt-name'), { target: { value: 'giao vien' } });
+    fireEvent.click(await screen.findByTestId('customer-suggest-c-gv'));
+    click('pay-debt-confirm');
+    await screen.findByTestId('queue-flash');
+    const o = server.orders.find((x) => x.customer_id === 'c-gv')!;
+
+    click('open-debt');
+    fireEvent.change(await screen.findByTestId('debt-search'), { target: { value: 'giao vien' } });
+    fireEvent.click(await screen.findByTestId('customer-suggest-c-gv'));
+    const row = await screen.findByTestId(`debt-open-${o.id}`);
+    expect(row).toHaveTextContent(`#${o.code}`);
+    expect(row).toHaveTextContent(o.items[0].name_snap);
+    expect(row).toHaveTextContent(dayTime(o.paid_at!));
+    expect(row).toHaveTextContent('39.000');
+
+    fireEvent.change(tid('debt-amount'), { target: { value: '10k' } });
+    click('debt-confirm');
+    await waitFor(() => expect(tid(`debt-open-${o.id}`)).toHaveTextContent('29.000/ 39.000'));
+    expect(tid('debt-last-payment')).toHaveTextContent('10.000 (tiền mặt)');
   });
 
   it('D19: thu nợ 50.000 tiền mặt: dư nợ giảm đúng ngay trên máy; không thu quá dư nợ', async () => {

@@ -16,3 +16,12 @@ export function hhmm(at: Date | string | number, tz = TZ): string {
 export function minutesBetween(from: Date | string | number, to: Date | string | number): number {
   return (new Date(to).getTime() - new Date(from).getTime()) / 60_000;
 }
+
+/** "Th 3 18/11 · 07:15" theo giờ Việt Nam (thứ + ngày/tháng + giờ). */
+export function dayTime(at: Date | string | number, tz = TZ): string {
+  const d = new Date(at);
+  const wd = new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'short' }).format(d);
+  const thu = { Sun: 'CN', Mon: 'Th 2', Tue: 'Th 3', Wed: 'Th 4', Thu: 'Th 5', Fri: 'Th 6', Sat: 'Th 7' }[wd] ?? '';
+  const dm = new Intl.DateTimeFormat('en-GB', { timeZone: tz, day: '2-digit', month: '2-digit' }).format(d);
+  return `${thu} ${dm} · ${hhmm(d, tz)}`;
+}

@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import type { DebtHistory } from '@/domain/debt';
 import type { Order, OrderItem } from '@/domain/types';
 import { createSupabaseCatalogSource, type CatalogData } from './catalog';
 import type { OpenState, PushResult, TabletShift, WireOp } from './types';
@@ -15,6 +16,8 @@ export interface PosBackend {
   push(op: WireOp): Promise<PushResult>;
   loadCatalog(profileId: string): Promise<CatalogData>;
   loadOpenState(profileId: string): Promise<OpenState>;
+  /** Các khoản nợ (ngày + món) và lần trả của một khách — màn Thu nợ. */
+  loadDebtHistory(customerId: string): Promise<DebtHistory>;
   /** Nghe thay đổi của hồ sơ tablet + danh mục. Trả hàm hủy đăng ký. */
   subscribe(profileId: string, onPulse: (scope: PulseScope) => void, onStatus: (s: ChannelStatus) => void): () => void;
 }
@@ -136,6 +139,12 @@ export function createSupabaseBackend(client: SupabaseClient): PosBackend {
     },
     loadCatalog: catalogSource,
     loadOpenState: (profileId) => loadOpenStateFrom(client, profileId),
+    async loadDebtHistory(customerId) {
+      const { data, error } = await client.rpc('customer_debt_history', { p_customer: customerId });
+      if (error) throw new PosNetworkError(`Không tải được lịch sử nợ: ${error.message}`, error.code ?? null);
+      if (!data) throw new PosNetworkError('Không tải được lịch sử nợ');
+      return data as DebtHistory;
+    },
     subscribe(profileId, onPulse, onStatus) {
       const openKey = `profile:${profileId}`;
       onStatus('connecting');

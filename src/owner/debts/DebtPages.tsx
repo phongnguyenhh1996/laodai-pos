@@ -4,7 +4,7 @@ import { ErrorText, Splash, TextField, errorMessage } from '@/app/ui';
 import { parseMoneyInput } from '@/domain/catalog';
 import { customerLabel, debtPaymentProblem, suggestCustomers } from '@/domain/debt';
 import { formatVnd } from '@/domain/money';
-import { hhmm } from '@/domain/time';
+import { dayTime } from '@/domain/time';
 import { useOwner } from '../OwnerContext';
 import { NavItem, NavList, OwnerLayout } from '../OwnerLayout';
 import { listDebts, loadCustomerDebt, recordOwnerDebtPayment, transferDebt, type CustomerDebt, type DebtRow } from './api';
@@ -19,8 +19,7 @@ export function DebtRoutes() {
   );
 }
 
-const day = (at: string) =>
-  new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', day: '2-digit', month: '2-digit' }).format(new Date(at)) + ' ' + hhmm(at);
+const day = (at: string) => dayTime(at);
 
 function useLoad<T>(load: () => Promise<T>) {
   const [data, setData] = useState<T | undefined>(undefined);
@@ -136,6 +135,7 @@ function CustomerBody({ d, onChanged }: { d: CustomerDebt; onChanged: () => Prom
               />
               <span className="flex-1">
                 {day(h.o.paid_at)} · Ghi nợ <b>đơn #<span className="font-mono">{h.o.code}</span></b>
+                {h.o.items && <span className="block text-ink-muted" data-testid={`debt-items-${h.o.id}`}>{h.o.items}</span>}
                 <span className="block text-sm text-ink-subtle">
                   {h.o.staff_name} – {h.o.tablet_name}
                 </span>

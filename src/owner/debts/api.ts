@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { Customer, Money } from '@/domain/types';
+import { debtItemsText } from '@/domain/debt';
+import type { Customer, Money, ToppingSnap } from '@/domain/types';
 
 /** Sổ nợ (mục 7, màn chủ số 5): khách, dư nợ, lịch sử; chuyển khoản nợ sang khách khác; ghi thu nợ. */
 
@@ -17,6 +18,8 @@ export interface DebtOrderRow {
   paid_at: string;
   tablet_name: string;
   staff_name: string;
+  /** "2 Xôi gà (trứng), 1 Trà đá". */
+  items: string;
 }
 
 export interface DebtPaymentRow {
@@ -59,7 +62,8 @@ export async function listDebts(client: SupabaseClient): Promise<DebtRow[]> {
     .sort((a, b) => b.balance - a.balance || a.customer.name.localeCompare(b.customer.name, 'vi'));
 }
 
-type RawOrder = { id: string; code: string; total: number; paid_at: string; tablet_profiles: { name: string } | null; shift: { staff: { name: string } | null } | null };
+type RawItem = { name_snap: string; qty: number; toppings_snap: ToppingSnap[]; sort: number; removed_at: string | null };
+type RawOrder = { id: string; code: string; total: number; paid_at: string; order_items: RawItem[]; tablet_profiles: { name: string } | null; shift: { staff: { name: string } | null } | null };
 type RawPayment = { id: string; amount: number; method: 'cash' | 'transfer'; at: string; shifts: { staff: { name: string } | null } | null };
 
 export async function loadCustomerDebt(client: SupabaseClient, customerId: string): Promise<CustomerDebt | null> {
@@ -67,7 +71,7 @@ export async function loadCustomerDebt(client: SupabaseClient, customerId: strin
     client.from('customers').select(CUSTOMER_COLUMNS).eq('id', customerId),
     client
       .from('orders')
-      .select('id,code,total,paid_at,tablet_profiles(name),shift:shifts!orders_paid_shift_id_fkey(staff(name))')
+      .select('id,code,total,paid_at,order_items(name_snap,qty,toppings_snap,sort,removed_at),tablet_profiles(name),shift:shifts!orders_paid_shift_id_fkey(staff(name))')
       .eq('customer_id', customerId)
       .eq('status', 'paid')
       .eq('payment_method', 'debt')
@@ -90,6 +94,12 @@ export async function loadCustomerDebt(client: SupabaseClient, customerId: strin
       paid_at: o.paid_at,
       tablet_name: o.tablet_profiles?.name ?? '',
       staff_name: o.shift?.staff?.name ?? '',
+      items: debtItemsText(
+        (o.order_items ?? [])
+          .filter((i) => !i.removed_at)
+          .sort((a, b) => a.sort - b.sort)
+          .map((i) => ({ name: i.name_snap, qty: i.qty, toppings: (i.toppings_snap ?? []).map((t) => t.name) })),
+      ),
     })),
     payments: ((pRes.data ?? []) as unknown as RawPayment[]).map((p) => ({
       id: p.id,
