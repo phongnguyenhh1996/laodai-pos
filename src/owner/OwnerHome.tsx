@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { BarChart3, BookUser, ChefHat, Clock, ReceiptText, ScrollText, Settings, Store, Timer, Trash2, Users } from 'lucide-react';
+import { BarChart3, BookUser, ChefHat, Clock, ReceiptText, ScrollText, Settings, Store, Timer, Trash2, Users, Wallet } from 'lucide-react';
 import { ErrorText, Splash, errorMessage } from '@/app/ui';
 import { useNow } from '@/app/useLive';
 import { formatVnd } from '@/domain/money';
@@ -22,12 +22,13 @@ export function OwnerHome() {
         <NavItem to="/owner/reports" testId="owner-nav-reports" icon={BarChart3} title="Báo cáo" subtitle="Doanh thu theo ngày / điểm / ca / nhân viên · đối chiếu chuyển khoản · món bán chạy" />
         <NavItem to="/owner/shifts" testId="owner-nav-shifts" icon={Users} title="Ca" subtitle="Đối soát từng ca · đơn của ca · bổ sung hộp / dĩa / tiền giữa ca" />
         <NavItem to="/owner/debts" testId="owner-nav-debts" icon={BookUser} title="Sổ nợ" subtitle="Dư nợ từng khách · lịch sử · chuyển nợ · ghi thu nợ" />
+        <NavItem to="/owner/payroll" testId="owner-nav-payroll" icon={Wallet} title="Lương" subtitle="Công theo ca · lương tháng · thưởng / trừ / ứng / trả · sinh nhật" />
         <NavItem to="/owner/log" testId="owner-nav-log" icon={ScrollText} title="Nhật ký" subtitle="Mọi thao tác: lọc theo loại / nhân viên / ngày" />
         <NavItem
           to="/owner/settings"
           testId="owner-nav-settings" icon={Settings}
           title="Cài đặt"
-          subtitle="Menu, món, topping, combo, giá · nhân viên · điểm bán · quầy"
+          subtitle="Menu, món, topping, combo, giá · nhân viên (CCCD, sinh nhật, mức lương) · điểm bán · quầy"
         />
         <NavItem to="/owner/device" testId="owner-nav-device" icon={Store} title="Quầy của máy này" subtitle={`Đang ở ${tabletName} · chuyển máy sang quầy khác`} />
       </NavList>

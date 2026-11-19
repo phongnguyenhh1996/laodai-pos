@@ -126,3 +126,14 @@ describe('nhật ký', () => {
     ]);
   });
 });
+
+describe('sổ lương', () => {
+  it('mô tả dòng ghi / hủy sổ lương', () => {
+    const after = { kind: 'days', amount: 1, month: '2026-11-01', note: 'Phụ dọn', staff_name: 'Lan' };
+    expect(describeAudit({ action: 'payroll_add', entity: 'payroll_entries', reason: null, before: null, after })).toEqual([
+      'Lan · Tháng 11/2026: Cộng / trừ ngày công +1 ngày (Phụ dọn)',
+    ]);
+    expect(actionsForFilter('owner')).toContain('payroll_void');
+    expect(actionLabel('payroll_void')).toBe('Hủy dòng sổ lương');
+  });
+});

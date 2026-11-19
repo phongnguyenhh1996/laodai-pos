@@ -106,7 +106,7 @@ describe('tablet nhận cài đặt qua danh mục', () => {
     expect(product(c, SEED.products.xoiGa).price).toBe(25000);
     expect(menuBoard(SEED.menus.xoi, c.products, c.toppings, c.combos).combos.find((x) => x.combo.id === SEED.combos.xoiGaTrung)?.price).toBe(31000);
     // Hồ sơ của tablet khác: không đọc được ⇒ không có danh mục
-    await expect(createSupabaseCatalogSource(tab)(SEED.tablets.B)).rejects.toThrow('phiên tablet không hợp lệ');
+    await expect(createSupabaseCatalogSource(tab)(SEED.tablets.B)).rejects.toThrow('phiên của máy không hợp lệ');
   });
 
   it('G37 (dữ liệu): bỏ Cơm gà khỏi tablet A ⇒ tablet A nhận ngay qua realtime, tab Cơm gà biến mất', async () => {

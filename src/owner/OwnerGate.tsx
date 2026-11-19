@@ -12,6 +12,7 @@ import { OwnerHome } from './OwnerHome';
 import { SettingsRoutes } from './settings/SettingsPages';
 import { ShiftRoutes } from './shifts/ShiftPages';
 import { DebtRoutes } from './debts/DebtPages';
+import { PayrollRoutes } from './payroll/PayrollPages';
 import { LogPage } from './log/LogPages';
 import { OrderRoutes } from './orders/OrderPages';
 import { ReportPage } from './reports/ReportPage';
@@ -26,6 +27,7 @@ function OwnerRoutes() {
       <Route path="settings/*" element={<SettingsRoutes />} />
       <Route path="shifts/*" element={<ShiftRoutes />} />
       <Route path="debts/*" element={<DebtRoutes />} />
+      <Route path="payroll/*" element={<PayrollRoutes />} />
       <Route path="log" element={<LogPage />} />
       <Route path="orders/*" element={<OrderRoutes />} />
       <Route path="reports" element={<ReportPage />} />

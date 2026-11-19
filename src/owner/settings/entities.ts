@@ -4,6 +4,7 @@ import {
   parseCountInput, parseMoneyInput,
 } from '@/domain/catalog';
 import { formatVnd } from '@/domain/money';
+import { formatDate, formatPhone, parseBirthday, parseIdNumber, parsePhone, type StaffDetails } from '@/domain/payroll';
 import { comboPrice } from '@/domain/pricing';
 import type { Combo, PointDineType, Menu, Point, Product, Staff, TabletProfile, Topping } from '@/domain/types';
 import type { OwnerCatalog, SettingsTable } from './api';
@@ -18,11 +19,16 @@ export interface Option {
 export interface FieldDef {
   key: string;
   label: string;
-  kind: 'text' | 'money' | 'count' | 'bool' | 'select' | 'multi';
+  kind: 'text' | 'money' | 'count' | 'bool' | 'select' | 'multi' | 'date';
   options?: (form: Form, cat: OwnerCatalog) => Option[];
   /** Chỉ chọn lúc tạo mới (vd. menu của món: đổi về sau làm combo / đơn cũ lệch menu). */
   createOnly?: boolean;
   hint?: string;
+  /** Ô text: bàn phím số (vd. CCCD) hoặc bàn phím điện thoại. */
+  numeric?: boolean;
+  tel?: boolean;
+  /** Tiêu đề nhóm hiện phía trên ô này. */
+  section?: string;
 }
 
 type Row = { id: string; name: string; active?: boolean };
@@ -42,6 +48,11 @@ export interface EntityDef {
   priceHistory?: 'product' | 'topping';
   /** Dòng phụ dưới form (vd. giá combo tự tính). */
   preview?(form: Form, cat: OwnerCatalog): string | null;
+  /**
+   * Phần lưu ở bảng riêng chỉ chủ đọc được (SĐT / CCCD / sinh nhật / lương ngày của nhân viên). Đọc + kiểm tra cùng lúc với `fromForm`
+   * (trước khi ghi gì); null = không đổi so với dữ liệu đang có, khỏi ghi.
+   */
+  details?(form: Form, cat: OwnerCatalog, selfId: string | null): Omit<StaffDetails, 'id'> | null;
 }
 
 // ---------------------------------------------------------------- đọc form
@@ -241,26 +252,68 @@ const combos: EntityDef = {
   },
 };
 
+const detailsOf = (c: OwnerCatalog, id: string | null | undefined) => (id ? c.staffDetails.find((d) => d.id === id) : undefined);
+
 const staff: EntityDef = {
   key: 'staff',
   table: 'staff',
   title: 'Nhân viên',
   noun: 'nhân viên',
   rows: (c) => c.staff,
-  summary: () => '',
+  summary: (r, c) => {
+    const d = detailsOf(c, r.id);
+    if (!d) return '';
+    return [
+      d.phone ? formatPhone(d.phone) : null,
+      d.day_rate ? `${formatVnd(d.day_rate)} / ngày` : null,
+      d.birthday ? `SN ${formatDate(d.birthday).slice(0, 5)}` : null,
+    ].filter(Boolean).join(' · ');
+  },
   fields: [
     { key: 'name', label: 'Tên (nhân viên chọn tên khi mở ca)', kind: 'text' },
-    SORT_FIELD,
+    { key: 'phone', label: 'Số điện thoại (tuỳ chọn)', kind: 'text', tel: true },
+    { key: 'id_number', label: 'Căn cước công dân (tuỳ chọn)', kind: 'text', numeric: true, hint: '12 số, hoặc CMND cũ 9 số. Số điện thoại, CCCD, sinh nhật, lương chỉ chủ xem được.' },
+    { key: 'birthday', label: 'Sinh nhật (tuỳ chọn)', kind: 'date' },
+    {
+      key: 'day_rate',
+      label: 'Lương một ngày',
+      kind: 'money',
+      section: 'Lương',
+      hint: 'Lương tháng = số ngày có mở ca × lương một ngày (mở nhiều ca trong ngày vẫn tính 1 ngày), chủ cộng / trừ ngày công ở màn Lương. Đổi lương ngày áp dụng cho cả tháng đang tính.',
+    },
+    { ...SORT_FIELD, section: 'Khác' },
     { key: 'active', label: 'Đang làm', kind: 'bool' },
   ],
   toForm: (r, c) => {
     const s = r as Staff | null;
-    return { name: s?.name ?? '', sort: s ? String(s.sort) : nextSort(c.staff), active: s?.active ?? true };
+    const d = detailsOf(c, s?.id);
+    return {
+      name: s?.name ?? '',
+      phone: d?.phone ? formatPhone(d.phone) : '',
+      id_number: d?.id_number ?? '',
+      birthday: d?.birthday ?? '',
+      day_rate: String(d?.day_rate ?? 0),
+      sort: s ? String(s.sort) : nextSort(c.staff),
+      active: s?.active ?? true,
+    };
   },
   fromForm: (f, c, selfId) => {
     const v: Omit<Staff, 'id'> = { name: str(f, 'name').trim(), sort: count(f, 'sort', 'Thứ tự'), active: bool(f, 'active') };
     checkStaff(v, c.staff, selfId);
     return v;
+  },
+  details: (f, c, selfId) => {
+    const v: Omit<StaffDetails, 'id'> = {
+      phone: parsePhone(str(f, 'phone')),
+      id_number: parseIdNumber(str(f, 'id_number')),
+      birthday: parseBirthday(str(f, 'birthday')),
+      day_rate: money(f, 'day_rate', 'Lương một ngày'),
+    };
+    const old = detailsOf(c, selfId);
+    const same = old
+      ? old.phone === v.phone && old.id_number === v.id_number && old.birthday === v.birthday && old.day_rate === v.day_rate
+      : v.phone === null && v.id_number === null && v.birthday === null && v.day_rate === 0;
+    return same ? null : v;
   },
 };
 

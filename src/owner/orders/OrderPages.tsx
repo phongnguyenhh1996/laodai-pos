@@ -39,7 +39,7 @@ function useCatalog(): OwnerCatalog | null {
     let alive = true;
     loadOwnerCatalog(client)
       .then((c) => alive && setCat(c))
-      .catch(() => alive && setCat({ menus: [], points: [], products: [], toppings: [], combos: [], staff: [], profiles: [] }));
+      .catch(() => alive && setCat({ menus: [], points: [], products: [], toppings: [], combos: [], staff: [], staffDetails: [], profiles: [] }));
     return () => {
       alive = false;
     };

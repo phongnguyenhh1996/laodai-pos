@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { sortCatalog } from '@/domain/catalog';
+import type { StaffDetails } from '@/domain/payroll';
 import type { Combo, Menu, Point, Product, Staff, TabletProfile, Topping } from '@/domain/types';
 
 /** Toàn bộ danh mục cho màn Cài đặt (dữ liệu nhỏ: tải hết một lần, tải lại sau mỗi lần lưu). */
@@ -10,6 +11,8 @@ export interface OwnerCatalog {
   toppings: Topping[];
   combos: Combo[];
   staff: Staff[];
+  /** SĐT, CCCD, sinh nhật, lương ngày (chỉ chủ đọc được). Nhân viên chưa có dòng = chưa nhập. */
+  staffDetails: StaffDetails[];
   profiles: TabletProfile[];
 }
 
@@ -40,7 +43,7 @@ async function rows<T>(client: SupabaseClient, table: SettingsTable): Promise<T[
 }
 
 export async function loadOwnerCatalog(client: SupabaseClient): Promise<OwnerCatalog> {
-  const [menus, points, products, toppings, combos, staff, profiles] = await Promise.all([
+  const [menus, points, products, toppings, combos, staff, profiles, staffDetails] = await Promise.all([
     rows<Menu>(client, 'menus'),
     rows<Point>(client, 'points'),
     rows<Product>(client, 'products'),
@@ -48,6 +51,7 @@ export async function loadOwnerCatalog(client: SupabaseClient): Promise<OwnerCat
     rows<Combo>(client, 'combos'),
     rows<Staff>(client, 'staff'),
     rows<TabletProfile>(client, 'tablet_profiles'),
+    loadStaffDetails(client),
   ]);
   const byName = <T extends { name: string }>(a: T, b: T) => a.name.localeCompare(b.name, 'vi');
   return {
@@ -57,6 +61,7 @@ export async function loadOwnerCatalog(client: SupabaseClient): Promise<OwnerCat
     toppings: sortCatalog(toppings),
     combos: sortCatalog(combos),
     staff: sortCatalog(staff),
+    staffDetails,
     profiles: [...profiles].sort(byName),
   };
 }
@@ -80,6 +85,23 @@ export async function saveSetting(
   const { data, error } = await client.from(table).insert(values).select('id').single();
   if (error) throw new SettingsError(friendly(error));
   return (data as { id: string }).id;
+}
+
+export const STAFF_DETAILS_COLUMNS = 'id,phone,id_number,birthday,day_rate';
+
+export async function loadStaffDetails(client: SupabaseClient): Promise<StaffDetails[]> {
+  const { data, error } = await client.from('staff_details').select(STAFF_DETAILS_COLUMNS);
+  if (error) throw new SettingsError(`Không tải được thông tin nhân viên: ${friendly(error)}`);
+  return (data ?? []) as StaffDetails[];
+}
+
+/** Ghi SĐT / CCCD / sinh nhật / lương ngày của nhân viên `id` (tạo dòng nếu chưa có). Mỗi lần ghi ⇒ nhật ký. */
+export async function saveStaffDetails(client: SupabaseClient, id: string, values: Omit<StaffDetails, 'id'>): Promise<void> {
+  const { error } = await client.from('staff_details').upsert({ id, ...values });
+  if (error) {
+    if (error.code === '23514') throw new SettingsError('Số điện thoại, căn cước công dân hoặc sinh nhật không hợp lệ');
+    throw new SettingsError(`Không lưu được thông tin nhân viên: ${friendly(error)}`);
+  }
 }
 
 export interface PriceChange {

@@ -6,7 +6,7 @@ import { formatVnd } from '@/domain/money';
 import { TZ } from '@/domain/time';
 import { useOwner } from '../OwnerContext';
 import { NavItem, NavList, OwnerLayout } from '../OwnerLayout';
-import { loadOwnerCatalog, loadPriceHistory, saveSetting, type OwnerCatalog, type PriceChange } from './api';
+import { loadOwnerCatalog, loadPriceHistory, saveSetting, saveStaffDetails, type OwnerCatalog, type PriceChange } from './api';
 import { ENTITIES, entityByKey, type EntityDef, type FieldDef, type Form, type FormValue } from './entities';
 
 /** `/owner/settings/*` (mục 7, màn chủ số 7). */
@@ -100,11 +100,11 @@ function EditorRoute() {
   const def = entityByKey(entity);
   if (!def || !id) return <Navigate to={SETTINGS} replace />;
   // Mỗi lần lưu xong điều hướng lại chính trang này ⇒ tải lại dữ liệu (kể cả lịch sử giá).
-  const saved = (loc.state as { saved?: boolean } | null)?.saved === true;
-  return <EditorLoader key={loc.key} def={def} id={id === 'new' ? null : id} saved={saved} />;
+  const state = loc.state as { saved?: boolean; error?: string } | null;
+  return <EditorLoader key={loc.key} def={def} id={id === 'new' ? null : id} saved={state?.saved === true} initialError={state?.error ?? null} />;
 }
 
-function EditorLoader({ def, id, saved }: { def: EntityDef; id: string | null; saved: boolean }) {
+function EditorLoader({ def, id, saved, initialError }: { def: EntityDef; id: string | null; saved: boolean; initialError: string | null }) {
   const { cat, error } = useOwnerCatalog();
   const title = id ? `Sửa ${def.noun}` : `Thêm ${def.noun}`;
   const back = `${SETTINGS}/${def.key}`;
@@ -114,7 +114,7 @@ function EditorLoader({ def, id, saved }: { def: EntityDef; id: string | null; s
       <ErrorText testId="settings-error">{error}</ErrorText>
       {!cat && !error && <Splash />}
       {cat && id && !row && <ErrorText testId="settings-error">Không tìm thấy {def.noun} này.</ErrorText>}
-      {cat && (!id || row) && <EntityForm def={def} cat={cat} id={id} row={row ?? null} saved={saved} />}
+      {cat && (!id || row) && <EntityForm def={def} cat={cat} id={id} row={row ?? null} saved={saved} initialError={initialError} />}
     </OwnerLayout>
   );
 }
@@ -125,18 +125,20 @@ function EntityForm({
   id,
   row,
   saved,
+  initialError,
 }: {
   def: EntityDef;
   cat: OwnerCatalog;
   id: string | null;
   row: Parameters<EntityDef['toForm']>[0];
   saved: boolean;
+  initialError: string | null;
 }) {
   const { client } = useOwner();
   const navigate = useNavigate();
   const [form, setForm] = useState<Form>(() => def.toForm(row, cat));
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(initialError);
   const [dirty, setDirty] = useState(false);
 
   const set = (key: string, value: FormValue) => {
@@ -149,17 +151,23 @@ function EntityForm({
     e.preventDefault();
     setError(null);
     let values: Record<string, unknown>;
+    let details: ReturnType<NonNullable<EntityDef['details']>> = null;
     try {
       values = def.fromForm(form, cat, id);
+      details = def.details?.(form, cat, id) ?? null;
     } catch (err) {
       setError(errorMessage(err));
       return;
     }
     setBusy(true);
+    let savedId = id;
     try {
-      const savedId = await saveSetting(client, def.table, id, values);
+      savedId = await saveSetting(client, def.table, id, values);
+      if (details) await saveStaffDetails(client, savedId, details);
       navigate(`${SETTINGS}/${def.key}/${savedId}`, { replace: true, state: { saved: true } });
     } catch (err) {
+      // Đã tạo nhân viên nhưng chưa lưu được phần thông tin riêng: sang trang sửa của nhân viên vừa tạo để lưu lại.
+      if (!id && savedId) navigate(`${SETTINGS}/${def.key}/${savedId}`, { replace: true, state: { error: errorMessage(err) } });
       setError(errorMessage(err));
       setBusy(false);
     }
@@ -175,7 +183,10 @@ function EntityForm({
         </p>
       )}
       {def.fields.map((f) => (
-        <Field key={f.key} def={f} form={form} cat={cat} disabled={busy || (f.createOnly === true && id !== null)} onChange={set} />
+        <div key={f.key} className="contents">
+          {f.section && <h2 className="mt-2 border-t border-line pt-4 text-lg font-semibold">{f.section}</h2>}
+          <Field def={f} form={form} cat={cat} disabled={busy || (f.createOnly === true && id !== null)} onChange={set} />
+        </div>
       ))}
       {preview && (
         <p data-testid="settings-preview" className="rounded-lg bg-surface-sunken px-4 py-3 text-ink">
@@ -211,7 +222,26 @@ function Field({
   switch (def.kind) {
     case 'text':
       return (
-        <TextField label={def.label} value={String(value)} disabled={disabled} maxLength={60} onChange={(e) => onChange(def.key, e.target.value)} data-testid={testId} />
+        <div className="flex flex-col gap-1">
+          <TextField
+            label={def.label}
+            value={String(value)}
+            disabled={disabled}
+            maxLength={60}
+            inputMode={def.numeric ? 'numeric' : def.tel ? 'tel' : undefined}
+            type={def.tel ? 'tel' : undefined}
+            onChange={(e) => onChange(def.key, e.target.value)}
+            data-testid={testId}
+          />
+          {hint}
+        </div>
+      );
+    case 'date':
+      return (
+        <div className="flex flex-col gap-1">
+          <TextField label={def.label} type="date" value={String(value)} disabled={disabled} onChange={(e) => onChange(def.key, e.target.value)} data-testid={testId} />
+          {hint}
+        </div>
       );
     case 'money':
     case 'count': {
