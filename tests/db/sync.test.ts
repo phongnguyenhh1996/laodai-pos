@@ -48,6 +48,40 @@ describe('sync_push', () => {
     expect(await sql(`select 1 from notifications where kind = 'delivery_order'`)).toHaveLength(3);
   });
 
+  it('đơn ship có khách: tạo khách mới cùng đơn, lưu địa chỉ gần nhất, báo Telegram kèm khách; trả tiền vẫn giữ khách', async () => {
+    const newId = '01900000-0000-7000-8000-00000000c0de';
+    const noName = await sim.createOrder([item('xoiGa')], { dine_type: 'delivery', address: '5 Hai Bà Trưng', customer: { id: newId, is_new: true, name: ' ' } });
+    expect(noName.result).toEqual({ status: 'rejected', reason: 'customer_required' });
+
+    const o = await sim.createOrder([item('xoiGa')], {
+      dine_type: 'delivery', address: '5 Hai Bà Trưng', customer: { id: newId, is_new: true, name: ' Anh Tú ', phone: '0912 345 678' },
+    });
+    expect(o.result).toMatchObject({ status: 'ok', order: { customer_id: newId } });
+    expect(await sql('select name, phone, address from customers where id = $1', [newId])).toEqual([
+      { name: 'Anh Tú', phone: '0912 345 678', address: '5 Hai Bà Trưng' },
+    ]);
+    const [n1] = await sql(`select payload from notifications where kind = 'delivery_order'`);
+    expect(n1.payload.customer).toEqual({ id: newId, label: 'Anh Tú', phone: '0912 345 678' });
+
+    // Đổi sang khách có sẵn ⇒ báo lại, địa chỉ lưu vào khách đó; đổi về mang về ⇒ bỏ khách.
+    const kept = { ...item('xoiGa'), id: (await sql('select id from order_items where order_id = $1', [o.id]))[0].id };
+    const gv = SEED.customers.dungGv;
+    await sim.update(o.id, [kept], { dine_type: 'delivery', address: '9 Pasteur', customer: { id: gv } });
+    expect(await sql('select customer_id from orders where id = $1', [o.id])).toEqual([{ customer_id: gv }]);
+    expect(await sql('select address from customers where id = $1', [gv])).toEqual([{ address: '9 Pasteur' }]);
+    expect(await sql(`select 1 from notifications where kind = 'delivery_order'`)).toHaveLength(2);
+    await sim.update(o.id, [kept], { dine_type: 'takeaway', customer: { id: gv } });
+    expect(await sql('select customer_id from orders where id = $1', [o.id])).toEqual([{ customer_id: null }]);
+
+    // Trả tiền mặt: đơn ship giữ khách, dư nợ không đổi.
+    await sim.update(o.id, [kept], { dine_type: 'delivery', address: '9 Pasteur', customer: { id: gv } });
+    expect(await sim.pay(o.id, o.total, 'cash')).toMatchObject({ status: 'ok' });
+    expect(await sql('select payment_method, customer_id from orders where id = $1', [o.id])).toEqual([
+      { payment_method: 'cash', customer_id: gv },
+    ]);
+    expect((await sql('select private.customer_balance($1) b', [gv]))[0].b).toBe(0);
+  });
+
   it('gửi lại cùng một op hai lần thì chỉ có một bản ghi', async () => {
     const o = sim.createOrderOp([item('xoiGa')]);
     expect(await push(tab, o.op)).toMatchObject({ status: 'ok' });

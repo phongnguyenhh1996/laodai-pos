@@ -35,7 +35,7 @@ export interface CustomerDebt {
   payments: DebtPaymentRow[];
 }
 
-const CUSTOMER_COLUMNS = 'id,name,description,phone,merged_into_id';
+const CUSTOMER_COLUMNS = 'id,name,description,phone,address,merged_into_id';
 
 function fail(what: string, error: { message: string }): never {
   throw new DebtsError(`Không tải được ${what}: ${error.message}`);

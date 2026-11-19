@@ -82,6 +82,27 @@ export class FakeServer {
     return this.orders.filter((o) => o.tablet_profile_id === profileId && (o.status === 'open' || o.status === 'served'));
   }
 
+  /** Khách của đơn ship (như `private.order_customer`): tạo khách mới nếu chưa có, lưu địa chỉ giao gần nhất. */
+  private shipCustomer(dine_type: string, address: string | null, raw: unknown): string | null {
+    if (dine_type !== 'delivery' || !address || !raw) return null;
+    const c = raw as { id: string; name?: string; description?: string | null; phone?: string | null };
+    const found = this.catalog.customers.find((x) => x.id === c.id);
+    if (found) {
+      found.address = address;
+      return found.id;
+    }
+    if (!c.name?.trim()) throw new Reject('customer_required');
+    this.catalog.customers.push({
+      id: c.id,
+      name: c.name.trim(),
+      description: c.description ?? null,
+      phone: c.phone ?? null,
+      address,
+      merged_into_id: null,
+    });
+    return c.id;
+  }
+
   order(id: string): Order | undefined {
     return this.orders.find((o) => o.id === id);
   }
@@ -191,6 +212,7 @@ export class FakeServer {
         if (total(items) !== o.total) throw new Reject('total_mismatch');
         if (o.dine_type === 'delivery' && !o.address) throw new Reject('address_required');
         if (this.order(o.id as string)) throw new Reject('order_exists');
+        const customer_id = this.shipCustomer(o.dine_type as string, (o.address as string | null) ?? null, p.customer);
         const mine = this.orders.filter((x) => x.tablet_profile_id === profileId);
         const order: Order = {
           id: o.id as string,
@@ -213,28 +235,30 @@ export class FakeServer {
           total: o.total as number,
           payment_method: null,
           cash_given: null,
-          customer_id: null,
+          customer_id,
           owner_edited: false,
           items: clone(items),
         };
         this.orders.push(order);
-        return { data: { order: clone(order) } };
+        return { data: { order: clone(order) }, catalog: !!customer_id };
       }
       case 'update_order': {
         const o = open(p.order_id);
         const items = p.items as OrderItem[];
         if (total(items) !== p.total) throw new Reject('total_mismatch');
         if (p.dine_type === 'delivery' && !p.address) throw new Reject('address_required');
+        const customer_id = this.shipCustomer(p.dine_type as string, p.address as string | null, p.customer);
         Object.assign(o, {
           point_id: p.point_id,
           dine_type: p.dine_type,
           address: p.address ?? null,
+          customer_id,
           label: p.label ?? null,
           table_no: p.table_no ?? null,
           items: clone(items),
           total: p.total,
         });
-        return { data: { order: clone(o) } };
+        return { data: { order: clone(o) }, catalog: !!customer_id };
       }
       case 'serve_order': {
         const o = open(p.order_id);
@@ -251,12 +275,12 @@ export class FakeServer {
         const o = open(p.order_id);
         const s = shift();
         if (p.total !== o.total) throw new Reject('total_mismatch');
-        let customer_id: string | null = null;
+        let customer_id: string | null = o.customer_id;
         if (p.method === 'cash' && (p.cash_given as number) < o.total) throw new Reject('cash_short');
         if (p.method === 'debt') {
           const c = p.customer as Customer & { is_new: boolean };
           if (!this.catalog.customers.some((x) => x.id === c.id)) {
-            this.catalog.customers.push({ id: c.id, name: c.name, description: c.description, phone: c.phone, merged_into_id: null });
+            this.catalog.customers.push({ id: c.id, name: c.name, description: c.description, phone: c.phone, address: o.address, merged_into_id: null });
           }
           customer_id = c.id;
           this.catalog.balances[c.id] = (this.catalog.balances[c.id] ?? 0) + o.total;

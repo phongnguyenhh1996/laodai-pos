@@ -8,6 +8,7 @@ import {
   canSwitchPoint,
   draftAddress,
   draftChanged,
+  draftCustomer,
   draftTotal,
   itemsSummary,
   lineSummary,
@@ -15,10 +16,13 @@ import {
   newDraft,
   replaceWithCombo,
   replaceWithProduct,
+  setCustomer,
   setDineType,
   stepLineQty,
   switchPoint,
+  toDraftCustomer,
   type CartDraft,
+  type DraftCustomer,
 } from '@/domain/cart';
 import { DELETE_REASON_LABELS } from '@/domain/audit';
 import { tabletPoints } from '@/domain/catalog';
@@ -29,6 +33,8 @@ import { pos } from '@/lib/pos';
 import { Splash, errorMessage } from '@/app/ui';
 import { MenuBoard } from './MenuBoard';
 import { Notice, Sheet, useTablet } from './parts';
+import { useDebtBook } from './debt';
+import { ShipCustomerPicker } from './ShipCustomer';
 import type { QueueFlash } from './QueueScreen';
 
 const DINE_TYPES: ReadonlyArray<{ id: DineType; Icon: typeof ShoppingBag }> = [
@@ -87,7 +93,14 @@ export function OrderScreen() {
     const x = draftRef.current!;
     const s = savedRef.current;
     setLastPointId(x.point_id);
-    const fields = { point_id: x.point_id, dine_type: x.dine_type, label: x.label, address: draftAddress(x), items: x.items };
+    const fields = {
+      point_id: x.point_id,
+      dine_type: x.dine_type,
+      label: x.label,
+      address: draftAddress(x),
+      customer: draftCustomer(x),
+      items: x.items,
+    };
     let o: Order;
     if (!s) {
       // Từ đây đơn đã có trên server (savedRef bên dưới): bước sau lỗi rồi bấm lại là sửa chứ không tạo đơn thứ hai.
@@ -138,6 +151,7 @@ export function OrderScreen() {
   }, []);
 
   const points = catalog ? tabletPoints(catalog.profile, catalog.points) : [];
+  const book = useDebtBook();
 
   /** Bản mới nhất của đơn đang sửa trên server (cập nhật realtime). */
   const remote = (saved ?? orderId) ? orders.find((o) => o.id === (saved?.id ?? orderId)) ?? null : null;
@@ -172,14 +186,24 @@ export function OrderScreen() {
   function adopt(o: Order) {
     savedRef.current = o;
     setSaved(o);
-    setDraft({
+    setDraft((prev) => ({
       point_id: o.point_id,
       dine_type: o.dine_type,
       dine_type_touched: true,
       label: o.label ?? '',
       address: o.address ?? '',
+      customer: customerOf(o, prev?.customer ?? null),
       items: o.items,
-    });
+    }));
+  }
+
+  /** Khách của đơn đã lưu, lấy từ danh sách khách (khách vừa tạo chưa có trong danh sách ⇒ giữ bản trên màn). */
+  function customerOf(o: Order, current: DraftCustomer | null): DraftCustomer | null {
+    if (!o.customer_id) return null;
+    const c = catalog?.customers.find((x) => x.id === o.customer_id);
+    if (c) return toDraftCustomer(c);
+    if (current?.id === o.customer_id) return current;
+    return { id: o.customer_id, name: 'Khách', description: null, phone: null, address: null, is_new: false };
   }
 
   // Chủ vừa bỏ điểm bán đang chọn khỏi hồ sơ tablet (danh mục mới đồng bộ về) ⇒ đơn chưa có món về điểm đầu tiên.
@@ -205,7 +229,7 @@ export function OrderScreen() {
   const point = cat.points.find((p) => p.id === d.point_id);
   const menuId = point?.menu_id ?? '';
   const total = draftTotal(d);
-  const dirty = saved ? draftChanged(d, saved) : d.items.length > 0 || d.label.trim() !== '' || d.address.trim() !== '';
+  const dirty = saved ? draftChanged(d, saved) : d.items.length > 0 || d.label.trim() !== '' || d.address.trim() !== '' || d.customer !== null;
   const empty = d.items.length === 0;
   /** Đơn ship chưa nhập địa chỉ: chưa lưu / ra món / thanh toán được. */
   const noAddress = needsAddress(d);
@@ -445,6 +469,9 @@ export function OrderScreen() {
             ))}
           </div>
           {d.dine_type === 'delivery' && (
+            <ShipCustomerPicker book={book} customer={d.customer} autoFocus={!d.address} onChange={(c) => edit((x) => setCustomer(x, c))} />
+          )}
+          {d.dine_type === 'delivery' && (
             <label className="flex shrink-0 flex-col gap-1">
               <span className="relative">
                 <MapPin aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-ink-subtle" />
@@ -452,9 +479,9 @@ export function OrderScreen() {
                   className="input min-h-[48px] pl-11 text-base"
                   aria-label="Địa chỉ giao"
                   aria-invalid={noAddress}
-                  placeholder="Địa chỉ giao, SĐT (bắt buộc)"
+                  placeholder={d.customer?.phone ? 'Địa chỉ giao (bắt buộc)' : 'Địa chỉ giao, SĐT (bắt buộc)'}
                   maxLength={200}
-                  autoFocus={!d.address}
+                  autoFocus={!d.address && !!d.customer}
                   value={d.address}
                   onChange={(e) => edit((x) => ({ ...x, address: e.target.value }))}
                   onFocus={() => setTypingAddress(true)}

@@ -138,6 +138,57 @@ describe('tạo đơn & thanh toán', () => {
     expect(create.payload).toMatchObject({ order: { dine_type: 'delivery', address: '12 Lê Lợi – 0909 123 456' } });
   });
 
+  it('đơn ship chọn khách có sẵn (như Thu nợ): điền sẵn địa chỉ, khách hiện trên thẻ, ghi nợ chọn sẵn khách đó', async () => {
+    await startShift();
+    await newOrder();
+    addProduct(XOI_GA.id, []);
+    click('order-dine-delivery');
+    fireEvent.change(tid('ship-customer-search'), { target: { value: 'hoa' } });
+    click('customer-suggest-c-hoa');
+    expect(tid('ship-customer-label')).toHaveTextContent('Cô Hoa (20 Lê Lợi)');
+    expect(tid('order-address')).toHaveValue('20 Lê Lợi, P.3');
+    click('order-save');
+    await screen.findByTestId('queue-screen');
+    const [o] = server.openOrders();
+    expect(o).toMatchObject({ dine_type: 'delivery', address: '20 Lê Lợi, P.3', customer_id: 'c-hoa' });
+    expect(server.ops.find((op) => op.kind === 'create_order')!.payload).toMatchObject({ customer: { id: 'c-hoa' } });
+    expect(await screen.findByTestId(`queue-customer-${o.id}`)).toHaveTextContent('Cô Hoa');
+
+    // Mở lại đơn: khách vẫn chọn; thanh toán ghi nợ ⇒ khách chọn sẵn.
+    click(`queue-open-${o.id}`);
+    expect(await screen.findByTestId('ship-customer-label')).toHaveTextContent('Cô Hoa');
+    click('order-pay');
+    await screen.findByTestId('pay-screen');
+    click('pay-method-debt');
+    expect(tid('customer-chosen-label')).toHaveTextContent('Cô Hoa');
+    click('pay-debt-confirm');
+    await screen.findByTestId('queue-screen');
+    expect(server.order(o.id)).toMatchObject({ status: 'paid', payment_method: 'debt', customer_id: 'c-hoa' });
+  });
+
+  it('đơn ship thêm khách mới (tên + SĐT): server tạo khách cùng đơn, lưu địa chỉ; trả tiền mặt vẫn giữ khách', async () => {
+    await startShift();
+    await newOrder();
+    addProduct(XOI_GA.id, []);
+    click('order-dine-delivery');
+    fireEvent.change(tid('ship-customer-search'), { target: { value: '0912 345 678' } });
+    click('ship-customer-new');
+    expect(tid('ship-customer-new-phone')).toHaveValue('0912 345 678');
+    expect(tid('ship-customer-new-ok')).toBeDisabled(); // tên bắt buộc
+    fireEvent.change(tid('ship-customer-new-name'), { target: { value: ' Anh Tú ' } });
+    click('ship-customer-new-ok');
+    expect(tid('ship-customer-chosen')).toHaveTextContent('Khách mới');
+    fireEvent.change(tid('order-address'), { target: { value: '5 Hai Bà Trưng' } });
+    click('order-pay-exact');
+    expect(await screen.findByTestId('queue-flash')).toHaveTextContent('Đã thu');
+    const create = server.ops.find((op) => op.kind === 'create_order')!;
+    const sent = create.payload.customer as { id: string };
+    expect(create.payload).toMatchObject({ customer: { is_new: true, name: 'Anh Tú', phone: '0912 345 678' } });
+    expect(server.catalog.customers.find((c) => c.id === sent.id)).toMatchObject({ name: 'Anh Tú', address: '5 Hai Bà Trưng' });
+    const o = server.orders.find((x) => x.id === create.entity_id)!;
+    expect(o).toMatchObject({ status: 'paid', payment_method: 'cash', customer_id: sent.id });
+  });
+
   it('đổi từ Ship về Mang về: bỏ địa chỉ', async () => {
     await startShift();
     await newOrder();

@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Bike, Check, ChefHat, Clock, Inbox, MapPin, Plus, ShoppingBag, UtensilsCrossed, Wallet, type LucideIcon } from 'lucide-react';
+import { Bike, Check, ChefHat, Clock, Inbox, MapPin, Plus, ShoppingBag, UserRound, UtensilsCrossed, Wallet, type LucideIcon } from 'lucide-react';
+import { customerLabel } from '@/domain/debt';
 import { itemsSummary } from '@/domain/cart';
 import { formatVnd } from '@/domain/money';
 import { buildQueue, type QueueCard, type WaitColor } from '@/domain/queue';
@@ -161,6 +162,10 @@ export function QueueScreen() {
   useFlip(scrollRef, `${serveSlots.map(slotKey).join(',')}|${paySlots.map(slotKey).join(',')}`);
   const pointName = (id: string) => catalog?.points.find((p) => p.id === id)?.name ?? '';
   const multiPoint = (catalog?.profile.point_ids.length ?? 0) > 1;
+  const customerName = (id: string | null) => {
+    const c = id ? catalog?.customers.find((x) => x.id === id) : undefined;
+    return c ? customerLabel(c) : null;
+  };
 
   async function serve(id: string) {
     setError(null);
@@ -180,6 +185,7 @@ export function QueueScreen() {
       leaving={exit}
       entering={!exit && entering.has(c.order.id)}
       pointName={multiPoint ? pointName(c.order.point_id) : null}
+      customerName={customerName(c.order.customer_id)}
       onOpen={() => navigate(`/order/${c.order.id}`)}
       onServe={() => void serve(c.order.id)}
       onPay={() => navigate(`/order/${c.order.id}/pay`)}
@@ -262,6 +268,7 @@ function Card({
   leaving,
   entering,
   pointName,
+  customerName,
   onOpen,
   onServe,
   onPay,
@@ -272,6 +279,8 @@ function Card({
   /** Đơn vừa vào hàng đợi: chạy hiệu ứng xuất hiện (một lần). */
   entering?: boolean;
   pointName: string | null;
+  /** Khách của đơn ship (nếu có chọn). */
+  customerName: string | null;
   onOpen: () => void;
   onServe: () => void;
   onPay: () => void;
@@ -340,6 +349,12 @@ function Card({
             {DINE_LABELS[o.dine_type]}
           </span>
         </span>
+        {o.dine_type === 'delivery' && customerName && (
+          <span className="flex items-center gap-1.5 truncate text-base font-medium text-ink" data-testid={tid('customer')}>
+            <UserRound aria-hidden className="h-4 w-4 shrink-0 text-ink-muted" />
+            <span className="truncate">{customerName}</span>
+          </span>
+        )}
         {o.dine_type === 'delivery' && o.address && (
           <span className="flex items-center gap-1.5 truncate text-base text-ink-muted" data-testid={tid('address')}>
             <MapPin aria-hidden className="h-4 w-4 shrink-0" />

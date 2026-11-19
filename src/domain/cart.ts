@@ -1,7 +1,17 @@
 // Giỏ hàng của màn tạo / sửa đơn trên tablet: thêm combo / món + topping, đổi số lượng, đổi điểm bán.
 // Hàm thuần, không đụng IndexedDB: màn đơn giữ bản nháp, chỉ ghi xuống khi bấm Lưu / Đã ra món / Thanh toán.
 import { assertQty, buildComboItem, buildItem, orderTotal } from './pricing';
-import type { Combo, DineType, Money, OrderItem, Point, Product, Topping } from './types';
+import type { Combo, Customer, DineType, Money, OrderItem, Point, Product, Topping } from './types';
+
+/** Khách của đơn ship: có trong danh sách khách, hoặc khách mới (server tạo cùng lúc lưu đơn). */
+export interface DraftCustomer {
+  id: string;
+  name: string;
+  description: string | null;
+  phone: string | null;
+  address: string | null;
+  is_new: boolean;
+}
 
 export interface CartDraft {
   point_id: string;
@@ -11,13 +21,15 @@ export interface CartDraft {
   label: string;
   /** Địa chỉ giao: chỉ dùng (và bắt buộc) khi đơn ship. */
   address: string;
+  /** Khách đơn ship (tùy chọn): chọn khách ⇒ điền sẵn địa chỉ giao gần nhất của khách. */
+  customer: DraftCustomer | null;
   items: OrderItem[];
 }
 
 export class CartError extends Error {}
 
 export function newDraft(point: Pick<Point, 'id' | 'default_dine_type'>): CartDraft {
-  return { point_id: point.id, dine_type: point.default_dine_type, dine_type_touched: false, label: '', address: '', items: [] };
+  return { point_id: point.id, dine_type: point.default_dine_type, dine_type_touched: false, label: '', address: '', customer: null, items: [] };
 }
 
 /** Hai dòng giống hệt nhau (cùng món, cùng topping, cùng giá chụp) ⇒ gộp thành một dòng tăng số lượng. */
@@ -152,6 +164,26 @@ export function draftAddress(draft: Pick<CartDraft, 'dine_type' | 'address'>): s
   return draft.dine_type === 'delivery' ? draft.address.trim() || null : null;
 }
 
+/** Khách gửi đi: chỉ đơn ship mới giữ khách. */
+export function draftCustomer(draft: Pick<CartDraft, 'dine_type' | 'customer'>): DraftCustomer | null {
+  return draft.dine_type === 'delivery' ? draft.customer : null;
+}
+
+export function toDraftCustomer(c: Customer, is_new = false): DraftCustomer {
+  return { id: c.id, name: c.name, description: c.description, phone: c.phone, address: c.address, is_new };
+}
+
+/**
+ * Chọn khách cho đơn ship. Khách có địa chỉ ⇒ điền vào ô địa chỉ khi ô còn trống
+ * hoặc đang là địa chỉ điền sẵn của khách chọn trước (không ghi đè địa chỉ nhân viên tự gõ).
+ */
+export function setCustomer(draft: CartDraft, customer: DraftCustomer | null): CartDraft {
+  const typed = draft.address.trim();
+  const autoFilled = !typed || (!!draft.customer?.address && typed === draft.customer.address.trim());
+  const address = customer?.address && autoFilled ? customer.address : draft.address;
+  return { ...draft, customer, address };
+}
+
 /** Đơn ship chưa có địa chỉ ⇒ chưa được lưu. */
 export function needsAddress(draft: Pick<CartDraft, 'dine_type' | 'address'>): boolean {
   return draft.dine_type === 'delivery' && draftAddress(draft) === null;
@@ -169,11 +201,19 @@ export function itemsSummary(items: ReadonlyArray<Pick<OrderItem, 'qty' | 'name_
 
 /** Bản nháp khác với đơn đã lưu ⇒ cần ghi `update_order`. */
 export function draftChanged(
-  draft: Pick<CartDraft, 'point_id' | 'dine_type' | 'label' | 'address' | 'items'>,
-  saved: { point_id: string; dine_type: DineType; label: string | null; address: string | null; items: readonly OrderItem[] },
+  draft: Pick<CartDraft, 'point_id' | 'dine_type' | 'label' | 'address' | 'items'> & Partial<Pick<CartDraft, 'customer'>>,
+  saved: {
+    point_id: string;
+    dine_type: DineType;
+    label: string | null;
+    address: string | null;
+    customer_id?: string | null;
+    items: readonly OrderItem[];
+  },
 ): boolean {
   if (draft.point_id !== saved.point_id || draft.dine_type !== saved.dine_type) return true;
   if (draftAddress(draft) !== (saved.address ?? null)) return true;
+  if ((draftCustomer({ dine_type: draft.dine_type, customer: draft.customer ?? null })?.id ?? null) !== (saved.customer_id ?? null)) return true;
   if ((draft.label.trim() || null) !== (saved.label ?? null)) return true;
   if (draft.items.length !== saved.items.length) return true;
   return draft.items.some((it, i) => {

@@ -94,7 +94,7 @@ describe('createSupabaseCatalogSource', () => {
     const got = await createSupabaseCatalogSource(client)('tab-a');
     expect(got.customers).toEqual(customers);
     expect(got.balances).toEqual({ c1: 45_000 });
-    expect(calls.find((c) => c.table === 'customers')?.cols).toBe('id,name,description,phone,merged_into_id');
+    expect(calls.find((c) => c.table === 'customers')?.cols).toBe('id,name,description,phone,address,merged_into_id');
     const nul = fakeClient(tables(), ok(d.config), ok(null));
     expect((await createSupabaseCatalogSource(nul.client)('tab-a')).balances).toEqual({});
     const bad = fakeClient(tables(), ok(d.config), { data: null, error: { message: 'boom' } });

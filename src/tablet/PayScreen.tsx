@@ -35,8 +35,11 @@ export function PayScreen() {
   const [debtName, setDebtName] = useState('');
   const [debtDesc, setDebtDesc] = useState('');
   const [debtPhone, setDebtPhone] = useState('');
-  const [debtCustomer, setDebtCustomer] = useState<Customer | null>(null);
   const book = useDebtBook();
+  // Đơn ship đã chọn khách ⇒ ghi nợ chọn sẵn khách đó (vẫn đổi được).
+  const [debtCustomer, setDebtCustomer] = useState<Customer | null>(
+    () => (order?.customer_id && book?.customers.find((c) => c.id === order.customer_id)) || null,
+  );
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);

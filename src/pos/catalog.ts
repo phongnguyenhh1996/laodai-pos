@@ -22,7 +22,7 @@ export interface CatalogData {
   combos: Combo[];
   staff: Staff[];
   config: TabletConfig;
-  /** Khách nợ (gợi ý khi ghi nợ / thu nợ) và dư nợ theo khách gốc. */
+  /** Danh sách khách (gợi ý khi ghi nợ / thu nợ / chọn khách đơn ship) và dư nợ theo khách gốc. */
   customers: Customer[];
   balances: Record<string, Money>;
 }
@@ -44,7 +44,7 @@ const COLUMNS = {
   toppings: 'id,menu_id,name,price,extra_box_takeaway,sort,active',
   combos: 'id,menu_id,name,product_id,topping_ids,sort,active',
   staff: 'id,name,active,sort',
-  customers: 'id,name,description,phone,merged_into_id',
+  customers: 'id,name,description,phone,address,merged_into_id',
 } as const;
 
 const PROFILE_COLUMNS = 'id,name,point_ids,default_boxes,default_plates,default_float';

@@ -89,7 +89,17 @@ export type Notification =
   | { kind: 'shift_open'; payload: Base & ShiftCtx }
   | { kind: 'shift_close'; payload: Base & ShiftCtx & { reconcile: Reconcile; adjusted: boolean } }
   | { kind: 'order_deleted'; payload: Base & ShiftCtx & { order: OrderSnap; reason: string; was_served: boolean } }
-  | { kind: 'delivery_order'; payload: Base & ShiftCtx & { order: OrderSnap; point_name: string | null; updated: boolean } }
+  | {
+      kind: 'delivery_order';
+      payload: Base &
+        ShiftCtx & {
+          order: OrderSnap;
+          point_name: string | null;
+          /** Khách đã chọn cho đơn ship (không chọn ⇒ null / không có). */
+          customer?: { id: string; label: string; phone: string | null } | null;
+          updated: boolean;
+        };
+    }
   | {
       kind: 'debt_recorded';
       payload: Base &
@@ -257,6 +267,7 @@ export function formatNotification(n: Notification, opts: FormatOptions): string
       const head = q.updated ? 'Cập nhật đơn ship' : 'Đơn ship mới';
       lines = [
         `🛵 ${head} #${q.order.code}${q.point_name ? ` – ${q.point_name}` : ''}`,
+        ...(q.customer ? [`👤 ${q.customer.label}${q.customer.phone ? ` – ${q.customer.phone}` : ''}`] : []),
         `📍 ${q.order.address ?? '(chưa có địa chỉ)'}`,
         ...(q.order.label ? [`Nhãn: ${q.order.label}`] : []),
         ...q.order.items.map(itemLine),

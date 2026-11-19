@@ -41,7 +41,7 @@ const REJECT_MESSAGES: Record<string, string> = {
   point_inactive: 'Điểm bán đã ngừng.',
   address_required: 'Đơn ship cần địa chỉ',
   cash_short: 'Khách đưa chưa đủ tiền',
-  customer_required: 'Cần tên khách ghi nợ',
+  customer_required: 'Cần tên khách',
   bad_customer: 'Không tìm thấy khách nợ.',
   bad_staff: 'Nhân viên không còn làm.',
   empty_items: 'Đơn chưa có món',
@@ -66,6 +66,30 @@ function orderAddress(dine_type: DineType, address: string | null | undefined): 
   return a;
 }
 
+/** Khách đơn ship: id có sẵn, hoặc khách mới (`is_new`, server tạo cùng lúc lưu đơn). */
+export interface OrderCustomer {
+  id: string;
+  name?: string;
+  description?: string | null;
+  phone?: string | null;
+  is_new?: boolean;
+}
+
+/** Chỉ đơn ship mới giữ khách; khách mới phải có tên. */
+function orderCustomer(dine_type: DineType, c: OrderCustomer | null | undefined): Record<string, unknown> | null {
+  if (dine_type !== 'delivery' || !c) return null;
+  if (!c.is_new) return { id: c.id };
+  const name = c.name?.trim().slice(0, 60);
+  if (!name) throw new PosError('Cần tên khách');
+  return {
+    id: c.id,
+    is_new: true,
+    name,
+    description: c.description?.trim().slice(0, 80) || null,
+    phone: c.phone?.trim().slice(0, 20) || null,
+  };
+}
+
 export interface OrderDraft {
   /** Id đơn do màn đơn giữ cố định: bấm lại sau lỗi mạng không tạo đơn thứ hai. */
   id?: string;
@@ -74,6 +98,7 @@ export interface OrderDraft {
   label?: string | null;
   table_no?: string | null;
   address?: string | null;
+  customer?: OrderCustomer | null;
   items: OrderItem[];
 }
 
@@ -211,6 +236,7 @@ export class Pos {
   async createOrder(draft: OrderDraft): Promise<Order> {
     validateItems(draft.items);
     const address = orderAddress(draft.dine_type, draft.address);
+    const customer = orderCustomer(draft.dine_type, draft.customer);
     const shift = this.shift();
     const id = draft.id ?? uuidv7();
     const order = {
@@ -223,25 +249,31 @@ export class Pos {
       opened_shift_id: shift.id,
       total: orderTotal(draft.items),
     };
-    const res = await this.send('create_order', id, () => ({ entity_id: id, payload: { order, items: draft.items } }));
-    return this.applied(res, id);
+    const res = await this.send('create_order', id, () => ({ entity_id: id, payload: { order, customer, items: draft.items } }));
+    return this.applied(res, id, !!customer?.is_new);
   }
 
   async updateOrder(
     orderId: string,
-    changes: Partial<Pick<OrderDraft, 'point_id' | 'dine_type' | 'label' | 'table_no' | 'address' | 'items'>>,
+    changes: Partial<Pick<OrderDraft, 'point_id' | 'dine_type' | 'label' | 'table_no' | 'address' | 'customer' | 'items'>>,
   ): Promise<Order> {
     if (changes.items) validateItems(changes.items);
     this.shift();
     const before = this.openOrder(orderId);
+    const { customer: changedCustomer, ...rest } = changes;
     const after: Order = {
       ...before,
-      ...changes,
+      ...rest,
       label: changes.label !== undefined ? changes.label?.trim() || null : before.label,
       table_no: changes.table_no !== undefined ? changes.table_no?.trim() || null : before.table_no,
     };
     after.address = orderAddress(after.dine_type, changes.address !== undefined ? changes.address : before.address);
     after.total = orderTotal(after.items);
+    // Không đổi khách ⇒ gửi lại khách đang có (server ghi đúng khách trong payload, bỏ khách nếu không phải đơn ship).
+    const customer = orderCustomer(
+      after.dine_type,
+      changedCustomer !== undefined ? changedCustomer : before.customer_id ? { id: before.customer_id } : null,
+    );
     const res = await this.send('update_order', orderId, () => ({
       entity_id: orderId,
       payload: {
@@ -249,13 +281,14 @@ export class Pos {
         point_id: after.point_id,
         dine_type: after.dine_type,
         address: after.address,
+        customer,
         label: after.label,
         table_no: after.table_no,
         items: after.items,
         total: after.total,
       },
     }));
-    return this.applied(res, orderId);
+    return this.applied(res, orderId, !!customer?.is_new);
   }
 
   async serveOrder(orderId: string): Promise<Order> {
@@ -332,8 +365,9 @@ export class Pos {
 
   // ---------------------------------------------------------------- nội bộ
 
-  /** Server trả đơn vừa ghi ⇒ đưa vào hàng đợi ngay. (Không có ⇒ tải lại rồi tìm.) */
-  private async applied(res: Ok, orderId: string): Promise<Order> {
+  /** Server trả đơn vừa ghi ⇒ đưa vào hàng đợi ngay. (Không có ⇒ tải lại rồi tìm.) Có khách mới ⇒ tải lại danh sách khách. */
+  private async applied(res: Ok, orderId: string, newCustomer = false): Promise<Order> {
+    if (newCustomer) await this.store.refreshCatalog();
     if (res.order) {
       this.store.applyOrder(res.order);
       return res.order;

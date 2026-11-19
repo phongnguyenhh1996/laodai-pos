@@ -66,7 +66,8 @@ export class TabletSim {
     return r;
   }
 
-  createOrderOp(items: TestItem[], extra: Record<string, unknown> = {}) {
+  /** `extra.customer` (khách đơn ship) nằm ở payload như tablet gửi; các trường khác nằm trong `order`. */
+  createOrderOp(items: TestItem[], { customer = null, ...extra }: Record<string, unknown> = {}) {
     const id = uuidv7();
     const total = items.reduce((s, it) => s + lineTotal(it), 0);
     const order = {
@@ -75,7 +76,7 @@ export class TabletSim {
       code: randomCode(), label: null, table_no: null, dine_type: 'takeaway', status: 'open',
       opened_shift_id: this.shiftId, total, ...extra,
     };
-    return { id, total, op: op('create_order', id, { order, items }) };
+    return { id, total, op: op('create_order', id, { order, customer, items }) };
   }
 
   async createOrder(items: TestItem[], extra: Record<string, unknown> = {}) {

@@ -1,4 +1,4 @@
-import { ChevronRight, HandCoins, UserRound } from 'lucide-react';
+import { Check, ChevronRight, HandCoins, UserRound } from 'lucide-react';
 import { customerLabel, suggestCustomers } from '@/domain/debt';
 import { formatVnd } from '@/domain/money';
 import type { Customer } from '@/domain/types';
@@ -12,21 +12,26 @@ export function useDebtBook(): DebtBook | null {
   return useMemo(() => (catalog ? debtBook(catalog) : null), [catalog]);
 }
 
-/** Danh sách gợi ý khách khi gõ tên / mô tả (không phân biệt dấu: "dung" khớp "Dũng"). */
+/** Danh sách gợi ý khách khi gõ tên / mô tả / SĐT (không phân biệt dấu: "dung" khớp "Dũng"). */
 export function CustomerSuggestions({
   book,
   query,
   onPick,
   showAllWithDebt = false,
+  ship = false,
+  limit,
 }: {
   book: DebtBook;
   query: string;
   onPick: (c: Customer) => void;
   /** Ô tìm còn trống ⇒ hiện sẵn các khách đang nợ (màn Thu nợ). */
   showAllWithDebt?: boolean;
+  /** Chọn khách cho đơn ship: dòng phụ SĐT · địa chỉ, chỉ hiện dư nợ khi còn nợ. */
+  ship?: boolean;
+  limit?: number;
 }) {
   const list = query.trim()
-    ? suggestCustomers(book.customers, query)
+    ? suggestCustomers(book.customers, query, limit)
     : showAllWithDebt
       ? book.customers.filter((c) => book.balance(c.id) > 0).sort((a, b) => a.name.localeCompare(b.name, 'vi'))
       : [];
@@ -44,16 +49,27 @@ export function CustomerSuggestions({
             <span aria-hidden className="icon-tile h-10 w-10 rounded-full bg-warning-soft text-warning-strong">
               <UserRound className="h-5 w-5" />
             </span>
-            <span className="min-w-0 flex-1 truncate text-base font-semibold">{customerLabel(c)}</span>
-            <span className="num shrink-0 text-base font-bold">
-              <span className="text-[13px] font-normal text-ink-subtle">nợ </span>
-              {formatVnd(book.balance(c.id))}
-            </span>
+            {ship ? (
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="truncate text-base font-semibold">{customerLabel(c)}</span>
+                {(c.phone || c.address) && (
+                  <span className="truncate text-sm text-ink-muted">{[c.phone, c.address].filter(Boolean).join(' · ')}</span>
+                )}
+              </span>
+            ) : (
+              <span className="min-w-0 flex-1 truncate text-base font-semibold">{customerLabel(c)}</span>
+            )}
+            {(!ship || book.balance(c.id) > 0) && (
+              <span className="num shrink-0 text-base font-bold">
+                <span className="text-[13px] font-normal text-ink-subtle">nợ </span>
+                {formatVnd(book.balance(c.id))}
+              </span>
+            )}
             <span className="badge shrink-0 gap-1 rounded-[10px] border border-brand bg-brand-soft px-2.5 py-1.5 text-[13px] font-semibold text-brand-deep">
-              <HandCoins aria-hidden className="h-4 w-4" />
+              {ship ? <Check aria-hidden className="h-4 w-4" /> : <HandCoins aria-hidden className="h-4 w-4" />}
               Chọn
             </span>
-            <ChevronRight aria-hidden className="hidden h-5 w-5 shrink-0 text-ink-subtle md:block" />
+            {!ship && <ChevronRight aria-hidden className="hidden h-5 w-5 shrink-0 text-ink-subtle md:block" />}
           </button>
         </li>
       ))}

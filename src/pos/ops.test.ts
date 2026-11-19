@@ -275,8 +275,8 @@ describe('debtBook', () => {
   it('bỏ khách bị gộp; dư nợ theo khách gốc; không có danh mục ⇒ sổ rỗng', () => {
     const book = debtBook({
       customers: [
-        { id: 'a', name: 'A', description: null, phone: null, merged_into_id: null },
-        { id: 'b', name: 'B', description: null, phone: null, merged_into_id: 'a' },
+        { id: 'a', name: 'A', description: null, phone: null, address: null, merged_into_id: null },
+        { id: 'b', name: 'B', description: null, phone: null, address: null, merged_into_id: 'a' },
       ],
       balances: { a: 5000 },
     });

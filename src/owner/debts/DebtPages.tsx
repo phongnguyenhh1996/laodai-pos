@@ -120,6 +120,7 @@ function CustomerBody({ d, onChanged }: { d: CustomerDebt; onChanged: () => Prom
         </b>
       </p>
       {d.customer.phone && <p className="text-ink-muted">SĐT: {d.customer.phone}</p>}
+      {d.customer.address && <p className="text-ink-muted">Địa chỉ giao gần nhất: {d.customer.address}</p>}
 
       <Card title="Lịch sử">
         {history.length === 0 && <p className="text-ink-subtle">Chưa có.</p>}

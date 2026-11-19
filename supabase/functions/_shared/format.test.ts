@@ -105,6 +105,20 @@ describe('định dạng Telegram', () => {
     expect(nextDay).toContain('Thực hiện: 05:42 18/11 · Đồng bộ: 08:00 19/11');
   });
 
+  it('đơn ship có chọn khách: hiện tên + SĐT khách trên địa chỉ', () => {
+    const msg = formatNotification(
+      {
+        kind: 'delivery_order',
+        payload: {
+          ...base, ...ctx, order: { ...order, status: 'open', dine_type: 'delivery', address: '12 Lê Lợi' }, point_name: 'Xôi A',
+          customer: { id: 'c1', label: 'Dũng (giáo viên)', phone: '0909 123 456' }, updated: false,
+        },
+      },
+      opts,
+    );
+    expect(msg).toContain('👤 Dũng (giáo viên) – 0909 123 456\n📍 12 Lê Lợi');
+  });
+
   it('mỗi tin có link mở thẳng chi tiết trong app chủ', () => {
     for (const s of samples) expect(formatNotification(s, opts)).toMatch(/🔗 https:\/\/pos\.laodai\.vn\/owner\/\S+$/);
   });

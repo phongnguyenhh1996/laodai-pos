@@ -120,6 +120,7 @@ export interface Order {
   total: Money;
   payment_method: PaymentMethod | null;
   cash_given: Money | null;
+  /** Khách ghi nợ, hoặc khách của đơn ship (giữ cả khi trả tiền mặt / chuyển khoản). */
   customer_id: string | null;
   owner_edited: boolean;
   items: OrderItem[];
@@ -155,6 +156,8 @@ export interface Customer {
   name: string;
   description: string | null;
   phone: string | null;
+  /** Địa chỉ giao gần nhất (đơn ship): chọn khách ⇒ điền sẵn. */
+  address: string | null;
   merged_into_id: string | null;
 }
 

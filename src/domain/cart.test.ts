@@ -14,8 +14,10 @@ import {
   newDraft,
   replaceWithCombo,
   replaceWithProduct,
+  setCustomer,
   setDineType,
   setLineQty,
+  type DraftCustomer,
   stepLineQty,
   switchPoint,
 } from './cart';
@@ -181,5 +183,22 @@ describe('cart', () => {
     expect(draftChanged({ ...ship, address: '12 Lê Lợi ' }, saved)).toBe(false);
     expect(draftChanged({ ...ship, address: '14 Lê Lợi' }, saved)).toBe(true);
     expect(draftChanged({ ...d, address: '12 Lê Lợi' }, saved)).toBe(true);
+  });
+
+  it('khách đơn ship: chọn khách điền sẵn địa chỉ (không đè địa chỉ tự gõ); đổi khách ⇒ có thay đổi; không phải ship ⇒ bỏ khách', () => {
+    const hoa: DraftCustomer = { id: 'c-hoa', name: 'Cô Hoa', description: null, phone: null, address: '20 Lê Lợi', is_new: false };
+    const tu: DraftCustomer = { id: 'c-tu', name: 'Tú', description: null, phone: null, address: '5 Hai Bà Trưng', is_new: false };
+    const ship = setDineType({ ...newDraft(XOI_A), items: [] }, 'delivery');
+    const a = setCustomer(ship, hoa);
+    expect(a.address).toBe('20 Lê Lợi');
+    expect(setCustomer(a, tu).address).toBe('5 Hai Bà Trưng'); // địa chỉ điền sẵn ⇒ theo khách mới
+    expect(setCustomer({ ...a, address: '7 Pasteur' }, tu).address).toBe('7 Pasteur'); // tự gõ ⇒ giữ
+    expect(setCustomer(a, null)).toMatchObject({ customer: null, address: '20 Lê Lợi' });
+
+    const saved = { point_id: 'xoi-a', dine_type: 'delivery' as DineType, label: null, address: '20 Lê Lợi', customer_id: 'c-hoa', items: [] };
+    expect(draftChanged(a, saved)).toBe(false);
+    expect(draftChanged({ ...a, customer: tu }, saved)).toBe(true);
+    expect(draftChanged({ ...a, customer: null }, saved)).toBe(true);
+    expect(draftChanged(setDineType(a, 'takeaway'), { ...saved, dine_type: 'takeaway', address: null, customer_id: null })).toBe(false);
   });
 });

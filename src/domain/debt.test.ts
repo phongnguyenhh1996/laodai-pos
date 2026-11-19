@@ -4,7 +4,7 @@ import { foldVietnamese } from './text';
 import type { Customer } from './types';
 
 const C = (id: string, name: string, description: string | null = null, merged_into_id: string | null = null, phone: string | null = null): Customer =>
-  ({ id, name, description, phone, merged_into_id });
+  ({ id, name, description, phone, address: null, merged_into_id });
 
 const customers = [
   C('c1', 'Dũng', 'giáo viên'),
