@@ -5,13 +5,13 @@ import { ErrorText, Splash, TextField, errorMessage } from '@/app/ui';
 import { parseMoneyInput } from '@/domain/catalog';
 import { formatVnd } from '@/domain/money';
 import {
-  DAY_OFF_REASON_MAX, PAYROLL_KIND_LABELS, PAYROLL_KIND_SHORT, computePayslip, daysUntilBirthday, formatDate, formatMinutes, formatPhone, isMonth, monthGrid,
-  monthLabel, monthOf, parseDayOffReason, parseDaysInput, shiftMonth, workDays, type DayOff, type PayrollEntry, type PayrollKind, type Payslip,
+  DAY_MARK_REASON_MAX, PAYROLL_KIND_LABELS, PAYROLL_KIND_SHORT, computePayslip, daysUntilBirthday, formatDate, formatMinutes, formatPhone, isMonth, monthGrid,
+  monthLabel, monthOf, parseDayMarkReason, parseDaysInput, shiftMonth, workDays, type DayMark, type DayMarkKind, type PayrollEntry, type PayrollKind, type Payslip,
 } from '@/domain/payroll';
 import { businessDate, hhmm, minutesBetween } from '@/domain/time';
 import { useOwner } from '../OwnerContext';
 import { OwnerLayout } from '../OwnerLayout';
-import { addDayOff, addPayrollEntry, loadPayrollMonth, removeDayOff, updateDayOffReason, voidPayrollEntry, type PayrollMonth } from './api';
+import { addDayMark, addPayrollEntry, loadPayrollMonth, removeDayMark, updateDayMark, voidPayrollEntry, type PayrollMonth } from './api';
 
 /** `/owner/payroll/*?m=YYYY-MM`: lương tháng của từng nhân viên. */
 export function PayrollRoutes() {
@@ -86,7 +86,7 @@ function PayrollList() {
 
   const rows = data
     ? data.staff
-        .map((s) => ({ s, p: computePayslip(data.details.find((d) => d.id === s.id) ?? null, data.shifts.filter((x) => x.staff_id === s.id), data.entries.filter((e) => e.staff_id === s.id), ym) }))
+        .map((s) => ({ s, p: computePayslip(data.details.find((d) => d.id === s.id) ?? null, data.shifts.filter((x) => x.staff_id === s.id), data.entries.filter((e) => e.staff_id === s.id), ym, data.marks.filter((m) => m.staff_id === s.id)) }))
         // Nhân viên nghỉ việc chỉ hiện ở tháng họ còn có ca / sổ lương.
         .filter(({ s, p }) => s.active || p.shifts > 0 || p.total !== 0 || p.advance + p.payment > 0)
     : [];
@@ -193,7 +193,7 @@ function StaffPayroll() {
 
   const s = data?.staff.find((x) => x.id === staffId);
   const details = data?.details.find((d) => d.id === staffId) ?? null;
-  const p = data && computePayslip(details, data.shifts, data.entries, ym);
+  const p = data && computePayslip(details, data.shifts, data.entries, ym, data.marks);
 
   async function voidEntry(e: PayrollEntry) {
     if (!window.confirm(`Hủy dòng "${PAYROLL_KIND_LABELS[e.kind]} ${amountLabel(e)}"?`)) return;
@@ -256,11 +256,14 @@ function StaffPayroll() {
 }
 
 function WorkRows({ p }: { p: Payslip }) {
-  const adj = p.days - p.shiftDays;
+  const adj = p.days - p.shiftDays - p.markedDays;
+  const parts = [`có ca ${p.shiftDays}`];
+  if (p.markedDays) parts.push(`đánh có làm ${p.markedDays}`);
+  if (adj) parts.push(`chỉnh ${adj > 0 ? '+' : ''}${adj}`);
   return (
     <>
       <Row label="Số ca" value={`${p.shifts} ca`} testId="payslip-shifts" />
-      <Row label="Ngày công" value={`${p.days} ngày${adj ? ` (có ca ${p.shiftDays}, chỉnh ${adj > 0 ? '+' : ''}${adj})` : ''}`} testId="payslip-days" />
+      <Row label="Ngày công" value={`${p.days} ngày${parts.length > 1 ? ` (${parts.join(', ')})` : ''}`} testId="payslip-days" />
     </>
   );
 }
@@ -412,8 +415,8 @@ const WEEKDAY_NAMES = ['Chủ nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Th
 const weekdayName = (ymd: string) => WEEKDAY_NAMES[new Date(`${ymd}T00:00:00Z`).getUTCDay()];
 
 /**
- * Lịch tháng: ngày có mở ca tô màu (kèm tổng giờ), ngày chủ đánh nghỉ tô vàng.
- * Bấm một ngày để xem các ca của ngày đó, hoặc đánh / bỏ ngày nghỉ (kèm lý do không bắt buộc).
+ * Lịch tháng: ngày có mở ca tô màu (kèm tổng giờ), ngày chủ đánh "có làm" viền đứt (+1 công), đánh nghỉ tô vàng.
+ * Bấm một ngày để xem các ca của ngày đó, hoặc đánh / đổi / bỏ đánh dấu (kèm lý do không bắt buộc).
  */
 function WorkCalendar({
   data,
@@ -435,10 +438,11 @@ function WorkCalendar({
   const today = businessDate(new Date());
   const weeks = monthGrid(ym);
   const work = workDays(data.shifts);
-  const offs = new Map(data.daysOff.map((o) => [o.day, o]));
-  const elapsed = weeks.flat().filter((d): d is string => !!d && d <= today).length;
-  const off = Math.max(0, elapsed - p.shiftDays);
-  const adj = p.days - p.shiftDays;
+  const marks = new Map(data.marks.map((m) => [m.day, m]));
+  const offCount = data.marks.filter((m) => m.kind === 'off').length;
+  // Ngày đã qua không có ca, cũng không đánh "có làm".
+  const idle = weeks.flat().filter((d): d is string => !!d && d <= today && !work.has(d) && marks.get(d)?.kind !== 'work').length;
+  const adj = p.days - p.shiftDays - p.markedDays;
   // Sinh nhật rơi vào tháng đang xem (29/2 ở năm không nhuận thì không có ô ⇒ bỏ).
   const bdayCell = birthday && birthday.slice(5, 7) === ym.slice(5) ? `${ym}-${birthday.slice(8)}` : null;
   const bday = bdayCell && weeks.flat().includes(bdayCell) ? bdayCell : null;
@@ -447,20 +451,31 @@ function WorkCalendar({
   return (
     <Card title="Lịch làm việc">
       <p className="text-sm text-ink-muted" data-testid="payroll-calendar-summary">
-        Đi làm <b className="text-ink">{p.shiftDays} ngày</b>
-        {elapsed > 0 && <> · không có ca {off} ngày</>}
-        {ym === today.slice(0, 7) && ' (tính tới hôm nay)'}
-        {data.daysOff.length > 0 && (
+        Có ca <b className="text-ink">{p.shiftDays} ngày</b>
+        {p.markedDays > 0 && (
           <>
-            {' · '}đánh nghỉ <b className="text-warning-strong">{data.daysOff.length} ngày</b>
+            {' · '}đánh có làm <b className="text-brand-strong">{p.markedDays} ngày</b>
           </>
         )}
         {adj !== 0 && (
           <>
             {' · '}chủ chỉnh {adj > 0 ? '+' : ''}
-            {adj} ⇒ <b className="text-ink">{p.days} ngày công</b>
+            {adj}
           </>
         )}
+        {(p.markedDays > 0 || adj !== 0) && (
+          <>
+            {' ⇒ '}
+            <b className="text-ink">{p.days} ngày công</b>
+          </>
+        )}
+        {offCount > 0 && (
+          <>
+            {' · '}đánh nghỉ <b className="text-warning-strong">{offCount} ngày</b>
+          </>
+        )}
+        {idle > 0 && <> · không có ca {idle} ngày</>}
+        {ym === today.slice(0, 7) && ' (tính tới hôm nay)'}
       </p>
       <div className="grid grid-cols-7 gap-1 text-center" role="grid" aria-label={`Lịch ${monthLabel(ym).toLowerCase()}`} data-testid="payroll-calendar">
         {WEEKDAYS.map((w, i) => (
@@ -471,7 +486,9 @@ function WorkCalendar({
         {weeks.flat().map((d, i) => {
           if (!d) return <span key={`x${i}`} aria-hidden />;
           const w = work.get(d);
-          const o = offs.get(d);
+          const mk = marks.get(d);
+          const o = mk?.kind === 'off' ? mk : undefined;
+          const extra = mk?.kind === 'work' && !w ? mk : undefined; // có làm, không mở ca ⇒ +1 công
           const future = d > today;
           const selected = picked === d;
           const isBday = d === bday;
@@ -479,7 +496,9 @@ function WorkCalendar({
             ? 'border-brand-strong bg-brand text-white'
             : w
               ? 'border-brand-line bg-brand-soft text-brand-deep hover:border-brand-strong'
-              : o
+              : extra
+                ? 'border-dashed border-brand bg-brand-soft/60 text-brand-deep hover:border-brand-strong'
+                : o
                 ? 'border-warning-line bg-warning-soft text-warning-strong hover:border-warning-strong'
                 : isBday
                   ? 'border-danger-line text-danger-strong hover:bg-surface-muted'
@@ -489,7 +508,7 @@ function WorkCalendar({
           const label = [
             formatDate(d),
             w ? `${w.shifts} ca, ${formatMinutes(w.minutes)}${w.open ? ', đang mở' : ''}` : '',
-            o ? `đánh nghỉ${o.reason ? `: ${o.reason}` : ''}` : '',
+            mk ? `đánh ${mk.kind === 'off' ? 'nghỉ' : 'có làm'}${mk.reason ? `: ${mk.reason}` : ''}` : '',
             isBday ? 'sinh nhật' : '',
           ]
             .filter(Boolean)
@@ -501,16 +520,16 @@ function WorkCalendar({
               role="gridcell"
               aria-label={label}
               aria-selected={selected}
-              title={o?.reason ?? undefined}
+              title={mk?.reason ?? undefined}
               onClick={() => setPicked(selected ? null : d)}
               className={`relative flex min-h-[52px] flex-col items-center justify-center rounded-lg border transition-colors duration-fast ${tone} ${
                 d === today ? 'ring-2 ring-brand ring-offset-1 ring-offset-surface' : ''
               }`}
               data-testid={`payroll-day-${d}`}
               data-worked={w ? true : undefined}
-              data-off={o ? true : undefined}
+              data-mark={mk?.kind}
             >
-              <span className={`num text-base leading-none ${w || o ? 'font-bold' : ''}`}>{Number(d.slice(8))}</span>
+              <span className={`num text-base leading-none ${w || mk ? 'font-bold' : ''}`}>{Number(d.slice(8))}</span>
               {w ? (
                 <span className={`num mt-1 whitespace-nowrap text-[11px] leading-none ${selected ? 'text-white/90' : 'text-brand-strong'}`}>
                   {w.open ? (
@@ -523,9 +542,13 @@ function WorkCalendar({
                   {w.shifts > 1 && !w.open ? ` · ${w.shifts}` : ''}
                 </span>
               ) : (
-                o && <span className={`mt-1 text-[11px] leading-none ${selected ? 'text-white/90' : ''}`}>nghỉ</span>
+                mk && (
+                  <span className={`mt-1 text-[11px] leading-none ${selected ? 'text-white/90' : mk.kind === 'work' ? 'text-brand-strong' : ''}`}>
+                    {mk.kind === 'off' ? 'nghỉ' : 'làm'}
+                  </span>
+                )
               )}
-              {w && o && <span aria-hidden className="absolute bottom-1 left-1 h-1.5 w-1.5 rounded-full bg-warning" />}
+              {w && mk && <span aria-hidden className={`absolute bottom-1 left-1 h-1.5 w-1.5 rounded-full ${mk.kind === 'off' ? 'bg-warning' : 'bg-brand'}`} />}
               {isBday && <Cake aria-hidden className={`absolute right-0.5 top-0.5 h-3 w-3 sm:h-3.5 sm:w-3.5 ${selected ? 'text-white' : 'text-danger-strong'}`} />}
             </button>
           );
@@ -534,6 +557,9 @@ function WorkCalendar({
       <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-subtle">
         <span className="flex items-center gap-1.5">
           <span aria-hidden className="h-3 w-3 rounded border border-brand-line bg-brand-soft" /> Có mở ca (tổng giờ · số ca)
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span aria-hidden className="h-3 w-3 rounded border border-dashed border-brand bg-brand-soft/60" /> Đánh có làm (+1 công)
         </span>
         <span className="flex items-center gap-1.5">
           <span aria-hidden className="h-3 w-3 rounded border border-warning-line bg-warning-soft" /> Đánh nghỉ
@@ -559,11 +585,11 @@ function WorkCalendar({
             Xem cả tháng
           </button>
         ) : (
-          <span className="text-sm text-ink-subtle">Bấm vào ngày để xem ca / đánh nghỉ</span>
+          <span className="text-sm text-ink-subtle">Bấm vào ngày để xem ca / đánh nghỉ, có làm</span>
         )}
       </div>
       {picked && (
-        <DayOffForm key={`${picked}:${offs.get(picked)?.id ?? ''}`} staffId={staffId} day={picked} dayOff={offs.get(picked) ?? null} hasShifts={shifts.length > 0} onSaved={onChanged} />
+        <DayMarkForm key={`${picked}:${marks.get(picked)?.id ?? ''}`} staffId={staffId} day={picked} mark={marks.get(picked) ?? null} hasShifts={shifts.length > 0} onSaved={onChanged} />
       )}
       {!picked && shifts.length === 0 && <p className="text-ink-subtle">Không có ca nào.</p>}
       {shifts.length > 0 && (
@@ -590,24 +616,32 @@ function WorkCalendar({
   );
 }
 
-const REASON_CHIPS = ['Có phép', 'Không phép', 'Ốm', 'Việc nhà'];
+const REASON_CHIPS: Record<DayMarkKind, string[]> = {
+  off: ['Có phép', 'Không phép', 'Ốm', 'Việc nhà'],
+  work: ['Quên mở ca', 'Đi chợ / lấy hàng', 'Làm ở bếp'],
+};
+const MARK_KINDS: DayMarkKind[] = ['off', 'work'];
 
-/** Đánh / sửa lý do / bỏ ngày nghỉ của một ngày. Ngày nghỉ chỉ để ghi nhận, lương vẫn tính theo ngày có mở ca. */
-function DayOffForm({
+/**
+ * Đánh dấu một ngày: "Nghỉ" (chỉ ghi nhận) hoặc "Có làm" (làm mà không mở ca ⇒ +1 ngày công); lý do / ghi chú không bắt buộc.
+ * Ngày đã có ca thì không cần đánh dấu (chỉ hiện khi ngày đó đã lỡ đánh trước để còn bỏ / sửa).
+ */
+function DayMarkForm({
   staffId,
   day,
-  dayOff,
+  mark,
   hasShifts,
   onSaved,
 }: {
   staffId: string;
   day: string;
-  dayOff: DayOff | null;
+  mark: DayMark | null;
   hasShifts: boolean;
   onSaved: () => Promise<void>;
 }) {
   const { client } = useOwner();
-  const [reason, setReason] = useState(dayOff?.reason ?? '');
+  const [kind, setKind] = useState<DayMarkKind>(mark?.kind ?? 'off');
+  const [reason, setReason] = useState(mark?.reason ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -627,71 +661,81 @@ function DayOffForm({
   function submit(e: FormEvent) {
     e.preventDefault();
     void run(async () => {
-      const r = parseDayOffReason(reason);
-      if (dayOff) await updateDayOffReason(client, dayOff.id, r);
-      else await addDayOff(client, staffId, day, r);
+      const r = parseDayMarkReason(reason);
+      if (mark) await updateDayMark(client, mark.id, { kind, reason: r });
+      else await addDayMark(client, staffId, day, kind, r);
     });
   }
 
-  // Ngày có ca mà chưa đánh nghỉ: chỉ xem ca.
-  if (hasShifts && !dayOff) return null;
+  // Ngày có ca mà chưa đánh dấu: chỉ xem ca.
+  if (hasShifts && !mark) return null;
 
-  const changed = (parseSafe(reason) ?? null) !== (dayOff?.reason ?? null);
+  const changed = !mark || kind !== mark.kind || (parseSafe(reason) ?? null) !== (mark.reason ?? null);
+  const dd = formatDate(day).slice(0, 5);
+  const tone = mark?.kind === 'work' ? 'border-brand-line bg-brand-tint' : mark ? 'border-warning-line bg-warning-tint' : 'border-line bg-surface-muted';
   return (
-    <form
-      className={`flex flex-col gap-3 rounded-lg border p-3 ${dayOff ? 'border-warning-line bg-warning-tint' : 'border-line bg-surface-muted'}`}
-      onSubmit={submit}
-      data-testid="payroll-dayoff"
-    >
-      {dayOff ? (
-        <p className="font-medium text-warning-strong" data-testid="payroll-dayoff-status">
-          Đã đánh nghỉ{dayOff.reason ? ` · ${dayOff.reason}` : ''}
-          {hasShifts && <span className="block text-sm font-normal text-ink-muted">Ngày này vẫn có mở ca nên vẫn tính 1 ngày công.</span>}
+    <form className={`flex flex-col gap-3 rounded-lg border p-3 ${tone}`} onSubmit={submit} data-testid="payroll-daymark">
+      {mark ? (
+        <p className={`font-medium ${mark.kind === 'work' ? 'text-brand-deep' : 'text-warning-strong'}`} data-testid="payroll-daymark-status">
+          Đã đánh {mark.kind === 'work' ? 'có làm' : 'nghỉ'}
+          {mark.reason ? ` · ${mark.reason}` : ''}
+          {hasShifts && <span className="block text-sm font-normal text-ink-muted">Ngày này có mở ca nên đã tính 1 ngày công theo ca.</span>}
         </p>
       ) : (
-        <p className="text-sm text-ink-muted">Không có ca. Đánh ngày nghỉ để ghi nhận (không đổi lương).</p>
+        <p className="text-sm text-ink-muted">Không có ca. Đánh nghỉ để ghi nhận, hoặc đánh có làm nếu làm mà không mở ca (+1 ngày công).</p>
       )}
+      <div className="grid grid-cols-2 gap-2" role="group" aria-label="Loại">
+        {MARK_KINDS.map((k) => (
+          <button
+            key={k}
+            type="button"
+            aria-pressed={kind === k}
+            className="btn btn-choice"
+            onClick={() => {
+              if (kind !== k && REASON_CHIPS[kind].includes(reason.trim())) setReason('');
+              setKind(k);
+            }}
+            data-testid={`payroll-daymark-kind-${k}`}
+          >
+            {k === 'off' ? 'Nghỉ' : 'Có làm (+1 công)'}
+          </button>
+        ))}
+      </div>
       <div className="flex flex-wrap gap-2" role="group" aria-label="Lý do nhanh">
-        {REASON_CHIPS.map((c) => (
+        {REASON_CHIPS[kind].map((c) => (
           <button
             key={c}
             type="button"
             className="btn btn-choice min-h-0 px-3 py-1.5 text-sm"
             aria-pressed={reason.trim() === c}
             onClick={() => setReason(reason.trim() === c ? '' : c)}
-            data-testid="payroll-dayoff-chip"
+            data-testid="payroll-daymark-chip"
           >
             {c}
           </button>
         ))}
       </div>
       <TextField
-        label="Lý do (không bắt buộc)"
+        label={kind === 'off' ? 'Lý do (không bắt buộc)' : 'Ghi chú (không bắt buộc)'}
         value={reason}
-        maxLength={DAY_OFF_REASON_MAX}
+        maxLength={DAY_MARK_REASON_MAX}
         onChange={(e) => setReason(e.target.value)}
-        data-testid="payroll-dayoff-reason"
+        data-testid="payroll-daymark-reason"
       />
-      <ErrorText testId="payroll-dayoff-error">{error}</ErrorText>
+      <ErrorText testId="payroll-daymark-error">{error}</ErrorText>
       <div className="flex flex-col gap-2 sm:flex-row">
-        {dayOff ? (
-          <>
-            <button type="submit" className="btn btn-primary flex-1" disabled={busy || !changed} data-testid="payroll-dayoff-save">
-              Lưu lý do
-            </button>
-            <button
-              type="button"
-              className="btn btn-secondary flex-1"
-              disabled={busy}
-              onClick={() => void run(() => removeDayOff(client, dayOff.id))}
-              data-testid="payroll-dayoff-remove"
-            >
-              Bỏ ngày nghỉ
-            </button>
-          </>
-        ) : (
-          <button type="submit" className="btn btn-primary flex-1" disabled={busy} data-testid="payroll-dayoff-add">
-            Đánh ngày nghỉ {formatDate(day).slice(0, 5)}
+        <button type="submit" className="btn btn-primary flex-1" disabled={busy || !changed} data-testid="payroll-daymark-save">
+          {mark ? 'Lưu' : kind === 'off' ? `Đánh nghỉ ${dd}` : `Đánh có làm ${dd}`}
+        </button>
+        {mark && (
+          <button
+            type="button"
+            className="btn btn-secondary flex-1"
+            disabled={busy}
+            onClick={() => void run(() => removeDayMark(client, mark.id))}
+            data-testid="payroll-daymark-remove"
+          >
+            Bỏ đánh dấu
           </button>
         )}
       </div>
@@ -701,7 +745,7 @@ function DayOffForm({
 
 function parseSafe(raw: string): string | null | undefined {
   try {
-    return parseDayOffReason(raw);
+    return parseDayMarkReason(raw);
   } catch {
     return undefined;
   }

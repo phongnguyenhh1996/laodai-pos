@@ -2,7 +2,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { computePayslip, monthOf, shiftMonth } from '@/domain/payroll';
-import { addDayOff, addPayrollEntry, loadPayrollMonth, removeDayOff, updateDayOffReason, voidPayrollEntry } from '@/owner/payroll/api';
+import { addDayMark, addPayrollEntry, loadPayrollMonth, removeDayMark, updateDayMark, voidPayrollEntry } from '@/owner/payroll/api';
 import { loadOwnerCatalog, saveStaffDetails } from '@/owner/settings/api';
 import { ownerClient, resetDb, sql, tabletClient } from '../support/db';
 import { TabletSim } from '../support/ops';
@@ -77,36 +77,47 @@ describe('sổ lương', () => {
   });
 });
 
-describe('ngày nghỉ', () => {
-  it('chủ đánh / sửa lý do / bỏ ngày nghỉ; không trùng ngày; có nhật ký; tablet không đọc / ghi được', async () => {
+describe('đánh dấu ngày (nghỉ / có làm)', () => {
+  it('chủ đánh / sửa / bỏ; không trùng ngày; có nhật ký; tablet không đọc / ghi được', async () => {
     const day = `${ym}-02`;
-    await addDayOff(owner, SEED.staff.Mai, day, null);
-    await expect(addDayOff(owner, SEED.staff.Mai, day, 'lần 2')).rejects.toThrow('đã đánh nghỉ');
+    await addDayMark(owner, SEED.staff.Mai, day, 'off', null);
+    await expect(addDayMark(owner, SEED.staff.Mai, day, 'work', 'lần 2')).rejects.toThrow('đã được đánh dấu');
     let m = await loadPayrollMonth(owner, ym, SEED.staff.Mai);
-    expect(m.daysOff).toEqual([{ id: expect.any(String), staff_id: SEED.staff.Mai, day, reason: null }]);
+    expect(m.marks).toEqual([{ id: expect.any(String), staff_id: SEED.staff.Mai, day, kind: 'off', reason: null }]);
 
-    await updateDayOffReason(owner, m.daysOff[0].id, 'Ốm');
+    await updateDayMark(owner, m.marks[0].id, { kind: 'off', reason: 'Ốm' });
+    await updateDayMark(owner, m.marks[0].id, { kind: 'work', reason: 'Phụ dọn kho' });
     m = await loadPayrollMonth(owner, ym, SEED.staff.Mai);
-    expect(m.daysOff[0].reason).toBe('Ốm');
+    expect(m.marks[0]).toMatchObject({ kind: 'work', reason: 'Phụ dọn kho' });
     // Tháng khác không lẫn vào
-    expect((await loadPayrollMonth(owner, shiftMonth(ym, -1), SEED.staff.Mai)).daysOff).toEqual([]);
+    expect((await loadPayrollMonth(owner, shiftMonth(ym, -1), SEED.staff.Mai)).marks).toEqual([]);
 
-    expect((await tab.from('staff_days_off').select('*')).data ?? []).toEqual([]);
-    const t = await tab.from('staff_days_off').insert({ staff_id: SEED.staff.Mai, day: `${ym}-03` }).select();
+    expect((await tab.from('staff_day_marks').select('*')).data ?? []).toEqual([]);
+    const t = await tab.from('staff_day_marks').insert({ staff_id: SEED.staff.Mai, day: `${ym}-03`, kind: 'work' }).select();
     expect(t.error).not.toBeNull();
-    const td = await tab.from('staff_days_off').delete().eq('id', m.daysOff[0].id).select();
+    const td = await tab.from('staff_day_marks').delete().eq('id', m.marks[0].id).select();
     expect(td.data ?? []).toEqual([]);
 
-    // Lý do rỗng bị DB chặn (UI gửi null)
-    const empty = await owner.from('staff_days_off').insert({ staff_id: SEED.staff.Mai, day: `${ym}-04`, reason: '' });
+    // DB chặn lý do rỗng (UI gửi null) và loại lạ
+    const empty = await owner.from('staff_day_marks').insert({ staff_id: SEED.staff.Mai, day: `${ym}-04`, kind: 'off', reason: '' });
     expect(empty.error?.code).toBe('23514');
+    const bad = await owner.from('staff_day_marks').insert({ staff_id: SEED.staff.Mai, day: `${ym}-04`, kind: 'half' });
+    expect(bad.error?.code).toBe('23514');
 
-    await removeDayOff(owner, m.daysOff[0].id);
-    await expect(removeDayOff(owner, m.daysOff[0].id)).rejects.toThrow('đã bị bỏ');
-    expect((await loadPayrollMonth(owner, ym, SEED.staff.Mai)).daysOff).toEqual([]);
+    await removeDayMark(owner, m.marks[0].id);
+    await expect(removeDayMark(owner, m.marks[0].id)).rejects.toThrow('đã bị bỏ');
+    expect((await loadPayrollMonth(owner, ym, SEED.staff.Mai)).marks).toEqual([]);
 
-    const log = await sql<{ action: string }>(`select action from audit_log where entity = 'staff_days_off' order by at, action`);
-    expect(log.map((r) => r.action)).toEqual(['day_off_add', 'day_off_update', 'day_off_remove']);
+    const log = await sql<{ action: string }>(`select action from audit_log where entity = 'staff_day_marks' order by at, action`);
+    expect(log.map((r) => r.action)).toEqual(['day_off_add', 'day_off_update', 'day_work_update', 'day_work_remove']);
+  });
+
+  it('"có làm" ở ngày không có ca được tính ngày công', async () => {
+    await saveStaffDetails(owner, SEED.staff.Hung, { phone: null, id_number: null, birthday: null, day_rate: 100000 });
+    await addDayMark(owner, SEED.staff.Hung, `${ym}-01`, 'work', null);
+    await addDayMark(owner, SEED.staff.Hung, `${ym}-02`, 'off', 'Ốm');
+    const m = await loadPayrollMonth(owner, ym, SEED.staff.Hung);
+    const p = computePayslip(m.details.find((d) => d.id === SEED.staff.Hung) ?? null, m.shifts, m.entries, ym, m.marks);
+    expect(p).toMatchObject({ markedDays: 1, days: 1, base: 100000 });
   });
 });
-

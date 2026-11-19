@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CatalogError } from './catalog';
 import {
-  computePayslip, daysUntilBirthday, formatMinutes, formatPhone, monthGrid, monthOf, parseDayOffReason, monthRange, parseBirthday, parseDaysInput,
+  computePayslip, daysUntilBirthday, formatMinutes, formatPhone, monthGrid, monthOf, parseDayMarkReason, monthRange, parseBirthday, parseDaysInput,
   parseIdNumber, parsePhone, shiftMonth, workDays, type PayrollEntry, type WorkShift,
 } from './payroll';
 
@@ -114,10 +114,24 @@ describe('lịch tháng', () => {
   });
 });
 
-describe('ngày nghỉ', () => {
+describe('đánh dấu ngày (nghỉ / có làm)', () => {
   it('lý do không bắt buộc, gọn khoảng trắng, tối đa 120 ký tự', () => {
-    expect(parseDayOffReason('   ')).toBeNull();
-    expect(parseDayOffReason('  Về   quê ')).toBe('Về quê');
-    expect(() => parseDayOffReason('x'.repeat(121))).toThrow(CatalogError);
+    expect(parseDayMarkReason('   ')).toBeNull();
+    expect(parseDayMarkReason('  Về   quê ')).toBe('Về quê');
+    expect(() => parseDayMarkReason('x'.repeat(121))).toThrow(CatalogError);
+  });
+
+  it('"có làm" ở ngày không có ca cộng 1 ngày công; trùng ngày có ca / tháng khác / "nghỉ" không cộng', () => {
+    const mark = (day: string, kind: 'off' | 'work') => ({ id: day, staff_id: 's', day, kind, reason: null });
+    const p = computePayslip({ day_rate: 200_000 }, SHIFTS, [], '2026-11', [
+      mark('2026-11-05', 'work'),
+      mark('2026-11-06', 'work'),
+      mark('2026-11-03', 'work'), // đã có ca
+      mark('2026-11-07', 'off'),
+      mark('2026-12-01', 'work'), // tháng khác
+    ]);
+    expect(p).toMatchObject({ shiftDays: 3, markedDays: 2, days: 5, base: 1_000_000 });
+    // Chủ trừ ngày công vẫn áp sau cùng
+    expect(computePayslip({ day_rate: 1 }, [], [entry('days', -5)], '2026-11', [mark('2026-11-05', 'work')]).days).toBe(0);
   });
 });

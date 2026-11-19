@@ -144,7 +144,9 @@ export interface Payslip {
   shifts: number;
   /** Số ngày (giờ VN) có mở ca. */
   shiftDays: number;
-  /** Ngày công sau khi chủ cộng / trừ (không âm). */
+  /** Số ngày chủ đánh "có làm" mà không có ca. */
+  markedDays: number;
+  /** Ngày công = có ca + đánh có làm ± chủ chỉnh (không âm). */
   days: number;
   /** Lương ngày công = days × rate. */
   base: Money;
@@ -160,46 +162,59 @@ export interface Payslip {
 
 /**
  * Lương của một nhân viên trong tháng `ym`: chỉ tính theo ngày. Ngày công = số ngày (giờ VN) nhân viên có mở ca,
- * mở nhiều ca trong ngày vẫn là 1 ngày, ± ngày công chủ ghi. Ca tính vào tháng của ngày mở ca; dòng sổ lương đã hủy bỏ qua.
+ * mở nhiều ca trong ngày vẫn là 1 ngày, + ngày chủ đánh "có làm" trên lịch (không trùng ngày có ca), ± ngày công chủ ghi.
+ * Ca tính vào tháng của ngày mở ca; dòng sổ lương đã hủy bỏ qua; đánh "nghỉ" không đổi lương.
  */
 export function computePayslip(
   details: Pick<StaffDetails, 'day_rate'> | null,
   shifts: readonly WorkShift[],
   entries: readonly PayrollEntry[],
   ym: string,
+  marks: readonly DayMark[] = [],
 ): Payslip {
   const rate = details?.day_rate ?? 0;
   const mine = shifts.filter((s) => monthOf(s.opened_at) === ym);
   const live = entries.filter((e) => !e.voided_at && e.month.slice(0, 7) === ym);
   const sum = (k: PayrollKind) => live.filter((e) => e.kind === k).reduce((s, e) => s + e.amount, 0);
 
-  const shiftDays = new Set(mine.map((s) => businessDate(s.opened_at))).size;
-  const days = Math.max(0, shiftDays + sum('days'));
+  const shiftDates = new Set(mine.map((s) => businessDate(s.opened_at)));
+  const shiftDays = shiftDates.size;
+  const markedDays = new Set(marks.filter((m) => m.kind === 'work' && m.day.slice(0, 7) === ym && !shiftDates.has(m.day)).map((m) => m.day)).size;
+  const days = Math.max(0, shiftDays + markedDays + sum('days'));
   const base = days * rate;
   const bonus = sum('bonus');
   const deduction = sum('deduction');
   const total = base + bonus - deduction;
   const advance = sum('advance');
   const payment = sum('payment');
-  return { rate, shifts: mine.length, shiftDays, days, base, bonus, deduction, total, advance, payment, remaining: total - advance - payment };
+  return { rate, shifts: mine.length, shiftDays, markedDays, days, base, bonus, deduction, total, advance, payment, remaining: total - advance - payment };
 }
 
 // ---------------------------------------------------------------- lịch tháng
 
-/** Ngày nghỉ chủ đánh trên lịch (chỉ ghi nhận, không đổi lương). */
-export interface DayOff {
+export type DayMarkKind = 'off' | 'work';
+
+export const DAY_MARK_LABELS: Record<DayMarkKind, string> = { off: 'Nghỉ', work: 'Có làm' };
+
+/**
+ * Đánh dấu ngày chủ ghi trên lịch (mỗi nhân viên mỗi ngày một dòng):
+ * - `off`: nghỉ, chỉ ghi nhận, không đổi lương;
+ * - `work`: có làm mà không mở ca ⇒ tính 1 ngày công (ngày đã có ca thì không cộng thêm).
+ */
+export interface DayMark {
   id: string;
   staff_id: string;
   day: string; // YYYY-MM-DD
+  kind: DayMarkKind;
   reason: string | null;
 }
 
-export const DAY_OFF_REASON_MAX = 120;
+export const DAY_MARK_REASON_MAX = 120;
 
-/** Ô lý do nghỉ: rỗng → null, cắt bớt khoảng trắng. */
-export function parseDayOffReason(raw: string): string | null {
+/** Ô lý do / ghi chú: rỗng → null, gọn khoảng trắng. */
+export function parseDayMarkReason(raw: string): string | null {
   const s = raw.trim().replace(/\s+/g, ' ');
-  if (s.length > DAY_OFF_REASON_MAX) throw new CatalogError(`Lý do tối đa ${DAY_OFF_REASON_MAX} ký tự`);
+  if (s.length > DAY_MARK_REASON_MAX) throw new CatalogError(`Ghi chú tối đa ${DAY_MARK_REASON_MAX} ký tự`);
   return s || null;
 }
 

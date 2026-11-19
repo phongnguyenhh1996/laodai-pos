@@ -1,7 +1,7 @@
 // Nhật ký (audit_log): nhãn, nhóm lọc và mô tả trước/sau cho màn Nhật ký và chi tiết đơn của chủ.
 import { itemsSummary } from './cart';
 import { formatVnd } from './money';
-import { PAYROLL_KIND_LABELS, formatDate, monthLabel, type PayrollKind } from './payroll';
+import { DAY_MARK_LABELS, PAYROLL_KIND_LABELS, formatDate, monthLabel, type DayMarkKind, type PayrollKind } from './payroll';
 import { DINE_LABELS, type DeleteReason, type DineType, type OrderItem, type OrderStatus, type PaymentMethod } from './types';
 
 const dineLabel = (t: DineType | undefined) => (t ? (DINE_LABELS[t] ?? t) : '—');
@@ -46,6 +46,9 @@ export const ACTION_LABELS: Record<string, string> = {
   day_off_add: 'Đánh ngày nghỉ',
   day_off_update: 'Sửa lý do nghỉ',
   day_off_remove: 'Bỏ ngày nghỉ',
+  day_work_add: 'Đánh ngày có làm',
+  day_work_update: 'Sửa ngày có làm',
+  day_work_remove: 'Bỏ ngày có làm',
 };
 
 export function actionLabel(action: string): string {
@@ -58,7 +61,7 @@ export const ACTION_GROUPS: Array<{ id: string; label: string; actions: string[]
   { id: 'edits', label: 'Sửa & xóa đơn', actions: ['order_update', 'order_delete', 'owner_edit_order'] },
   { id: 'shifts', label: 'Ca', actions: ['shift_open', 'shift_close', 'shift_adjust'] },
   { id: 'debts', label: 'Nợ', actions: ['customer_create', 'debt_payment', 'debt_transfer'] },
-  { id: 'owner', label: 'Chủ', actions: ['owner_mode', 'owner_edit_order', 'shift_adjust', 'settings_create', 'settings_update', 'payroll_add', 'payroll_void', 'day_off_add', 'day_off_update', 'day_off_remove'] },
+  { id: 'owner', label: 'Chủ', actions: ['owner_mode', 'owner_edit_order', 'shift_adjust', 'settings_create', 'settings_update', 'payroll_add', 'payroll_void', 'day_off_add', 'day_off_update', 'day_off_remove', 'day_work_add', 'day_work_update', 'day_work_remove'] },
   { id: 'alerts', label: 'Cảnh báo (thiếu số đơn, bị từ chối, đăng nhập)', actions: ['seq_gap', 'sync_rejected', 'tablet_login'] },
 ];
 
@@ -160,10 +163,18 @@ export function describeAudit(e: Pick<AuditEntry, 'action' | 'before' | 'after' 
     }
     case 'day_off_add':
     case 'day_off_update':
-    case 'day_off_remove': {
+    case 'day_off_remove':
+    case 'day_work_add':
+    case 'day_work_update':
+    case 'day_work_remove': {
       const prev = (e.before ?? {}) as Record<string, unknown>;
-      const reason = e.action === 'day_off_update' ? `${prev.reason ?? '—'} → ${after.reason ?? '—'}` : after.reason;
-      lines.push(`${after.staff_name ?? ''} · ${after.day ? formatDate(String(after.day)) : ''}${reason ? ` (${reason})` : ''}`);
+      const label = (k: unknown) => DAY_MARK_LABELS[(k ?? 'off') as DayMarkKind] ?? String(k);
+      const parts: string[] = [];
+      if (e.action.endsWith('_update')) {
+        if ((prev.kind ?? 'off') !== (after.kind ?? 'off')) parts.push(`${label(prev.kind)} → ${label(after.kind)}`);
+        if ((prev.reason ?? null) !== (after.reason ?? null)) parts.push(`${prev.reason ?? '—'} → ${after.reason ?? '—'}`);
+      } else if (after.reason) parts.push(String(after.reason));
+      lines.push(`${after.staff_name ?? ''} · ${after.day ? formatDate(String(after.day)) : ''}${parts.length ? ` (${parts.join(', ')})` : ''}`);
       break;
     }
     case 'settings_create':

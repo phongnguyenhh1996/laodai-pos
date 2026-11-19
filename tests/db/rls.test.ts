@@ -56,7 +56,7 @@ describe('vai trò tablet KHÔNG được', () => {
     expect(data![0]).toMatchObject({ status: 'open', tablet_profile_id: SEED.tablets.A });
   });
 
-  it.each(['audit_log', 'shift_adjustments', 'price_history', 'settings', 'debt_payments', 'sync_ops', 'seq_gaps', 'notifications', 'staff_details', 'payroll_entries', 'staff_days_off'])(
+  it.each(['audit_log', 'shift_adjustments', 'price_history', 'settings', 'debt_payments', 'sync_ops', 'seq_gaps', 'notifications', 'staff_details', 'payroll_entries', 'staff_day_marks'])(
     'đọc %s',
     async (t) => {
       const { data } = await tabA.from(t).select('*');

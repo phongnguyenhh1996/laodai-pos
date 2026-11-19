@@ -138,7 +138,7 @@ describe('sổ lương', () => {
   });
 });
 
-describe('ngày nghỉ', () => {
+describe('đánh dấu ngày', () => {
   it('mô tả đánh / sửa / bỏ ngày nghỉ', () => {
     const after = { day: '2026-11-20', reason: 'Về quê', staff_name: 'Lan' };
     expect(describeAudit({ action: 'day_off_add', entity: 'staff_days_off', reason: null, before: null, after })).toEqual(['Lan · 20/11/2026 (Về quê)']);
@@ -150,5 +150,15 @@ describe('ngày nghỉ', () => {
     ]);
     expect(actionsForFilter('owner')).toContain('day_off_remove');
     expect(actionLabel('day_off_add')).toBe('Đánh ngày nghỉ');
+  });
+
+  it('mô tả đổi nghỉ ↔ có làm', () => {
+    const before = { day: '2026-11-20', kind: 'off', reason: null, staff_name: 'Lan' };
+    const after = { ...before, kind: 'work', reason: 'Phụ dọn kho' };
+    expect(describeAudit({ action: 'day_work_update', entity: 'staff_day_marks', reason: null, before, after })).toEqual([
+      'Lan · 20/11/2026 (Nghỉ → Có làm, — → Phụ dọn kho)',
+    ]);
+    expect(actionsForFilter('owner')).toContain('day_work_add');
+    expect(actionLabel('day_work_add')).toBe('Đánh ngày có làm');
   });
 });
