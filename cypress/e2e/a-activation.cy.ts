@@ -74,6 +74,7 @@ describe('A. Kích hoạt & phân quyền', () => {
     cy.visit('/owner');
     cy.get('[data-testid=owner-password]').type(SEED.owner.password, { log: false });
     cy.get('[data-testid=owner-unlock-submit]').click();
+    cy.get('[data-testid=owner-pin-later]').click();
     cy.get('[data-testid=owner-home]').should('be.visible');
     cy.telegramWaitFor('Vào chế độ chủ trên Tablet A');
 
@@ -96,11 +97,42 @@ describe('A. Kích hoạt & phân quyền', () => {
     cy.get('[data-testid=owner-home]').should('not.exist');
   });
 
+  it('A4c: vào bằng mật khẩu ⇒ hỏi cài PIN cho máy này; lần sau vào bằng PIN; PIN chỉ của máy này', () => {
+    const typePin = (pad: string, pin: string) => [...pin].forEach((d) => cy.get(`[data-testid=${pad}-${d}]`).click());
+    cy.activateTablet('A');
+    cy.visit('/owner');
+    cy.get('[data-testid=owner-password]').type(SEED.owner.password, { log: false });
+    cy.get('[data-testid=owner-unlock-submit]').click();
+    cy.get('[data-testid=owner-pin-setup]').should('be.visible');
+    typePin('owner-pin-new', '135790');
+    cy.get('[data-testid=owner-pin-setup-step]').should('contain.text', 'Nhập lại');
+    typePin('owner-pin-new', '135790');
+    cy.get('[data-testid=owner-home]').should('be.visible');
+
+    // Thoát rồi vào lại: mặc định hỏi PIN, sai thì báo còn mấy lần, đúng thì vào thẳng
+    cy.get('[data-testid=owner-exit]').click();
+    cy.get('[data-testid=open-owner-mode]').click();
+    cy.get('[data-testid=owner-pin]').should('be.visible');
+    cy.get('[data-testid=owner-password]').should('not.exist');
+    typePin('owner-pin', '000000');
+    cy.get('[data-testid=owner-error]').should('contain.text', 'Còn 4 lần');
+    typePin('owner-pin', '135790');
+    cy.get('[data-testid=owner-home]').should('be.visible');
+    cy.get('[data-testid=owner-pin-setup]').should('not.exist');
+
+    // Máy khác (trình duyệt sạch) cùng tài khoản chủ: không có PIN ⇒ hỏi mật khẩu
+    cy.activateTablet('B');
+    cy.visit('/owner');
+    cy.get('[data-testid=owner-password]').should('be.visible');
+    cy.get('[data-testid=owner-pin]').should('not.exist');
+  });
+
   it('A4b: tải lại trang khi đang ở chế độ chủ ⇒ mất phiên chủ tạm, phải nhập lại mật khẩu', () => {
     cy.activateTablet('A');
     cy.visit('/owner');
     cy.get('[data-testid=owner-password]').type(SEED.owner.password, { log: false });
     cy.get('[data-testid=owner-unlock-submit]').click();
+    cy.get('[data-testid=owner-pin-later]').click();
     cy.get('[data-testid=owner-home]').should('be.visible');
     cy.reload();
     cy.get('[data-testid=owner-unlock]').should('be.visible');

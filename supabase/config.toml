@@ -435,3 +435,6 @@ verify_jwt = false
 
 [functions.activate-tablet]
 verify_jwt = false
+
+[functions.owner-pin-unlock]
+verify_jwt = false

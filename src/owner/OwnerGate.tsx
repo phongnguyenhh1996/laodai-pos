@@ -5,8 +5,9 @@ import { LockKeyhole } from 'lucide-react';
 import { ErrorText, Splash, TextField, errorMessage } from '@/app/ui';
 import { useActivation, useTabletName } from '@/app/useActivation';
 import { useIdleTimeout } from '@/app/useIdleTimeout';
-import { enterOwnerModeOnTablet, exitOwnerMode } from '@/lib/auth';
-import type { Activation } from '@/pos';
+import { AuthError, enterOwnerModeOnTablet, enterOwnerModeWithPin, exitOwnerMode, hasOwnerPin, setupOwnerPin } from '@/lib/auth';
+import { declineOwnerPin, ownerPinDeclined, type Activation } from '@/pos';
+import { OwnerPinSetup, PinPad } from './pin/OwnerPin';
 import { OwnerContext, type OwnerSession } from './OwnerContext';
 import { OwnerHome } from './OwnerHome';
 import { SettingsRoutes } from './settings/SettingsPages';
@@ -39,7 +40,8 @@ function OwnerRoutes() {
 
 /**
  * `/owner/*`: mọi thiết bị như nhau. Máy chưa đăng nhập + chọn quầy ⇒ về màn đăng nhập;
- * đã chọn quầy ⇒ nhập lại mật khẩu chủ (phiên chủ tạm trong bộ nhớ, tự thoát sau 2 phút).
+ * đã chọn quầy ⇒ nhập mã PIN của máy (nếu đã cài) hoặc mật khẩu chủ (phiên chủ tạm trong bộ nhớ, tự thoát sau 2 phút).
+ * Vào bằng mật khẩu trên máy chưa có PIN ⇒ hỏi cài PIN (PIN theo từng máy).
  */
 export function OwnerGate() {
   const act = useActivation();
@@ -51,6 +53,8 @@ export function OwnerGate() {
 function OwnerMode({ activation }: { activation: Activation }) {
   const navigate = useNavigate();
   const [owner, setOwner] = useState<SupabaseClient | null>(null);
+  // Vừa vào bằng mật khẩu trên máy chưa có PIN ⇒ hỏi cài PIN trước khi vào.
+  const [askPin, setAskPin] = useState(false);
   const tabletName = useTabletName(activation);
 
   // Rời chế độ chủ bằng bất kỳ đường nào (nút Thoát, hết giờ, nút Back) ⇒ thu hồi phiên tạm.
@@ -70,7 +74,31 @@ function OwnerMode({ activation }: { activation: Activation }) {
 
   useIdleTimeout(OWNER_IDLE_MS, () => navigate('/', { replace: true }), owner !== null);
 
-  if (!session) return <OwnerUnlock activation={activation} onUnlocked={setOwner} onCancel={() => navigate('/')} />;
+  if (!session) {
+    return (
+      <OwnerUnlock
+        activation={activation}
+        onUnlocked={(c, via) => {
+          setAskPin(via === 'password' && !hasOwnerPin() && !ownerPinDeclined());
+          setOwner(c);
+        }}
+        onCancel={() => navigate('/')}
+      />
+    );
+  }
+  if (askPin) {
+    return (
+      <OwnerPinSetup
+        save={(pin) => setupOwnerPin(session.client, activation, pin)}
+        onDone={() => setAskPin(false)}
+        onLater={() => setAskPin(false)}
+        onDecline={() => {
+          declineOwnerPin();
+          setAskPin(false);
+        }}
+      />
+    );
+  }
   return (
     <OwnerContext.Provider value={session}>
       <OwnerRoutes />
@@ -84,9 +112,10 @@ function OwnerUnlock({
   onCancel,
 }: {
   activation: Activation;
-  onUnlocked: (c: SupabaseClient) => void;
+  onUnlocked: (c: SupabaseClient, via: 'pin' | 'password') => void;
   onCancel: () => void;
 }) {
+  const [mode, setMode] = useState<'pin' | 'password'>(() => (hasOwnerPin() ? 'pin' : 'password'));
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -96,7 +125,7 @@ function OwnerUnlock({
     setBusy(true);
     setError(null);
     try {
-      onUnlocked(await enterOwnerModeOnTablet(activation, password));
+      onUnlocked(await enterOwnerModeOnTablet(activation, password), 'password');
     } catch (err) {
       setError(errorMessage(err));
       setPassword('');
@@ -104,15 +133,68 @@ function OwnerUnlock({
     }
   }
 
+  async function submitPin(pin: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      onUnlocked(await enterOwnerModeWithPin(activation, pin), 'pin');
+    } catch (err) {
+      if (err instanceof AuthError && err.code === 'wrong_pin') {
+        setError(err.remaining ? `Sai mã PIN. Còn ${err.remaining} lần thử, sai hết thì phải nhập mật khẩu.` : err.message);
+      } else {
+        // PIN bị xóa (sai quá nhiều / chủ xóa) ⇒ chuyển sang mật khẩu.
+        if (err instanceof AuthError && (err.code === 'pin_locked' || err.code === 'pin_missing')) setMode('password');
+        setError(errorMessage(err));
+      }
+      setBusy(false);
+    }
+  }
+
+  const header = (
+    <header className="flex flex-col gap-3">
+      <span aria-hidden className="flex h-14 w-14 items-center justify-center rounded-2xl bg-ink text-white shadow-card">
+        <LockKeyhole className="h-7 w-7" />
+      </span>
+      <h1 className="text-3xl font-bold">Chế độ chủ</h1>
+      <p className="text-lg text-ink-muted">
+        {mode === 'pin' ? 'Nhập mã PIN chế độ chủ của máy này.' : 'Nhập mật khẩu chủ. Lần đầu vào trên máy này sẽ được báo cho chủ.'}
+      </p>
+    </header>
+  );
+
+  if (mode === 'pin') {
+    return (
+      <main data-testid="owner-unlock" className="mx-auto flex h-full max-w-md flex-col justify-center gap-6 p-6">
+        {header}
+        <section className="card flex flex-col gap-5 p-6">
+          <PinPad onComplete={(p) => void submitPin(p)} disabled={busy} testId="owner-pin" />
+          {busy && <p className="text-center text-ink-muted">Đang kiểm tra…</p>}
+          <ErrorText testId="owner-error">{error}</ErrorText>
+          <div className="flex gap-3">
+            <button type="button" className="btn btn-secondary flex-1" onClick={onCancel} data-testid="owner-cancel">
+              Quay lại bán hàng
+            </button>
+            <button
+              type="button"
+              className="btn btn-segment flex-1"
+              disabled={busy}
+              onClick={() => {
+                setMode('password');
+                setError(null);
+              }}
+              data-testid="owner-use-password"
+            >
+              Dùng mật khẩu
+            </button>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main data-testid="owner-unlock" className="mx-auto flex h-full max-w-md flex-col justify-center gap-6 p-6">
-      <header className="flex flex-col gap-3">
-        <span aria-hidden className="flex h-14 w-14 items-center justify-center rounded-2xl bg-ink text-white shadow-card">
-          <LockKeyhole className="h-7 w-7" />
-        </span>
-        <h1 className="text-3xl font-bold">Chế độ chủ</h1>
-        <p className="text-lg text-ink-muted">Nhập mật khẩu chủ. Lần đầu vào trên máy này sẽ được báo cho chủ.</p>
-      </header>
+      {header}
       <form className="card flex flex-col gap-4 p-6" onSubmit={submit}>
         <TextField
           label="Mật khẩu chủ"
@@ -133,6 +215,19 @@ function OwnerUnlock({
             {busy ? 'Đang kiểm tra…' : 'Vào'}
           </button>
         </div>
+        {hasOwnerPin() && (
+          <button
+            type="button"
+            className="btn btn-segment"
+            onClick={() => {
+              setMode('pin');
+              setError(null);
+            }}
+            data-testid="owner-use-pin"
+          >
+            Dùng mã PIN
+          </button>
+        )}
       </form>
     </main>
   );

@@ -1,11 +1,25 @@
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Check, TriangleAlert } from 'lucide-react';
+import { Check, KeyRound, TriangleAlert } from 'lucide-react';
 import { ErrorText, Splash, errorMessage } from '@/app/ui';
-import { listTabletProfiles, switchTablet, type TabletProfileOption } from '@/lib/auth';
+import {
+  hasOwnerPin,
+  listOwnerPinDevices,
+  listTabletProfiles,
+  removeOwnerPinDevice,
+  removeOwnerPinOnThisDevice,
+  setupOwnerPin,
+  switchTablet,
+  type OwnerPinDevice,
+  type TabletProfileOption,
+} from '@/lib/auth';
 import { pos, tabletStore } from '@/lib/pos';
+import { deviceId, readActivation } from '@/pos';
+import { formatDate } from '@/domain/payroll';
+import { businessDate, hhmm } from '@/domain/time';
 import { useOwner } from '../OwnerContext';
 import { OwnerLayout } from '../OwnerLayout';
+import { OwnerPinSetup } from '../pin/OwnerPin';
 
 /**
  * `/owner/device`: đổi quầy cho máy đang dùng. Dùng luôn phiên chủ tạm (không đăng nhập lại).
@@ -112,6 +126,129 @@ export function DevicePage() {
           )}
         </>
       )}
+      <OwnerPinSection />
     </OwnerLayout>
+  );
+}
+
+const when = (at: string) => `${hhmm(at)} ${formatDate(businessDate(at))}`;
+
+/** Mã PIN chế độ chủ: mỗi máy một mã. Đổi / bỏ mã của máy này, xóa mã của máy khác (mất máy, không dùng nữa). */
+function OwnerPinSection() {
+  const owner = useOwner();
+  const [hasPin, setHasPin] = useState(hasOwnerPin);
+  const [devices, setDevices] = useState<OwnerPinDevice[] | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const myDevice = deviceId();
+
+  const reload = useCallback(() => {
+    listOwnerPinDevices(owner.client)
+      .then(setDevices)
+      .catch((e: unknown) => setError(errorMessage(e)));
+  }, [owner.client]);
+  useEffect(reload, [reload]);
+
+  async function run(job: () => Promise<void>, done: string) {
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      await job();
+      setHasPin(hasOwnerPin());
+      setNotice(done);
+      reload();
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (editing) {
+    const activation = readActivation();
+    return (
+      <div className="fixed inset-0 z-20 overflow-y-auto bg-canvas">
+        <OwnerPinSetup
+          title={hasPin ? 'Đổi mã PIN máy này' : 'Cài mã PIN máy này'}
+          intro="Mã PIN chỉ dùng được trên máy này. Máy khác có mã riêng."
+          laterLabel="Thôi"
+          save={async (pin) => {
+            if (!activation) throw new Error('Máy chưa kích hoạt');
+            await setupOwnerPin(owner.client, activation, pin);
+          }}
+          onDone={() => {
+            setEditing(false);
+            setHasPin(true);
+            setNotice('Đã lưu mã PIN cho máy này.');
+            reload();
+          }}
+          onLater={() => setEditing(false)}
+        />
+      </div>
+    );
+  }
+
+  const others = devices?.filter((d) => d.device_id !== myDevice || !hasPin) ?? [];
+  return (
+    <section className="mt-4 flex flex-col gap-3" data-testid="owner-pin-section">
+      <h2 className="flex items-center gap-2 text-xl font-bold">
+        <KeyRound aria-hidden className="h-5 w-5" /> Mã PIN chế độ chủ
+      </h2>
+      <div className="card flex flex-col gap-3 p-5">
+        <p className="text-lg" data-testid="owner-pin-status">
+          {hasPin ? 'Máy này vào chế độ chủ bằng mã PIN.' : 'Máy này chưa có mã PIN: vào chế độ chủ phải nhập mật khẩu.'}
+        </p>
+        <div className="flex flex-wrap gap-3">
+          <button type="button" className="btn btn-primary flex-1" disabled={busy} onClick={() => setEditing(true)} data-testid="owner-pin-edit">
+            {hasPin ? 'Đổi mã PIN' : 'Cài mã PIN'}
+          </button>
+          {hasPin && (
+            <button
+              type="button"
+              className="btn btn-danger-outline flex-1"
+              disabled={busy}
+              onClick={() => void run(() => removeOwnerPinOnThisDevice(owner.client), 'Đã bỏ mã PIN của máy này.')}
+              data-testid="owner-pin-remove"
+            >
+              Bỏ mã PIN
+            </button>
+          )}
+        </div>
+      </div>
+      {others.length > 0 && (
+        <div className="card flex flex-col divide-y divide-line overflow-hidden" data-testid="owner-pin-devices">
+          <p className="px-4 py-3 text-ink-muted">Máy khác đang có mã PIN. Xóa nếu máy bị mất hoặc không dùng nữa.</p>
+          {others.map((d) => (
+            <div key={d.id} className="flex items-center justify-between gap-3 px-4 py-3" data-testid={`owner-pin-device-${d.id}`}>
+              <div className="flex flex-col">
+                <span className="text-lg font-medium">{d.tablet_name ?? 'Máy không rõ quầy'}</span>
+                <span className="text-sm text-ink-muted">
+                  Cài lúc {when(d.created_at)}
+                  {d.last_used_at && ` · dùng lần cuối ${when(d.last_used_at)}`}
+                </span>
+              </div>
+              <button
+                type="button"
+                className="btn btn-danger-outline"
+                disabled={busy}
+                onClick={() => void run(() => removeOwnerPinDevice(owner.client, d.id), `Đã xóa mã PIN của ${d.tablet_name ?? 'máy đó'}.`)}
+                data-testid={`owner-pin-device-remove-${d.id}`}
+              >
+                Xóa
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      {notice && (
+        <p className="text-success-strong" role="status" data-testid="owner-pin-notice">
+          {notice}
+        </p>
+      )}
+      <ErrorText testId="owner-pin-error">{error}</ErrorText>
+    </section>
   );
 }

@@ -22,6 +22,7 @@ function enterOwnerModeOnTablet() {
   cy.get(tid('open-owner-mode')).click();
   cy.get(tid('owner-password')).type(SEED.owner.password, { log: false });
   cy.get(tid('owner-unlock-submit')).click();
+  cy.get(tid('owner-pin-later')).click();
   cy.get(tid('owner-home')).should('be.visible');
 }
 

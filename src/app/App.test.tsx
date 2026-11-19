@@ -5,8 +5,16 @@ import '@testing-library/jest-dom/vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { App } from './App';
 import { tabletStore } from '@/lib/pos';
-import { AuthError, enterOwnerModeOnTablet, exitOwnerMode, listTabletProfiles, switchTablet } from '@/lib/auth';
-import { readActivation, writeActivation } from '@/pos';
+import {
+  AuthError,
+  enterOwnerModeOnTablet,
+  enterOwnerModeWithPin,
+  exitOwnerMode,
+  listTabletProfiles,
+  setupOwnerPin,
+  switchTablet,
+} from '@/lib/auth';
+import { OWNER_PIN_KEY, ownerPinDeclined, readActivation, writeActivation } from '@/pos';
 import { OWNER_IDLE_MS } from '@/owner/OwnerGate';
 import { COMBO_XOI_FULL, COM_GA, PRODUCTS, XOI_GA } from '@/domain/fixtures';
 import { storeSession } from '@/test-utils/auth';
@@ -15,6 +23,9 @@ import { ACT, CATALOG, activateDevice, resetTablet, server, useFakeServer } from
 vi.mock('@/lib/auth', async (orig) => ({
   ...(await orig<typeof import('@/lib/auth')>()),
   enterOwnerModeOnTablet: vi.fn(),
+  enterOwnerModeWithPin: vi.fn(),
+  setupOwnerPin: vi.fn(),
+  listOwnerPinDevices: vi.fn(() => Promise.resolve([])),
   exitOwnerMode: vi.fn(),
   listTabletProfiles: vi.fn(),
   switchTablet: vi.fn(),
@@ -176,6 +187,7 @@ describe('chế độ chủ trên tablet', () => {
     go('/owner');
     fireEvent.change(await screen.findByTestId('owner-password'), { target: { value: 'pw' } });
     fireEvent.click(screen.getByTestId('owner-unlock-submit'));
+    fireEvent.click(await screen.findByTestId('owner-pin-later'));
     expect(await screen.findByTestId('owner-home')).toBeInTheDocument();
     expect(enterOwnerModeOnTablet).toHaveBeenCalledWith(ACT, 'pw');
 
@@ -198,9 +210,94 @@ describe('chế độ chủ trên tablet', () => {
     go('/owner');
     fireEvent.change(await screen.findByTestId('owner-password'), { target: { value: 'pw' } });
     fireEvent.click(screen.getByTestId('owner-unlock-submit'));
+    fireEvent.click(await screen.findByTestId('owner-pin-later'));
     fireEvent.click(await screen.findByTestId('owner-exit'));
     expect(await screen.findByTestId('tablet-home')).toBeInTheDocument();
     await waitFor(() => expect(exitOwnerMode).toHaveBeenCalledWith(fakeOwner));
+  });
+});
+
+function typePin(pad: string, pin: string) {
+  for (const d of pin) fireEvent.click(screen.getByTestId(`${pad}-${d}`));
+}
+
+describe('mã PIN chế độ chủ (theo thiết bị)', () => {
+  async function unlockWithPassword() {
+    vi.mocked(enterOwnerModeOnTablet).mockResolvedValue(fakeOwner);
+    activateDevice();
+    go('/owner');
+    fireEvent.change(await screen.findByTestId('owner-password'), { target: { value: 'pw' } });
+    fireEvent.click(screen.getByTestId('owner-unlock-submit'));
+    await screen.findByTestId('owner-pin-setup');
+  }
+  const fakeOwner = fakeOwnerClient();
+
+  it('đúng mật khẩu trên máy chưa có PIN ⇒ hỏi cài PIN; nhập 2 lần khớp ⇒ lưu cho máy này rồi vào chế độ chủ', async () => {
+    vi.mocked(setupOwnerPin).mockResolvedValue();
+    await unlockWithPassword();
+    expect(screen.getByTestId('owner-pin-setup-step')).toHaveTextContent('Nhập mã PIN mới');
+    typePin('owner-pin-new', '123456');
+    await waitFor(() => expect(screen.getByTestId('owner-pin-setup-step')).toHaveTextContent('Nhập lại'));
+    typePin('owner-pin-new', '123456');
+    expect(await screen.findByTestId('owner-home')).toBeInTheDocument();
+    expect(setupOwnerPin).toHaveBeenCalledWith(fakeOwner, ACT, '123456');
+  });
+
+  it('nhập lại không khớp ⇒ báo lỗi, nhập lại từ đầu, chưa lưu', async () => {
+    await unlockWithPassword();
+    typePin('owner-pin-new', '123456');
+    await waitFor(() => expect(screen.getByTestId('owner-pin-setup-step')).toHaveTextContent('Nhập lại'));
+    typePin('owner-pin-new', '654321');
+    expect(await screen.findByTestId('owner-pin-setup-error')).toHaveTextContent('không khớp');
+    expect(screen.getByTestId('owner-pin-setup-step')).toHaveTextContent('Nhập mã PIN mới');
+    expect(setupOwnerPin).not.toHaveBeenCalled();
+  });
+
+  it('"Không dùng PIN trên máy này" ⇒ vào chế độ chủ, máy này không hỏi lại', async () => {
+    await unlockWithPassword();
+    fireEvent.click(screen.getByTestId('owner-pin-decline'));
+    expect(await screen.findByTestId('owner-home')).toBeInTheDocument();
+    expect(ownerPinDeclined()).toBe(true);
+  });
+
+  it('máy đã có PIN ⇒ mặc định hỏi PIN; đúng PIN ⇒ vào thẳng, không hỏi cài lại', async () => {
+    localStorage.setItem(OWNER_PIN_KEY, 'k'.repeat(64));
+    vi.mocked(enterOwnerModeWithPin).mockResolvedValue(fakeOwner);
+    activateDevice();
+    go('/owner');
+    await screen.findByTestId('owner-pin');
+    expect(screen.queryByTestId('owner-password')).not.toBeInTheDocument();
+    typePin('owner-pin', '246810');
+    expect(await screen.findByTestId('owner-home')).toBeInTheDocument();
+    expect(enterOwnerModeWithPin).toHaveBeenCalledWith(ACT, '246810');
+    expect(screen.queryByTestId('owner-pin-setup')).not.toBeInTheDocument();
+  });
+
+  it('sai PIN ⇒ báo số lần còn lại; sai quá nhiều (PIN bị xóa) ⇒ chuyển sang nhập mật khẩu', async () => {
+    localStorage.setItem(OWNER_PIN_KEY, 'k'.repeat(64));
+    vi.mocked(enterOwnerModeWithPin).mockRejectedValueOnce(new AuthError('wrong_pin', undefined, 2));
+    activateDevice();
+    go('/owner');
+    await screen.findByTestId('owner-pin');
+    typePin('owner-pin', '111111');
+    expect(await screen.findByTestId('owner-error')).toHaveTextContent('Còn 2 lần thử');
+    expect(screen.queryByTestId('owner-home')).not.toBeInTheDocument();
+
+    vi.mocked(enterOwnerModeWithPin).mockRejectedValueOnce(new AuthError('pin_locked'));
+    await waitFor(() => expect(screen.getByTestId('owner-pin-1')).toBeEnabled());
+    typePin('owner-pin', '222222');
+    expect(await screen.findByTestId('owner-password')).toBeInTheDocument();
+    expect(screen.getByTestId('owner-error')).toHaveTextContent('đã bị xóa');
+  });
+
+  it('"Dùng mật khẩu" trên màn PIN ⇒ nhập mật khẩu được', async () => {
+    localStorage.setItem(OWNER_PIN_KEY, 'k'.repeat(64));
+    activateDevice();
+    go('/owner');
+    fireEvent.click(await screen.findByTestId('owner-use-password'));
+    expect(screen.getByTestId('owner-password')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('owner-use-pin'));
+    expect(screen.getByTestId('owner-pin')).toBeInTheDocument();
   });
 });
 
@@ -215,6 +312,7 @@ describe('đổi quầy cho máy này (chế độ chủ)', () => {
     go('/owner');
     fireEvent.change(await screen.findByTestId('owner-password'), { target: { value: 'pw' } });
     fireEvent.click(screen.getByTestId('owner-unlock-submit'));
+    fireEvent.click(await screen.findByTestId('owner-pin-later'));
     expect(await screen.findByTestId('owner-nav-device')).toHaveTextContent('Đang ở Tablet A');
     fireEvent.click(screen.getByTestId('owner-nav-device'));
     await screen.findByTestId('device-profiles');

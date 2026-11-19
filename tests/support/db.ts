@@ -9,7 +9,7 @@ import { SEED } from './seed-ids';
 const SEED_SQL = readFileSync(fileURLToPath(new URL('../../supabase/seed.sql', import.meta.url)), 'utf8');
 
 const BUSINESS_TABLES = [
-  'live_pulse', 'owner_mode_devices', 'notifications', 'seq_gaps', 'sync_ops', 'audit_log', 'debt_payments', 'order_items', 'orders', 'customers',
+  'live_pulse', 'owner_device_pins', 'owner_mode_devices', 'notifications', 'seq_gaps', 'sync_ops', 'audit_log', 'debt_payments', 'order_items', 'orders', 'customers',
   'shift_adjustments', 'shifts', 'price_history', 'combos', 'toppings', 'products', 'tablet_profiles', 'points',
   'menus', 'staff', 'settings',
 ];

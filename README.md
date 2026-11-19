@@ -48,7 +48,7 @@ src/app|owner      khung app, chế độ chủ; trang đầu = Tổng quan hôm
 supabase/migrations   schema, RLS, RPC `sync_push` (server cấp mã đơn / số thứ tự, trả dữ liệu vừa ghi), `live_pulse` (nhịp realtime), `reconcile_shift`, RPC của chủ (`owner_dashboard`, `owner_orders`,
                       `owner_report`, `owner_edit_order`…), cron tổng kết ngày,
                       ràng buộc danh mục (combo cùng menu, hồ sơ tablet trỏ điểm bán có thật, không đổi menu)
-supabase/functions    `telegram-dispatch`, `activate-tablet`, `_shared/format.ts` (định dạng tin)
+supabase/functions    `telegram-dispatch`, `activate-tablet`, `owner-pin-unlock` (vào chế độ chủ bằng PIN), `_shared/format.ts` (định dạng tin)
 tests/fixtures/reconcile-cases.json  bộ dữ liệu đối soát dùng chung cho test TS và SQL
 tests/db/          test DB (Vitest + Supabase local); `pos-client.test.ts` chạy tablet realtime thật: hai máy cùng hồ sơ, Realtime, idempotent
 tests/telegram-mock/  server giả Telegram (`GET /__messages`)

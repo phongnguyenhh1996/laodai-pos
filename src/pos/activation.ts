@@ -57,3 +57,51 @@ export function deviceId(storage: Storage | undefined = globalThis.localStorage)
     return null;
   }
 }
+
+/** Khóa localStorage giữ khóa thiết bị cho mã PIN chế độ chủ (server chỉ lưu băm của khóa này). */
+export const OWNER_PIN_KEY = 'laodai-owner-pin';
+/** Chủ chọn "Không dùng PIN trên máy này": không hỏi cài PIN nữa. */
+export const OWNER_PIN_DECLINED_KEY = 'laodai-owner-pin-declined';
+
+export function readOwnerPinToken(storage: Storage | undefined = globalThis.localStorage): string | null {
+  try {
+    return storage?.getItem(OWNER_PIN_KEY) || null;
+  } catch {
+    return null;
+  }
+}
+
+export function writeOwnerPinToken(token: string, storage: Storage | undefined = globalThis.localStorage): void {
+  storage?.setItem(OWNER_PIN_KEY, token);
+  storage?.removeItem(OWNER_PIN_DECLINED_KEY);
+}
+
+export function clearOwnerPinToken(storage: Storage | undefined = globalThis.localStorage): void {
+  try {
+    storage?.removeItem(OWNER_PIN_KEY);
+  } catch {
+    /* không ghi được localStorage */
+  }
+}
+
+/** Khóa thiết bị ngẫu nhiên 256 bit (hex). */
+export function newOwnerPinToken(): string {
+  const b = crypto.getRandomValues(new Uint8Array(32));
+  return Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
+}
+
+export function ownerPinDeclined(storage: Storage | undefined = globalThis.localStorage): boolean {
+  try {
+    return storage?.getItem(OWNER_PIN_DECLINED_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function declineOwnerPin(storage: Storage | undefined = globalThis.localStorage): void {
+  try {
+    storage?.setItem(OWNER_PIN_DECLINED_KEY, '1');
+  } catch {
+    /* không ghi được localStorage: lần sau hỏi lại */
+  }
+}

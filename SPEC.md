@@ -32,7 +32,7 @@ Chi phí vận hành dự kiến: 0đ/tháng (gói free).
 - **Mọi thiết bị cùng một luồng** (tablet hay điện thoại chủ như nhau): vào app → chủ **đăng nhập 1 lần** → chọn **quầy** (trong dữ liệu là `tablet_profiles`, vd. "Tablet A") → Edge Function cấp **phiên vai trò `tablet`** và hủy phiên chủ trên máy đó. Báo Telegram: "Tablet A vừa được đăng nhập". Không có form đăng nhập chủ riêng cho điện thoại.
   - Vai trò `tablet` bị RLS giới hạn: chỉ đọc menu/nhân viên/khách nợ, chỉ thao tác **đơn đang mở** của hồ sơ tablet mình, không đọc được đơn đã thanh toán, ca đã đóng, báo cáo, nhật ký.
   - ⇒ "Nhân viên không thấy doanh thu" được đảm bảo ở **tầng dữ liệu**, không chỉ ẩn giao diện.
-- **Chế độ chủ** (mọi thiết bị): nhập lại mật khẩu chủ → phiên chủ tạm thời (chỉ trong bộ nhớ, tải lại trang là mất), **tự thoát sau 2 phút** không thao tác, trở lại phiên `tablet`. Mỗi lần vào đều báo Telegram.
+- **Chế độ chủ** (mọi thiết bị): nhập lại mật khẩu chủ, hoặc **mã PIN 6 số của riêng máy đó** (vào bằng mật khẩu trên máy chưa có PIN ⇒ hỏi cài PIN; mỗi máy một PIN, sai 5 lần liền ⇒ PIN máy đó bị xóa, phải nhập mật khẩu; chủ xem / xóa PIN từng máy ở màn "Quầy của máy này") → phiên chủ tạm thời (chỉ trong bộ nhớ, tải lại trang là mất), **tự thoát sau 2 phút** không thao tác, trở lại phiên `tablet`. Mỗi lần vào đều báo Telegram.
 - Nhân viên: **chọn tên**, không PIN.
 
 ---

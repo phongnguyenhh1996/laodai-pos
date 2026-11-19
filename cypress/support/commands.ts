@@ -70,6 +70,7 @@ function unlockOwnerMode() {
   cy.get('[data-testid=owner-unlock]').should('be.visible');
   cy.get('[data-testid=owner-password]').type(SEED.owner.password, { log: false });
   cy.get('[data-testid=owner-unlock-submit]').click();
+  cy.get('[data-testid=owner-pin-later]').click(); // máy chưa có PIN ⇒ hỏi cài PIN: để sau
   cy.get('[data-testid=owner-unlock]').should('not.exist');
   return cy.wrap(null, { log: false });
 }

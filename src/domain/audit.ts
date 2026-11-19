@@ -25,6 +25,9 @@ export interface AuditEntry {
 export const ACTION_LABELS: Record<string, string> = {
   tablet_login: 'Tablet đăng nhập',
   owner_mode: 'Vào chế độ chủ trên tablet',
+  owner_pin_set: 'Cài mã PIN chế độ chủ',
+  owner_pin_removed: 'Xóa mã PIN chế độ chủ',
+  owner_pin_locked: 'Mã PIN chế độ chủ bị xóa (sai quá nhiều lần)',
   shift_open: 'Mở ca',
   shift_close: 'Đóng ca',
   shift_adjust: 'Chủ bổ sung giữa ca',
@@ -61,8 +64,8 @@ export const ACTION_GROUPS: Array<{ id: string; label: string; actions: string[]
   { id: 'edits', label: 'Sửa & xóa đơn', actions: ['order_update', 'order_delete', 'owner_edit_order'] },
   { id: 'shifts', label: 'Ca', actions: ['shift_open', 'shift_close', 'shift_adjust'] },
   { id: 'debts', label: 'Nợ', actions: ['customer_create', 'debt_payment', 'debt_transfer'] },
-  { id: 'owner', label: 'Chủ', actions: ['owner_mode', 'owner_edit_order', 'shift_adjust', 'settings_create', 'settings_update', 'payroll_add', 'payroll_void', 'day_off_add', 'day_off_update', 'day_off_remove', 'day_work_add', 'day_work_update', 'day_work_remove'] },
-  { id: 'alerts', label: 'Cảnh báo (thiếu số đơn, bị từ chối, đăng nhập)', actions: ['seq_gap', 'sync_rejected', 'tablet_login'] },
+  { id: 'owner', label: 'Chủ', actions: ['owner_mode', 'owner_pin_set', 'owner_pin_removed', 'owner_edit_order', 'shift_adjust', 'settings_create', 'settings_update', 'payroll_add', 'payroll_void', 'day_off_add', 'day_off_update', 'day_off_remove', 'day_work_add', 'day_work_update', 'day_work_remove'] },
+  { id: 'alerts', label: 'Cảnh báo (thiếu số đơn, bị từ chối, đăng nhập)', actions: ['seq_gap', 'sync_rejected', 'tablet_login', 'owner_pin_locked'] },
 ];
 
 /** Giá trị bộ lọc "loại" (id nhóm hoặc tên action, như link trong tin Telegram) → danh sách action. */

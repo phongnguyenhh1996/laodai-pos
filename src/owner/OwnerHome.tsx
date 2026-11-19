@@ -30,7 +30,7 @@ export function OwnerHome() {
           title="Cài đặt"
           subtitle="Menu, món, topping, combo, giá · nhân viên (CCCD, sinh nhật, mức lương) · điểm bán · quầy"
         />
-        <NavItem to="/owner/device" testId="owner-nav-device" icon={Store} title="Quầy của máy này" subtitle={`Đang ở ${tabletName} · chuyển máy sang quầy khác`} />
+        <NavItem to="/owner/device" testId="owner-nav-device" icon={Store} title="Quầy của máy này" subtitle={`Đang ở ${tabletName} · chuyển máy sang quầy khác · mã PIN chế độ chủ`} />
       </NavList>
     </OwnerLayout>
   );
