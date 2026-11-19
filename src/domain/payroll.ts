@@ -186,6 +186,23 @@ export function computePayslip(
 
 // ---------------------------------------------------------------- lịch tháng
 
+/** Ngày nghỉ chủ đánh trên lịch (chỉ ghi nhận, không đổi lương). */
+export interface DayOff {
+  id: string;
+  staff_id: string;
+  day: string; // YYYY-MM-DD
+  reason: string | null;
+}
+
+export const DAY_OFF_REASON_MAX = 120;
+
+/** Ô lý do nghỉ: rỗng → null, cắt bớt khoảng trắng. */
+export function parseDayOffReason(raw: string): string | null {
+  const s = raw.trim().replace(/\s+/g, ' ');
+  if (s.length > DAY_OFF_REASON_MAX) throw new CatalogError(`Lý do tối đa ${DAY_OFF_REASON_MAX} ký tự`);
+  return s || null;
+}
+
 /** Lưới lịch tháng `ym`, tuần bắt đầu thứ Hai: mỗi tuần 7 ô, ô ngoài tháng = null. */
 export function monthGrid(ym: string): (string | null)[][] {
   const [y, m] = ym.split('-').map(Number);

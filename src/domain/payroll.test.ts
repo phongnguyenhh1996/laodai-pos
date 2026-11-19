@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CatalogError } from './catalog';
 import {
-  computePayslip, daysUntilBirthday, formatMinutes, formatPhone, monthGrid, monthOf, monthRange, parseBirthday, parseDaysInput,
+  computePayslip, daysUntilBirthday, formatMinutes, formatPhone, monthGrid, monthOf, parseDayOffReason, monthRange, parseBirthday, parseDaysInput,
   parseIdNumber, parsePhone, shiftMonth, workDays, type PayrollEntry, type WorkShift,
 } from './payroll';
 
@@ -111,5 +111,13 @@ describe('lịch tháng', () => {
     expect(w.get('2026-11-04')).toEqual({ shifts: 1, minutes: 120, open: true });
     expect(w.get('2026-11-30')).toMatchObject({ shifts: 1, minutes: 120 });
     expect(w.has('2026-11-01')).toBe(false);
+  });
+});
+
+describe('ngày nghỉ', () => {
+  it('lý do không bắt buộc, gọn khoảng trắng, tối đa 120 ký tự', () => {
+    expect(parseDayOffReason('   ')).toBeNull();
+    expect(parseDayOffReason('  Về   quê ')).toBe('Về quê');
+    expect(() => parseDayOffReason('x'.repeat(121))).toThrow(CatalogError);
   });
 });

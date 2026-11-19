@@ -137,3 +137,18 @@ describe('sổ lương', () => {
     expect(actionLabel('payroll_void')).toBe('Hủy dòng sổ lương');
   });
 });
+
+describe('ngày nghỉ', () => {
+  it('mô tả đánh / sửa / bỏ ngày nghỉ', () => {
+    const after = { day: '2026-11-20', reason: 'Về quê', staff_name: 'Lan' };
+    expect(describeAudit({ action: 'day_off_add', entity: 'staff_days_off', reason: null, before: null, after })).toEqual(['Lan · 20/11/2026 (Về quê)']);
+    expect(
+      describeAudit({ action: 'day_off_update', entity: 'staff_days_off', reason: null, before: { ...after, reason: null }, after }),
+    ).toEqual(['Lan · 20/11/2026 (— → Về quê)']);
+    expect(describeAudit({ action: 'day_off_remove', entity: 'staff_days_off', reason: null, before: after, after: { ...after, reason: null } })).toEqual([
+      'Lan · 20/11/2026',
+    ]);
+    expect(actionsForFilter('owner')).toContain('day_off_remove');
+    expect(actionLabel('day_off_add')).toBe('Đánh ngày nghỉ');
+  });
+});

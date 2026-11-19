@@ -1,7 +1,7 @@
 // Nhật ký (audit_log): nhãn, nhóm lọc và mô tả trước/sau cho màn Nhật ký và chi tiết đơn của chủ.
 import { itemsSummary } from './cart';
 import { formatVnd } from './money';
-import { PAYROLL_KIND_LABELS, monthLabel, type PayrollKind } from './payroll';
+import { PAYROLL_KIND_LABELS, formatDate, monthLabel, type PayrollKind } from './payroll';
 import { DINE_LABELS, type DeleteReason, type DineType, type OrderItem, type OrderStatus, type PaymentMethod } from './types';
 
 const dineLabel = (t: DineType | undefined) => (t ? (DINE_LABELS[t] ?? t) : '—');
@@ -43,6 +43,9 @@ export const ACTION_LABELS: Record<string, string> = {
   settings_update: 'Sửa cài đặt',
   payroll_add: 'Ghi sổ lương',
   payroll_void: 'Hủy dòng sổ lương',
+  day_off_add: 'Đánh ngày nghỉ',
+  day_off_update: 'Sửa lý do nghỉ',
+  day_off_remove: 'Bỏ ngày nghỉ',
 };
 
 export function actionLabel(action: string): string {
@@ -55,7 +58,7 @@ export const ACTION_GROUPS: Array<{ id: string; label: string; actions: string[]
   { id: 'edits', label: 'Sửa & xóa đơn', actions: ['order_update', 'order_delete', 'owner_edit_order'] },
   { id: 'shifts', label: 'Ca', actions: ['shift_open', 'shift_close', 'shift_adjust'] },
   { id: 'debts', label: 'Nợ', actions: ['customer_create', 'debt_payment', 'debt_transfer'] },
-  { id: 'owner', label: 'Chủ', actions: ['owner_mode', 'owner_edit_order', 'shift_adjust', 'settings_create', 'settings_update', 'payroll_add', 'payroll_void'] },
+  { id: 'owner', label: 'Chủ', actions: ['owner_mode', 'owner_edit_order', 'shift_adjust', 'settings_create', 'settings_update', 'payroll_add', 'payroll_void', 'day_off_add', 'day_off_update', 'day_off_remove'] },
   { id: 'alerts', label: 'Cảnh báo (thiếu số đơn, bị từ chối, đăng nhập)', actions: ['seq_gap', 'sync_rejected', 'tablet_login'] },
 ];
 
@@ -153,6 +156,14 @@ export function describeAudit(e: Pick<AuditEntry, 'action' | 'before' | 'after' 
       const value = kind === 'days' ? `${amount > 0 ? '+' : ''}${amount} ngày` : formatVnd(amount);
       const month = String(after.month ?? '').slice(0, 7);
       lines.push(`${after.staff_name ?? ''} · ${monthLabel(month)}: ${PAYROLL_KIND_LABELS[kind] ?? kind} ${value}${after.note ? ` (${after.note})` : ''}`);
+      break;
+    }
+    case 'day_off_add':
+    case 'day_off_update':
+    case 'day_off_remove': {
+      const prev = (e.before ?? {}) as Record<string, unknown>;
+      const reason = e.action === 'day_off_update' ? `${prev.reason ?? '—'} → ${after.reason ?? '—'}` : after.reason;
+      lines.push(`${after.staff_name ?? ''} · ${after.day ? formatDate(String(after.day)) : ''}${reason ? ` (${reason})` : ''}`);
       break;
     }
     case 'settings_create':

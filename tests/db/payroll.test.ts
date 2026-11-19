@@ -1,8 +1,8 @@
 // Nhân viên: CCCD / sinh nhật / lương (bảng riêng chỉ chủ đọc) + sổ lương tính từ ca thật.
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { computePayslip, monthOf } from '@/domain/payroll';
-import { addPayrollEntry, loadPayrollMonth, voidPayrollEntry } from '@/owner/payroll/api';
+import { computePayslip, monthOf, shiftMonth } from '@/domain/payroll';
+import { addDayOff, addPayrollEntry, loadPayrollMonth, removeDayOff, updateDayOffReason, voidPayrollEntry } from '@/owner/payroll/api';
 import { loadOwnerCatalog, saveStaffDetails } from '@/owner/settings/api';
 import { ownerClient, resetDb, sql, tabletClient } from '../support/db';
 import { TabletSim } from '../support/ops';
@@ -76,3 +76,37 @@ describe('sổ lương', () => {
     expect((await tab.from('payroll_entries').select('*')).data ?? []).toEqual([]);
   });
 });
+
+describe('ngày nghỉ', () => {
+  it('chủ đánh / sửa lý do / bỏ ngày nghỉ; không trùng ngày; có nhật ký; tablet không đọc / ghi được', async () => {
+    const day = `${ym}-02`;
+    await addDayOff(owner, SEED.staff.Mai, day, null);
+    await expect(addDayOff(owner, SEED.staff.Mai, day, 'lần 2')).rejects.toThrow('đã đánh nghỉ');
+    let m = await loadPayrollMonth(owner, ym, SEED.staff.Mai);
+    expect(m.daysOff).toEqual([{ id: expect.any(String), staff_id: SEED.staff.Mai, day, reason: null }]);
+
+    await updateDayOffReason(owner, m.daysOff[0].id, 'Ốm');
+    m = await loadPayrollMonth(owner, ym, SEED.staff.Mai);
+    expect(m.daysOff[0].reason).toBe('Ốm');
+    // Tháng khác không lẫn vào
+    expect((await loadPayrollMonth(owner, shiftMonth(ym, -1), SEED.staff.Mai)).daysOff).toEqual([]);
+
+    expect((await tab.from('staff_days_off').select('*')).data ?? []).toEqual([]);
+    const t = await tab.from('staff_days_off').insert({ staff_id: SEED.staff.Mai, day: `${ym}-03` }).select();
+    expect(t.error).not.toBeNull();
+    const td = await tab.from('staff_days_off').delete().eq('id', m.daysOff[0].id).select();
+    expect(td.data ?? []).toEqual([]);
+
+    // Lý do rỗng bị DB chặn (UI gửi null)
+    const empty = await owner.from('staff_days_off').insert({ staff_id: SEED.staff.Mai, day: `${ym}-04`, reason: '' });
+    expect(empty.error?.code).toBe('23514');
+
+    await removeDayOff(owner, m.daysOff[0].id);
+    await expect(removeDayOff(owner, m.daysOff[0].id)).rejects.toThrow('đã bị bỏ');
+    expect((await loadPayrollMonth(owner, ym, SEED.staff.Mai)).daysOff).toEqual([]);
+
+    const log = await sql<{ action: string }>(`select action from audit_log where entity = 'staff_days_off' order by at, action`);
+    expect(log.map((r) => r.action)).toEqual(['day_off_add', 'day_off_update', 'day_off_remove']);
+  });
+});
+

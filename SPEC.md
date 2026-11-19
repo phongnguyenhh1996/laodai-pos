@@ -56,6 +56,7 @@ staff_details     id (= staff.id), phone, id_number (CCCD 12 số / CMND 9 số)
                   day_rate (lương một ngày)                       -- chỉ chủ đọc (tablet đọc được staff)
 payroll_entries   id, staff_id, month (ngày 1), kind (bonus|deduction|advance|payment|days),
                   amount, note, at, voided_at                     -- sổ lương; không sửa/xóa, ghi nhầm thì hủy
+staff_days_off    id, staff_id, day, reason (tùy chọn), at         -- ngày nghỉ chủ đánh trên lịch; chỉ ghi nhận, bỏ được
 menus             id, name                                   -- "Xôi", "Cơm gà"
 points            id, name, menu_id, active                  -- Xôi A, Xôi B, Cơm gà
 tablet_profiles   id, name, point_ids[], default_boxes, default_plates, default_float
@@ -215,7 +216,7 @@ Thiết kế: nút ≥ 56px, chữ to, tối đa 2–3 chạm cho một đơn co
 4. **Báo cáo**: doanh thu theo ngày/điểm/ca/nhân viên; tỷ lệ TM/CK/Nợ theo nhân viên; **tổng CK theo ngày/điểm** để đối chiếu app ngân hàng; món bán chạy; số lần sửa/xóa theo nhân viên.
 5. **Sổ nợ**: khách, dư nợ, lịch sử; **chuyển khoản nợ** sang khách khác; ghi thu nợ.
 6. **Nhật ký**.
-7. **Lương** (theo tháng, **chỉ tính theo ngày**, không tính theo giờ): ngày công = số ngày nhân viên có mở ca (giờ VN, mở nhiều ca trong ngày vẫn là 1 ngày; ca tính vào tháng của ngày mở ca) ± ngày công chủ chỉnh (khi nhân viên làm mà không mở ca, hoặc mở ca nhầm). Lương tháng = ngày công × lương một ngày + thưởng − trừ; còn phải trả = lương tháng − ứng − đã trả. Sinh nhật trong tháng.
+7. **Lương** (theo tháng, **chỉ tính theo ngày**, không tính theo giờ): ngày công = số ngày nhân viên có mở ca (giờ VN, mở nhiều ca trong ngày vẫn là 1 ngày; ca tính vào tháng của ngày mở ca) ± ngày công chủ chỉnh (khi nhân viên làm mà không mở ca, hoặc mở ca nhầm). Lương tháng = ngày công × lương một ngày + thưởng − trừ; còn phải trả = lương tháng − ứng − đã trả. Sinh nhật trong tháng. Lịch tháng của từng nhân viên: ngày có mở ca (tổng giờ), bấm ngày để xem ca hoặc đánh / bỏ ngày nghỉ kèm lý do không bắt buộc (ngày nghỉ không đổi lương; đánh trước được cho ngày sắp tới).
 8. **Cài đặt**: menu / món / topping (cờ "thêm hộp") / combo / giá (có lịch sử), nhân viên (SĐT, CCCD, sinh nhật, lương một ngày), điểm bán, hồ sơ tablet + mặc định đầu ca, Telegram, ngưỡng màu chờ, giờ tổng kết ngày, mật khẩu.
 
 ---
