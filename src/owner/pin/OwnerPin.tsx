@@ -6,31 +6,45 @@ import { ErrorText, errorMessage } from '@/app/ui';
 export const PIN_LENGTH = 6;
 
 /**
- * Bàn phím số + 6 chấm. Đủ 6 số ⇒ gọi `onComplete` và xóa trắng (nhập lại khi sai).
+ * Bàn phím số + 6 chấm. Đủ 6 số ⇒ gọi `onComplete`, chấm vẫn đầy trong lúc xử lý.
+ * Người gọi phải `disabled` trong lúc xử lý (hết `disabled` ⇒ xóa trắng để nhập lại),
+ * hoặc đổi `key` để có bàn phím mới. `busyLabel` hiện dưới chấm khi đang xử lý.
  * Bấm phím số / Backspace trên bàn phím thật cũng được.
  */
 export function PinPad({
   onComplete,
   disabled,
+  busyLabel,
   testId = 'pin-pad',
 }: {
   onComplete: (pin: string) => void;
   disabled?: boolean;
+  busyLabel?: string;
   testId?: string;
 }) {
   const [pin, setPin] = useState('');
+  const [sent, setSent] = useState(false);
 
   const press = useCallback(
-    (d: string) => !disabled && setPin((p) => (p.length >= PIN_LENGTH ? p : p + d)),
-    [disabled],
+    (d: string) => !disabled && !sent && setPin((p) => (p.length >= PIN_LENGTH ? p : p + d)),
+    [disabled, sent],
   );
 
   useEffect(() => {
-    if (pin.length !== PIN_LENGTH) return;
-    setPin('');
+    if (pin.length !== PIN_LENGTH || sent) return;
+    setSent(true);
     onComplete(pin);
-  }, [pin, onComplete]);
-  const back = useCallback(() => !disabled && setPin((p) => p.slice(0, -1)), [disabled]);
+  }, [pin, sent, onComplete]);
+
+  // Xử lý xong mà bàn phím còn đây (vd. sai PIN) ⇒ xóa trắng để nhập lại.
+  useEffect(() => {
+    if (sent && !disabled) {
+      setPin('');
+      setSent(false);
+    }
+  }, [sent, disabled]);
+  const busy = sent && disabled;
+  const back = useCallback(() => !disabled && !sent && setPin((p) => p.slice(0, -1)), [disabled, sent]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -48,8 +62,8 @@ export function PinPad({
   }, [press, back]);
 
   return (
-    <div className="flex flex-col items-center gap-6" data-testid={testId}>
-      <div className="flex gap-3" aria-label={`Đã nhập ${pin.length} trên ${PIN_LENGTH} số`} data-testid={`${testId}-dots`}>
+    <div className="flex flex-col items-center gap-6" data-testid={testId} aria-busy={busy || undefined}>
+      <div className={`flex gap-3 ${busy ? 'animate-pulse' : ''}`} aria-label={`Đã nhập ${pin.length} trên ${PIN_LENGTH} số`} data-testid={`${testId}-dots`}>
         {Array.from({ length: PIN_LENGTH }, (_, i) => (
           <span
             key={i}
@@ -60,6 +74,11 @@ export function PinPad({
           />
         ))}
       </div>
+      {busy && busyLabel && (
+        <p role="status" className="-my-3 text-center text-ink-muted" data-testid={`${testId}-busy`}>
+          {busyLabel}
+        </p>
+      )}
       <div className="grid w-full max-w-xs grid-cols-3 gap-3">
         {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((d) => (
           <PinKey key={d} label={d} onPress={() => press(d)} disabled={disabled} testId={`${testId}-${d}`} />
@@ -151,10 +170,10 @@ export function OwnerPinSetup({
       </header>
       <section className="card flex flex-col gap-5 p-6">
         <p className="text-center text-lg font-semibold" data-testid="owner-pin-setup-step">
-          {busy ? 'Đang lưu…' : first === null ? 'Nhập mã PIN mới (6 số)' : 'Nhập lại mã PIN để xác nhận'}
+          {first === null ? 'Nhập mã PIN mới (6 số)' : 'Nhập lại mã PIN để xác nhận'}
         </p>
         {/* key: đổi bước ⇒ bàn phím mới, chấm trống */}
-        <PinPad key={first === null ? 'new' : 'confirm'} onComplete={(p) => void onComplete(p)} disabled={busy} testId="owner-pin-new" />
+        <PinPad key={first === null ? 'new' : 'confirm'} onComplete={(p) => void onComplete(p)} disabled={busy} busyLabel="Đang lưu mã PIN…" testId="owner-pin-new" />
         <ErrorText testId="owner-pin-setup-error">{error}</ErrorText>
         <div className="flex flex-col gap-2">
           <button type="button" className="btn btn-secondary" onClick={onLater} disabled={busy} data-testid="owner-pin-later">

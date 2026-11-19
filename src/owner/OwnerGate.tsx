@@ -167,8 +167,7 @@ function OwnerUnlock({
       <main data-testid="owner-unlock" className="mx-auto flex h-full max-w-md flex-col justify-center gap-6 p-6">
         {header}
         <section className="card flex flex-col gap-5 p-6">
-          <PinPad onComplete={(p) => void submitPin(p)} disabled={busy} testId="owner-pin" />
-          {busy && <p className="text-center text-ink-muted">Đang kiểm tra…</p>}
+          <PinPad onComplete={(p) => void submitPin(p)} disabled={busy} busyLabel="Đang kiểm tra…" testId="owner-pin" />
           <ErrorText testId="owner-error">{error}</ErrorText>
           <div className="flex gap-3">
             <button type="button" className="btn btn-secondary flex-1" onClick={onCancel} data-testid="owner-cancel">
