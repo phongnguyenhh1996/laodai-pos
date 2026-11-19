@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { CatalogError } from './catalog';
 import {
-  computePayslip, daysUntilBirthday, formatMinutes, formatPhone, monthOf, monthRange, parseBirthday, parseDaysInput,
-  parseIdNumber, parsePhone, shiftMonth, type PayrollEntry, type WorkShift,
+  computePayslip, daysUntilBirthday, formatMinutes, formatPhone, monthGrid, monthOf, monthRange, parseBirthday, parseDaysInput,
+  parseIdNumber, parsePhone, shiftMonth, workDays, type PayrollEntry, type WorkShift,
 } from './payroll';
 
 const shift = (id: string, opened: string, closed: string | null): WorkShift => ({ id, staff_id: 's', opened_at: opened, closed_at: closed });
@@ -92,5 +92,24 @@ describe('nhập liệu', () => {
     expect(parseDaysInput('1.5')).toBeNull();
     expect(formatMinutes(275)).toBe('4 giờ 35 phút');
     expect(formatMinutes(-60)).toBe('−1 giờ');
+  });
+});
+
+describe('lịch tháng', () => {
+  it('lưới tuần bắt đầu thứ Hai', () => {
+    const nov = monthGrid('2026-11'); // 1/11/2026 là Chủ nhật
+    expect(nov[0]).toEqual([null, null, null, null, null, null, '2026-11-01']);
+    expect(nov.at(-1)).toEqual(['2026-11-30', null, null, null, null, null, null]);
+    expect(nov.flat().filter(Boolean)).toHaveLength(30);
+    expect(monthGrid('2027-02')).toHaveLength(4); // 1/2/2027 là thứ Hai, 28 ngày
+    expect(monthGrid('2024-02').flat().filter(Boolean)).toHaveLength(29);
+  });
+
+  it('gộp ca theo ngày mở (giờ VN), ca đang mở tính tới bây giờ', () => {
+    const w = workDays(SHIFTS, new Date('2026-11-04T07:30:00+07:00'));
+    expect(w.get('2026-11-03')).toEqual({ shifts: 2, minutes: 270 + 195, open: false });
+    expect(w.get('2026-11-04')).toEqual({ shifts: 1, minutes: 120, open: true });
+    expect(w.get('2026-11-30')).toMatchObject({ shifts: 1, minutes: 120 });
+    expect(w.has('2026-11-01')).toBe(false);
   });
 });

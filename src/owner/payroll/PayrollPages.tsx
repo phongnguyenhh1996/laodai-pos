@@ -5,8 +5,8 @@ import { ErrorText, Splash, TextField, errorMessage } from '@/app/ui';
 import { parseMoneyInput } from '@/domain/catalog';
 import { formatVnd } from '@/domain/money';
 import {
-  PAYROLL_KIND_LABELS, PAYROLL_KIND_SHORT, computePayslip, daysUntilBirthday, formatDate, formatMinutes, formatPhone, isMonth, monthLabel,
-  monthOf, parseDaysInput, shiftMonth, type PayrollEntry, type PayrollKind, type Payslip,
+  PAYROLL_KIND_LABELS, PAYROLL_KIND_SHORT, computePayslip, daysUntilBirthday, formatDate, formatMinutes, formatPhone, isMonth, monthGrid,
+  monthLabel, monthOf, parseDaysInput, shiftMonth, workDays, type PayrollEntry, type PayrollKind, type Payslip,
 } from '@/domain/payroll';
 import { businessDate, hhmm, minutesBetween } from '@/domain/time';
 import { useOwner } from '../OwnerContext';
@@ -246,9 +246,9 @@ function StaffPayroll() {
               tone={p.remaining > 0 ? 'text-warning-strong' : p.remaining < 0 ? 'text-danger-strong' : 'text-success-strong'}
             />
           </Card>
+          <WorkCalendar data={data} ym={ym} p={p} birthday={details?.birthday ?? null} />
           <EntryForm staffId={s.id} ym={ym} remaining={p.remaining} onSaved={reload} />
           <Ledger entries={data.entries} onVoid={(e) => void voidEntry(e)} />
-          <ShiftList data={data} />
         </>
       )}
     </OwnerLayout>
@@ -400,12 +400,124 @@ function Ledger({ entries, onVoid }: { entries: PayrollEntry[]; onVoid: (e: Payr
   );
 }
 
-function ShiftList({ data }: { data: PayrollMonth }) {
+const WEEKDAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+
+/** 270 → "4h30", 480 → "8h". */
+const shortHours = (min: number) => {
+  const m = Math.round(min);
+  return `${Math.floor(m / 60)}h${m % 60 ? String(m % 60).padStart(2, '0') : ''}`;
+};
+
+/** Lịch tháng: ngày có mở ca tô màu (kèm tổng giờ), bấm một ngày để xem các ca của ngày đó. */
+function WorkCalendar({ data, ym, p, birthday }: { data: PayrollMonth; ym: string; p: Payslip; birthday: string | null }) {
+  const [picked, setPicked] = useState<string | null>(null);
+  useEffect(() => setPicked(null), [ym]);
+  const today = businessDate(new Date());
+  const weeks = monthGrid(ym);
+  const work = workDays(data.shifts);
+  const elapsed = weeks.flat().filter((d): d is string => !!d && d <= today).length;
+  const off = Math.max(0, elapsed - p.shiftDays);
+  const adj = p.days - p.shiftDays;
+  // Sinh nhật rơi vào tháng đang xem (29/2 ở năm không nhuận thì không có ô ⇒ bỏ).
+  const bdayCell = birthday && birthday.slice(5, 7) === ym.slice(5) ? `${ym}-${birthday.slice(8)}` : null;
+  const bday = bdayCell && weeks.flat().includes(bdayCell) ? bdayCell : null;
+  const shifts = picked ? data.shifts.filter((s) => businessDate(s.opened_at) === picked) : data.shifts;
+
   return (
-    <Card title={`Các ca trong tháng (${data.shifts.length})`}>
-      {data.shifts.length === 0 && <p className="text-ink-subtle">Không có ca nào.</p>}
+    <Card title="Lịch làm việc">
+      <p className="text-sm text-ink-muted" data-testid="payroll-calendar-summary">
+        Đi làm <b className="text-ink">{p.shiftDays} ngày</b>
+        {elapsed > 0 && <> · nghỉ {off} ngày</>}
+        {ym === today.slice(0, 7) && ' (tính tới hôm nay)'}
+        {adj !== 0 && (
+          <>
+            {' · '}chủ chỉnh {adj > 0 ? '+' : ''}
+            {adj} ⇒ <b className="text-ink">{p.days} ngày công</b>
+          </>
+        )}
+      </p>
+      <div className="grid grid-cols-7 gap-1 text-center" role="grid" aria-label={`Lịch ${monthLabel(ym).toLowerCase()}`} data-testid="payroll-calendar">
+        {WEEKDAYS.map((w, i) => (
+          <span key={w} role="columnheader" className={`pb-1 text-xs font-semibold ${i === 6 ? 'text-danger-strong' : 'text-ink-subtle'}`}>
+            {w}
+          </span>
+        ))}
+        {weeks.flat().map((d, i) => {
+          if (!d) return <span key={`x${i}`} aria-hidden />;
+          const w = work.get(d);
+          const future = d > today;
+          const selected = picked === d;
+          const isBday = d === bday;
+          const tone = selected
+            ? 'border-brand-strong bg-brand text-white'
+            : w
+              ? 'border-brand-line bg-brand-soft text-brand-deep'
+              : isBday
+                ? 'border-danger-line text-danger-strong'
+                : future
+                  ? 'border-transparent text-ink-subtle/60'
+                  : 'border-line text-ink-muted';
+          const label = `${formatDate(d)}${w ? `: ${w.shifts} ca, ${formatMinutes(w.minutes)}${w.open ? ', đang mở' : ''}` : future ? '' : ': nghỉ'}${isBday ? ', sinh nhật' : ''}`;
+          return (
+            <button
+              key={d}
+              type="button"
+              role="gridcell"
+              aria-label={label}
+              aria-selected={selected}
+              disabled={!w}
+              onClick={() => setPicked(selected ? null : d)}
+              className={`relative flex min-h-[52px] flex-col items-center justify-center rounded-lg border transition-colors duration-fast ${tone} ${
+                d === today ? 'ring-2 ring-brand ring-offset-1 ring-offset-surface' : ''
+              } ${w && !selected ? 'hover:border-brand-strong' : ''}`}
+              data-testid={`payroll-day-${d}`}
+              data-worked={w ? true : undefined}
+            >
+              <span className={`num text-base leading-none ${w ? 'font-bold' : ''}`}>{Number(d.slice(8))}</span>
+              {w && (
+                <span className={`num mt-1 whitespace-nowrap text-[11px] leading-none ${selected ? 'text-white/90' : 'text-brand-strong'}`}>
+                  {w.open ? (
+                    <>
+                      <span className="hidden sm:inline">đang </span>mở
+                    </>
+                  ) : (
+                    shortHours(w.minutes)
+                  )}
+                  {w.shifts > 1 && !w.open ? ` · ${w.shifts}` : ''}
+                </span>
+              )}
+              {isBday && <Cake aria-hidden className={`absolute right-0.5 top-0.5 h-3 w-3 sm:h-3.5 sm:w-3.5 ${selected ? 'text-white' : 'text-danger-strong'}`} />}
+            </button>
+          );
+        })}
+      </div>
+      <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-subtle">
+        <span className="flex items-center gap-1.5">
+          <span aria-hidden className="h-3 w-3 rounded border border-brand-line bg-brand-soft" /> Có mở ca (tổng giờ · số ca)
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span aria-hidden className="h-3 w-3 rounded border border-line" /> Nghỉ
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span aria-hidden className="h-3 w-3 rounded ring-2 ring-brand" /> Hôm nay
+        </span>
+        {bday && (
+          <span className="flex items-center gap-1.5">
+            <Cake aria-hidden className="h-3.5 w-3.5 text-danger-strong" /> Sinh nhật
+          </span>
+        )}
+      </p>
+      <div className="flex items-center justify-between gap-2 border-t border-line pt-2">
+        <h3 className="font-semibold">{picked ? `Ca ngày ${formatDate(picked).slice(0, 5)}` : `Các ca trong tháng (${data.shifts.length})`}</h3>
+        {picked && (
+          <button type="button" className="text-sm text-brand-strong underline" onClick={() => setPicked(null)} data-testid="payroll-day-clear">
+            Xem cả tháng
+          </button>
+        )}
+      </div>
+      {shifts.length === 0 && <p className="text-ink-subtle">Không có ca nào.</p>}
       <ul className="flex flex-col divide-y divide-line" data-testid="payroll-shifts">
-        {data.shifts.map((s) => (
+        {shifts.map((s) => (
           <li key={s.id}>
             <Link to={`/owner/shifts/${s.id}`} className="-mx-2 flex items-center justify-between gap-3 rounded-lg px-2 py-2 hover:bg-surface-muted">
               <span>

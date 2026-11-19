@@ -184,6 +184,43 @@ export function computePayslip(
   return { rate, shifts: mine.length, shiftDays, days, base, bonus, deduction, total, advance, payment, remaining: total - advance - payment };
 }
 
+// ---------------------------------------------------------------- lịch tháng
+
+/** Lưới lịch tháng `ym`, tuần bắt đầu thứ Hai: mỗi tuần 7 ô, ô ngoài tháng = null. */
+export function monthGrid(ym: string): (string | null)[][] {
+  const [y, m] = ym.split('-').map(Number);
+  const count = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const lead = (new Date(Date.UTC(y, m - 1, 1)).getUTCDay() + 6) % 7; // T2 = 0 … CN = 6
+  const cells: (string | null)[] = Array(lead).fill(null);
+  for (let d = 1; d <= count; d++) cells.push(`${ym}-${String(d).padStart(2, '0')}`);
+  while (cells.length % 7) cells.push(null);
+  const weeks: (string | null)[][] = [];
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+  return weeks;
+}
+
+export interface WorkDay {
+  shifts: number;
+  /** Tổng phút của các ca đã đóng trong ngày (ca đang mở tính tới `now`). */
+  minutes: number;
+  open: boolean;
+}
+
+/** Ngày (giờ VN, theo ngày mở ca) → số ca + tổng giờ. */
+export function workDays(shifts: readonly WorkShift[], now: Date = new Date()): Map<string, WorkDay> {
+  const map = new Map<string, WorkDay>();
+  for (const s of shifts) {
+    const day = businessDate(s.opened_at);
+    const w = map.get(day) ?? { shifts: 0, minutes: 0, open: false };
+    const end = s.closed_at ? new Date(s.closed_at) : now;
+    w.shifts += 1;
+    w.minutes += Math.max(0, (end.getTime() - new Date(s.opened_at).getTime()) / 60_000);
+    if (!s.closed_at) w.open = true;
+    map.set(day, w);
+  }
+  return map;
+}
+
 /** 275 → "4 giờ 35 phút" (độ dài ca, chỉ để xem). */
 export function formatMinutes(min: number): string {
   const sign = min < 0 ? '−' : '';
