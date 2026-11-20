@@ -153,9 +153,10 @@ describe('G. Chủ', () => {
         cy.get(tid('edit-save')).should('be.enabled').click();
 
         cy.get(tid('order-edit-saved')).should('be.visible');
-        cy.get(tid('order-detail-status')).should('have.text', 'Đã thanh toán · chủ đã sửa');
+        cy.get(tid('order-detail-status')).should('have.text', 'Đã thanh toán');
+        cy.get(tid('order-detail-edited')).should('be.visible');
         cy.get(tid('order-detail-total')).should('have.text', '25.000');
-        cy.get(tid('order-detail-times')).should('contain.text', 'Chuyển khoản');
+        cy.get(tid('order-detail-method')).should('contain.text', 'Chuyển khoản');
         cy.get('[data-testid=log-row][data-action=owner_edit_order]').should('have.length', 1).and('contain.text', '50.000 → 25.000');
 
         // Telegram: trước / sau + ca đã đóng được tính lại
@@ -170,7 +171,7 @@ describe('G. Chủ', () => {
         cy.location('pathname').should('eq', `/owner/shifts/${shiftId}`);
         cy.get(tid('shift-adjusted')).should('be.visible');
         cy.get(tid('rep-revenue')).should('have.text', '40.000');
-        cy.get(tid('rep-revenue-split')).should('have.text', '15.000 · 25.000 · 0');
+        cy.get(tid('rep-revenue-split')).should('have.text', 'TM 15.000 · CK 25.000 · Nợ 0');
         cy.get(tid('rep-cash-expected')).should('have.text', '515.000');
         cy.get(tid('rep-cash-counted')).should('have.text', '565.000');
         cy.get(tid('rep-cash-diff')).should('have.text', '+50.000').and('have.attr', 'data-alert', 'true');
@@ -221,26 +222,24 @@ describe('G. Chủ', () => {
     cy.task('scenario:staffReport');
     cy.loginOwner();
     cy.ownerNav('reports');
-    cy.get(tid('report-from')).should('have.value', today());
+    cy.get(tid('report-today')).should('have.attr', 'aria-pressed', 'true');
     cy.get(tid('report-revenue')).should('have.text', '90.000');
     cy.get(tid('report-revenue-shares')).should('have.text', 'TM 28% · CK 50% · Nợ 22%');
 
     const staff = (k: keyof typeof SEED.staff, f: string) => tid(`report-staff-${SEED.staff[k]}-${f}`);
     cy.get(staff('Lan', 'total')).should('have.text', '60.000');
-    cy.get(staff('Lan', 'split')).should('have.text', 'TM 25.000 · CK 15.000 · Nợ 20.000 · 3 đơn');
-    cy.get(staff('Lan', 'shares')).should('have.text', 'TM 42% · CK 25% · Nợ 33%');
+    cy.get(staff('Lan', 'shares')).should('have.text', '3 đơn · TM 42% · CK 25% · Nợ 33%');
     cy.get(staff('Lan', 'edits')).should('have.text', 'Sửa 1');
     cy.get(staff('Lan', 'deletes')).should('have.text', 'Xóa 1');
 
     cy.get(staff('Mai', 'total')).should('have.text', '30.000');
-    cy.get(staff('Mai', 'split')).should('have.text', 'TM 0 · CK 30.000 · Nợ 0 · 1 đơn');
-    cy.get(staff('Mai', 'shares')).should('have.text', 'TM 0% · CK 100% · Nợ 0%');
+    cy.get(staff('Mai', 'shares')).should('have.text', '1 đơn · CK 100%');
     cy.get(staff('Mai', 'edits')).should('have.text', 'Sửa 2');
     cy.get(staff('Mai', 'deletes')).should('have.text', 'Xóa 1');
 
     cy.get(staff('Hung', 'total')).should('have.text', '0');
-    cy.get(staff('Hung', 'shares')).should('have.text', 'TM 0% · CK 0% · Nợ 0%');
-    cy.get(staff('Hung', 'edits')).should('have.text', 'Sửa 0');
+    cy.get(staff('Hung', 'shares')).should('have.text', '0 đơn');
+    cy.get(staff('Hung', 'edits')).should('not.exist'); // 0 lần ⇒ không hiện chip
 
     // Đối chiếu chuyển khoản hôm nay
     cy.get(tid(`report-bank-${today()}-${SEED.points.xoiA}`)).should('have.text', '15.000');
@@ -249,23 +248,25 @@ describe('G. Chủ', () => {
     cy.get(tid('report-top-row')).should('have.length', 4); // Xôi gà, xôi xéo, xôi pate, xôi thập cẩm
 
     // Khoảng ngày khác ⇒ không có số liệu
+    cy.get(tid('report-custom')).click();
     cy.get(tid('report-from')).type('2020-01-01');
     cy.get(tid('report-to')).type('2020-01-02');
     cy.location('search').should('contain', 'from=2020-01-01').and('contain', 'to=2020-01-02');
     cy.get(tid('report-revenue')).should('have.text', '0');
     cy.get(staff('Lan', 'total')).should('have.text', '0');
-    cy.get(staff('Lan', 'edits')).should('have.text', 'Sửa 0');
+    cy.get(staff('Lan', 'edits')).should('not.exist');
     cy.get(tid('report-today')).click();
     cy.get(staff('Lan', 'total')).should('have.text', '60.000');
 
-    // Màn Đơn lọc theo nhân viên + hình thức cùng số liệu
+    // Màn Đơn lọc theo nhân viên + hình thức cùng số liệu (có lọc nhân viên ⇒ ô lọc thêm tự mở)
     cy.ownerVisit(`/owner/orders?staff=${SEED.staff.Lan}&status=paid`);
+    cy.get(tid('orders-tab-paid')).should('have.attr', 'aria-selected', 'true');
     cy.get(tid('orders-row')).should('have.length', 3);
     cy.get(tid('orders-sum')).should('have.text', '60.000');
     cy.get(tid('orders-filter-method')).select('transfer');
     cy.get(tid('orders-row')).should('have.length', 1);
     cy.get(tid('orders-sum')).should('have.text', '15.000');
-    cy.get(tid('orders-filter-status')).select('deleted');
+    cy.get(tid('orders-tab-deleted')).click();
     cy.get(tid('orders-empty')).should('be.visible');
     cy.get(tid('orders-filter-method')).select('');
     cy.get(tid('orders-row')).should('have.length', 1).and('have.attr', 'data-status', 'deleted');

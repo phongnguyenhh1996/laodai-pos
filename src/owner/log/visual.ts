@@ -1,0 +1,62 @@
+import {
+  ArrowRightLeft,
+  Banknote,
+  CalendarDays,
+  ChefHat,
+  CircleCheck,
+  HandCoins,
+  LogIn,
+  Package,
+  PackageX,
+  Pencil,
+  Printer,
+  ReceiptText,
+  Settings,
+  ShieldCheck,
+  Trash2,
+  TriangleAlert,
+  UserPlus,
+  Users,
+  Wallet,
+  type LucideIcon,
+} from 'lucide-react';
+import type { Tone } from '../ui';
+
+/** Icon + sắc thái ô icon cho từng loại thao tác trong nhật ký (Figma R28 / T29). */
+const MAP: Record<string, [LucideIcon, Tone]> = {
+  tablet_login: [LogIn, 'gray'],
+  owner_mode: [ShieldCheck, 'gray'],
+  owner_pin_set: [ShieldCheck, 'gray'],
+  owner_pin_removed: [ShieldCheck, 'gray'],
+  owner_pin_locked: [ShieldCheck, 'red'],
+  shift_open: [Users, 'green'],
+  shift_close: [CircleCheck, 'gray'],
+  shift_adjust: [Users, 'amber'],
+  order_create: [ReceiptText, 'orange'],
+  order_update: [Pencil, 'amber'],
+  order_serve: [ChefHat, 'blue'],
+  order_pay: [Banknote, 'green'],
+  order_delete: [Trash2, 'red'],
+  owner_edit_order: [Pencil, 'red'],
+  customer_create: [UserPlus, 'gray'],
+  debt_payment: [HandCoins, 'green'],
+  debt_transfer: [ArrowRightLeft, 'amber'],
+  seq_gap: [TriangleAlert, 'red'],
+  sync_rejected: [TriangleAlert, 'red'],
+  settings_create: [Settings, 'gray'],
+  settings_update: [Settings, 'gray'],
+  print_template_update: [Settings, 'gray'],
+  payroll_add: [Wallet, 'gray'],
+  payroll_void: [Wallet, 'gray'],
+  print_request: [Printer, 'gray'],
+  print_printed: [Printer, 'gray'],
+  print_failed: [Printer, 'red'],
+  print_expired: [Printer, 'red'],
+  sold_out_set: [PackageX, 'amber'],
+  sold_out_clear: [Package, 'green'],
+};
+
+export function actionVisual(action: string): { icon: LucideIcon; tone: Tone } {
+  const v = MAP[action] ?? (action.startsWith('day_') ? [CalendarDays, 'gray'] : [ReceiptText, 'gray']);
+  return { icon: v[0], tone: v[1] as Tone };
+}

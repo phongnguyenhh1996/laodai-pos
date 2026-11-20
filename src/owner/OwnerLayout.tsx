@@ -62,14 +62,20 @@ export function OwnerLayout({
   actions,
   back,
   wide = false,
+  tabBar,
+  bottomBar,
   testId,
   children,
 }: {
   title: string;
-  subtitle?: string;
+  subtitle?: ReactNode;
   actions?: ReactNode;
   back?: string;
   wide?: boolean;
+  /** Điện thoại: hiện thanh tab cả ở trang con (Figma R23 "Đơn chi tiết"). Mặc định chỉ trang cấp 1. */
+  tabBar?: boolean;
+  /** Điện thoại: thanh thao tác dính đáy (Figma R24 "Lưu thay đổi") thay cho thanh tab. Tablet: đặt nút vào `actions`. */
+  bottomBar?: ReactNode;
   testId: string;
   children: ReactNode;
 }) {
@@ -78,6 +84,7 @@ export function OwnerLayout({
   const { pathname } = useLocation();
   const active = activeKey(pathname);
   const child = back !== undefined && back !== '/owner';
+  const showTabs = !bottomBar && (tabBar ?? !child);
 
   const content = (
     <div className={`flex w-full flex-col gap-4 p-4 pb-6 md:gap-5 md:px-7 md:pb-8 md:pt-6 ${wide ? '' : 'mx-auto max-w-2xl md:px-4'}`}>
@@ -107,7 +114,7 @@ export function OwnerLayout({
   }
 
   return (
-    <main data-testid={testId} className={`flex min-h-full flex-col bg-[#f6f6f6] text-[#111] ${child ? '' : 'pb-[82px]'}`}>
+    <main data-testid={testId} className={`flex min-h-full flex-col bg-[#f6f6f6] text-[#111] ${showTabs ? 'pb-[82px]' : bottomBar ? 'pb-[84px]' : ''}`}>
       <header className="sticky top-0 z-10 flex h-[72px] items-center justify-between gap-3 border-b border-line bg-white px-4">
         <div className="flex min-w-0 items-center gap-2.5">
           {child ? <BackLink to={back} /> : <Logo className="h-10 w-10 rounded-xl text-[15px]" />}
@@ -130,7 +137,12 @@ export function OwnerLayout({
         </button>
       </header>
       {content}
-      {!child && <TabBar active={active} />}
+      {showTabs && <TabBar active={active} />}
+      {bottomBar && (
+        <div className="fixed inset-x-0 bottom-0 z-10 flex h-[84px] items-center gap-2.5 border-t border-line bg-white px-4 pb-3.5" data-testid="owner-bottom-bar">
+          {bottomBar}
+        </div>
+      )}
     </main>
   );
 }

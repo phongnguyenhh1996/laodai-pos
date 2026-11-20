@@ -96,7 +96,7 @@ describe('E. Kịch bản gian lận', () => {
         // Báo cáo ca: mục bao bì của đơn bị xóa sau khi ra món
         cy.task<Array<{ id: string }>>('db:shifts', 'A').then(([shift]) => {
           cy.ownerVisit(`/owner/shifts/${shift.id}`);
-          cy.get(tid('rep-deleted')).should('have.text', '1 (1 đã ra món)');
+          cy.get(tid('rep-deleted')).should('contain.text', 'Đơn đã xóa (1 ra món)').find('b').should('have.text', '1');
           cy.get(tid('rep-deleted-after-served')).should('have.text', `${code} (1 hộp)`);
         });
       });
@@ -123,7 +123,8 @@ describe('E. Kịch bản gian lận', () => {
     cy.task<Array<{ id: string }>>('db:shifts', 'A').then(([shift]) => {
       cy.loginOwner();
       cy.ownerVisit(`/owner/shifts/${shift.id}`);
-      cy.get(tid('rep-edits')).should('have.text', '1 lần').click();
+      cy.get(tid('rep-edits')).should('contain.text', 'Sửa đơn đang mở').find('b').should('have.text', '1');
+      cy.get(tid('rep-edits')).click();
       // Nhật ký lọc sẵn: sửa & xóa của Lan
       cy.location('search').should('contain', 'type=edits').and('contain', `staff=${SEED.staff.Lan}`);
       cy.get(tid('log-filter-type')).should('have.value', 'edits');
@@ -204,7 +205,7 @@ describe('E. Kịch bản gian lận', () => {
     cy.get(tid(`report-bank-${today}-${SEED.points.com}`)).should('have.text', '40.000');
     cy.get(tid(`report-bank-${today}-total`)).should('have.text', '71.000');
     cy.get(tid(`report-bank-${today}-debt`)).should('not.exist');
-    cy.get(tid(`report-staff-${SEED.staff.Lan}-shares`)).should('have.text', 'TM 28% · CK 72% · Nợ 0%');
+    cy.get(tid(`report-staff-${SEED.staff.Lan}-shares`)).should('contain.text', 'TM 28% · CK 72%');
 
     // App ngân hàng chỉ có 40.000 ⇒ chủ lọc đơn CK của Xôi A hôm nay: ra đúng đơn bị ghi sai và người thu
     cy.ownerVisit(`/owner/orders?method=transfer&point=${SEED.points.xoiA}`);
@@ -227,7 +228,7 @@ describe('E. Kịch bản gian lận', () => {
 
     cy.telegramWaitFor('Đóng ca – Lan').its('text').should('contain', 'Hộp: dùng 10 / theo đơn 2 → +8').and('contain', 'Dĩa: dùng 1 / theo đơn 1');
     ownerOpensOnlyShift();
-    cy.get(tid('rep-boxes-supply')).should('have.text', '200 + 0 = 200');
+    cy.get(tid('rep-boxes-supply')).should('have.text', '200 + 0');
     cy.get(tid('rep-boxes-left')).should('have.text', '190');
     cy.get(tid('rep-boxes')).should('have.text', '10 / 2');
     cy.get(tid('rep-boxes-diff')).should('have.text', '+8').and('have.attr', 'data-alert', 'true');

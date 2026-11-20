@@ -82,7 +82,7 @@ describe('B. Ca', () => {
       cy.loginOwner();
       ownerOpensShift(shift.id);
       cy.get(tid('shift-report')).should('have.attr', 'data-status', 'open');
-      cy.get(tid('rep-boxes-supply')).should('have.text', '200 + 0 = 200');
+      cy.get(tid('rep-boxes-supply')).should('have.text', '200 + 0');
       cy.get(tid('rep-cash-expected')).should('have.text', '531.000');
 
       // +50 hộp
@@ -91,7 +91,7 @@ describe('B. Ca', () => {
       cy.get(tid('adjust-note')).type('mang thêm');
       cy.get(tid('adjust-submit')).click();
       cy.get(tid('adjustment-row')).should('have.length', 1).first().should('contain.text', '+50 hộp').and('contain.text', 'mang thêm');
-      cy.get(tid('rep-boxes-supply')).should('have.text', '200 + 50 = 250');
+      cy.get(tid('rep-boxes-supply')).should('have.text', '200 + 50');
       // +200k tiền lẻ ⇒ tiền kỳ vọng tăng đúng 200.000
       cy.get(tid('adjust-kind-cash')).click();
       cy.get(tid('adjust-qty')).type('200k');
@@ -110,7 +110,7 @@ describe('B. Ca', () => {
       cy.task('sim:closeShift', { tablet: 'A', boxes: 248, plates: 60, cash: 731_000 });
       cy.ownerReload();
       cy.get(tid('shift-report')).should('have.attr', 'data-status', 'closed');
-      cy.get(tid('rep-boxes-supply')).should('have.text', '200 + 50 = 250');
+      cy.get(tid('rep-boxes-supply')).should('have.text', '200 + 50');
       cy.get(tid('rep-boxes-left')).should('have.text', '248');
       cy.get(tid('rep-boxes')).should('have.text', '2 / 1');
       cy.get(tid('rep-boxes-diff')).should('have.text', '+1');

@@ -1,32 +1,28 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { ErrorText, Splash, errorMessage } from '@/app/ui';
-import { ACTION_GROUPS, ACTION_LABELS, DELETE_REASON_LABELS, actionLabel, describeAudit, type AuditEntry } from '@/domain/audit';
-import { lineSummary } from '@/domain/cart';
-import { formatVnd } from '@/domain/money';
+import { ACTION_GROUPS, ACTION_LABELS, actionLabel, describeAudit, type AuditEntry } from '@/domain/audit';
 import { hhmm } from '@/domain/time';
-import { DINE_LABELS, type DeleteReason } from '@/domain/types';
 import { useOwner } from '../OwnerContext';
 import { OwnerLayout } from '../OwnerLayout';
-import { PAGE_SIZE, loadLog, loadLogNames, loadOrderDetail, loadOrderPrints, type LogNames, type OrderDetail, type OrderPrintRow } from './api';
-import { RemotePrint, shownStatus } from '../print/RemotePrint';
+import { PAGE_SIZE, loadLog, loadLogNames, type LogNames } from './api';
 
-const day = (at: string) =>
-  new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', day: '2-digit', month: '2-digit' }).format(new Date(at)) + ' ' + hhmm(at);
+export const day = (at: string) =>
+  new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', day: '2-digit', month: '2-digit' }).format(new Date(at)).replace('-', '/') + ' ' + hhmm(at);
 
 /** Đồng bộ trễ ≥ 2 phút (làm lúc offline) ⇒ hiện cả thời điểm thực hiện và đồng bộ, như tin Telegram. */
-function when(e: AuditEntry): string {
+export function when(e: AuditEntry): string {
   const lag = Date.parse(e.synced_at) - Date.parse(e.at);
   return lag >= 2 * 60_000 ? `${day(e.at)} (đồng bộ ${day(e.synced_at)})` : day(e.at);
 }
 
-function actor(e: AuditEntry, names: LogNames): string {
+export function actor(e: AuditEntry, names: LogNames): string {
   if (e.actor_kind === 'owner') return 'Chủ';
   if (e.actor_kind === 'system') return 'Hệ thống';
   return (e.staff_id && names.staff.get(e.staff_id)) || 'Nhân viên';
 }
 
-function useLog(filterKey: string, load: (after?: AuditEntry) => Promise<AuditEntry[]>) {
+export function useLog(filterKey: string, load: (after?: AuditEntry) => Promise<AuditEntry[]>) {
   const [rows, setRows] = useState<AuditEntry[] | null>(null);
   const [more, setMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -58,7 +54,7 @@ function useLog(filterKey: string, load: (after?: AuditEntry) => Promise<AuditEn
   return { rows, more, error, loadMore };
 }
 
-function useNames(): LogNames | null {
+export function useNames(): LogNames | null {
   const { client } = useOwner();
   const [names, setNames] = useState<LogNames | null>(null);
   useEffect(() => {
@@ -187,149 +183,5 @@ function LogRow({ e, names }: { e: AuditEntry; names: LogNames }) {
         </p>
       ))}
     </li>
-  );
-}
-
-const STATUS: Record<OrderDetail['status'], string> = { open: 'Chờ ra món', served: 'Chờ thanh toán', paid: 'Đã thanh toán', deleted: 'Đã xóa' };
-const METHOD = { cash: 'Tiền mặt', transfer: 'Chuyển khoản', debt: 'Ghi nợ' } as const;
-
-/** `/owner/orders/:orderId`: chi tiết đơn + toàn bộ nhật ký của đơn. */
-export function OrderDetailPage() {
-  const { orderId = '' } = useParams();
-  const { client } = useOwner();
-  const saved = (useLocation().state as { saved?: boolean } | null)?.saved === true;
-  const names = useNames();
-  const [order, setOrder] = useState<OrderDetail | null | undefined>(undefined);
-  const [error, setError] = useState<string | null>(null);
-  useEffect(() => {
-    let alive = true;
-    loadOrderDetail(client, orderId)
-      .then((o) => alive && setOrder(o))
-      .catch((e: unknown) => alive && setError(errorMessage(e)));
-    return () => {
-      alive = false;
-    };
-  }, [client, orderId]);
-  const load = useCallback((after?: AuditEntry) => loadLog(client, { entityId: orderId }, after), [client, orderId]);
-  const log = useLog(orderId, load);
-
-  const o = order;
-  return (
-    <OwnerLayout title={o ? `Đơn #${o.code}` : 'Đơn'} back="/owner/orders" testId="order-detail">
-      <ErrorText testId="order-detail-error">{error ?? log.error}</ErrorText>
-      {saved && (
-        <p className="rounded-lg bg-success-soft px-4 py-3 text-success-strong" data-testid="order-edit-saved">
-          Đã lưu. Ca đã đóng (nếu có) đã được tính lại; Telegram đã được báo.
-        </p>
-      )}
-      {o === undefined && !error && <Splash />}
-      {o === null && <p className="text-ink-subtle">Không có đơn này.</p>}
-      {o && (
-        <section className="flex flex-col gap-1 card p-4" data-testid="order-detail-info" data-status={o.status}>
-          <p className="flex items-baseline justify-between">
-            <b className={o.status === 'deleted' ? 'text-danger-strong' : ''} data-testid="order-detail-status">
-              {STATUS[o.status]}
-              {o.owner_edited && ' · chủ đã sửa'}
-            </b>
-            <b className={`text-2xl ${o.status === 'deleted' ? 'line-through' : ''}`} data-testid="order-detail-total">
-              {formatVnd(o.total)}
-            </b>
-          </p>
-          <p className="text-ink-muted">
-            {o.point_name} · {o.tablet_name} · {DINE_LABELS[o.dine_type]}
-            {o.label ? ` · ${o.label}` : ''}
-          </p>
-          {o.address && (
-            <p className="text-ink-muted" data-testid="order-detail-address">
-              Giao đến: {o.address}
-            </p>
-          )}
-          {o.items.map((it, i) => (
-            <p key={i} data-testid="order-detail-item">
-              {lineSummary(it)} — {formatVnd((it.unit_price_snap + it.toppings_snap.reduce((s, t) => s + t.price, 0)) * it.qty)}
-            </p>
-          ))}
-          <p className="text-sm text-ink-muted" data-testid="order-detail-times">
-            Tạo {day(o.created_at)} ({o.opened_by})
-            {o.served_at && ` · Ra món ${hhmm(o.served_at)}`}
-            {o.paid_at && ` · Thu ${hhmm(o.paid_at)} (${o.paid_by}) · ${METHOD[o.payment_method!]}`}
-            {o.cash_given !== null && o.payment_method === 'cash' && ` · khách đưa ${formatVnd(o.cash_given)}`}
-            {o.customer_label && ` · ${o.customer_label}`}
-            {o.deleted_at && ` · Xóa ${hhmm(o.deleted_at)} – ${DELETE_REASON_LABELS[o.delete_reason as DeleteReason] ?? o.delete_reason}`}
-          </p>
-          <p className="flex flex-wrap gap-x-3 text-sm">
-            <Link to={`/owner/shifts/${o.opened_shift_id}`} className="underline" data-testid="order-detail-opened-shift">
-              Ca mở đơn
-            </Link>
-            {o.paid_shift_id && o.paid_shift_id !== o.opened_shift_id && (
-              <Link to={`/owner/shifts/${o.paid_shift_id}`} className="underline" data-testid="order-detail-paid-shift">
-                Ca thu tiền
-              </Link>
-            )}
-          </p>
-          {o.status === 'paid' && (
-            <Link to={`/owner/orders/${o.id}/edit`} className="btn btn-brand-outline mt-2" data-testid="order-edit">
-              Sửa đơn đã thanh toán
-            </Link>
-          )}
-        </section>
-      )}
-      {o && o.status !== 'deleted' && <OrderPrintSection client={client} order={o} />}
-      <h2 className="text-lg font-semibold">Nhật ký của đơn</h2>
-      {log.rows && names && (
-        <ol className="flex flex-col divide-y divide-line overflow-hidden card" data-testid="log-list">
-          {log.rows.map((e) => (
-            <LogRow key={e.id} e={e} names={names} />
-          ))}
-        </ol>
-      )}
-    </OwnerLayout>
-  );
-}
-
-const PRINT_KIND = { kitchen: 'Phiếu bếp', bill: 'Bill', test: 'In thử' } as const;
-const PRINT_SOURCE = { auto: 'tự in', staff: 'nhân viên in lại', owner: 'chủ gửi' } as const;
-const PRINT_STATUS = { pending: 'đang chờ', claimed: 'đang in', printed: 'đã in', failed: 'lỗi', expired: 'hết hạn' } as const;
-
-/** In lại từ xa (SPEC 12.6) + lịch sử in của đơn. Bill: chỉ khi đã thanh toán (bản in lại giống hệt bản gốc). */
-function OrderPrintSection({ client, order }: { client: ReturnType<typeof useOwner>['client']; order: OrderDetail }) {
-  const [rows, setRows] = useState<OrderPrintRow[] | null>(null);
-  const reload = useCallback(() => {
-    loadOrderPrints(client, order.id)
-      .then(setRows)
-      .catch(() => setRows([]));
-  }, [client, order.id]);
-  useEffect(() => {
-    reload();
-    const t = setInterval(reload, 5000);
-    return () => clearInterval(t);
-  }, [reload]);
-  return (
-    <section className="flex flex-col gap-3" data-testid="order-print">
-      <h2 className="text-lg font-semibold">In</h2>
-      {order.status === 'paid' && (
-        <RemotePrint client={client} kind="bill" orderId={order.id} defaultProfileId={order.tablet_profile_id} label="In lại bill" testId="reprint-bill" />
-      )}
-      <RemotePrint client={client} kind="kitchen" orderId={order.id} defaultProfileId={order.tablet_profile_id} label="In lại phiếu bếp" testId="reprint-kitchen" />
-      {rows && rows.length > 0 && (
-        <ul className="card flex flex-col divide-y divide-line overflow-hidden" data-testid="order-print-history">
-          {rows.map((r) => {
-            const st = shownStatus(r);
-            return (
-              <li key={r.id} className="flex flex-wrap justify-between gap-2 px-4 py-2 text-base" data-testid="order-print-row" data-status={st}>
-                <span>
-                  {PRINT_KIND[r.kind]} · {PRINT_SOURCE[r.source]}
-                  {r.tablet_profiles ? ` · ${r.tablet_profiles.name}` : ''}
-                </span>
-                <span className={st === 'printed' ? 'text-success-strong' : st === 'failed' || st === 'expired' ? 'text-danger-strong' : 'text-ink-muted'}>
-                  {day(r.created_at)} · {PRINT_STATUS[st]}
-                  {r.error ? ` (${r.error})` : ''}
-                </span>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </section>
   );
 }
