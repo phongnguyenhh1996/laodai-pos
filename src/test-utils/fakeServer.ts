@@ -1,6 +1,8 @@
 // Server giả trong bộ nhớ cho test: làm đúng vai `sync_push` + các truy vấn của tablet (theo từng hồ sơ),
 // cấp mã đơn + số thứ tự, từ chối khi đơn / ca không còn mở, và báo thay đổi (live_pulse) cho mọi máy đang nghe.
+import type { SoldOut } from '@/domain/catalog';
 import { generateOrderCode } from '@/domain/orderCode';
+import { businessDate } from '@/domain/time';
 import type { Customer, Order, OrderItem } from '@/domain/types';
 import {
   PosNetworkError,
@@ -319,6 +321,17 @@ export class FakeServer {
         if (!this.catalog.customers.some((c) => c.id === id)) throw new Reject('bad_customer');
         this.catalog.balances[id] = (this.catalog.balances[id] ?? 0) - (p.amount as number);
         this.debtPayments.push({ id: p.id as string, customer_id: id, amount: p.amount as number, method: p.method as 'cash' | 'transfer', at: new Date().toISOString() });
+        return { catalog: true };
+      }
+      case 'set_sold_out': {
+        shift();
+        const point = p.point_id as string;
+        if (!this.catalog.profile.point_ids.includes(point)) throw new Reject('point_not_allowed');
+        const kind = p.item_kind as 'product' | 'topping';
+        const day = businessDate(new Date(), this.catalog.config.timezone);
+        const same = (r: SoldOut) => r.point_id === point && r.item_kind === kind && r.item_id === p.item_id && r.day === day;
+        const rest = (this.catalog.sold_out ?? []).filter((r) => !same(r));
+        this.catalog.sold_out = p.sold_out ? [...rest, { point_id: point, item_kind: kind, item_id: p.item_id as string, day, at: now }] : rest;
         return { catalog: true };
       }
     }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   CatalogError, activeStaff, checkCombo, checkMenu, checkPoint, checkProduct, checkStaff, checkTabletProfile,
-  checkTopping, menuBoard, parseCountInput, parseMoneyInput, sortCatalog, tabletPoints,
+  checkTopping, menuBoard, parseCountInput, parseMoneyInput, soldOutAt, sortCatalog, tabletPoints,
 } from './catalog';
 import {
   CANH, CHA, COMBOS, COMBO_XOI_FULL, COM_GA, COM_MENU, PATE_CU, PRODUCTS, TOPPINGS, TRUNG, XOI_GA, XOI_MENU,
@@ -175,5 +175,24 @@ describe('kiểm tra dữ liệu chủ nhập', () => {
     expect(err(() => checkTabletProfile({ ...a, default_boxes: -1 }, ctx, PROFILE.id))).toMatch('hộp đầu ca');
     expect(err(() => checkTabletProfile({ ...a, default_plates: -1 }, ctx, PROFILE.id))).toMatch('dĩa đầu ca');
     expect(err(() => checkTabletProfile({ ...a, default_float: 0.5 }, ctx, PROFILE.id))).toMatch('Tiền lẻ');
+  });
+});
+
+describe('soldOutAt (hết món)', () => {
+  const rows = [
+    { point_id: 'xoi-a', item_kind: 'product' as const, item_id: XOI_GA.id, day: '2026-11-20', at: '' },
+    { point_id: 'xoi-a', item_kind: 'topping' as const, item_id: CHA.id, day: '2026-11-20', at: '' },
+    { point_id: 'xoi-b', item_kind: 'topping' as const, item_id: TRUNG.id, day: '2026-11-20', at: '' },
+    { point_id: 'xoi-a', item_kind: 'topping' as const, item_id: TRUNG.id, day: '2026-11-19', at: '' },
+  ];
+  it('chỉ tính điểm bán + ngày đang xét; combo hết khi món chính hoặc một topping hết', () => {
+    const s = soldOutAt(rows, 'xoi-a', '2026-11-20');
+    expect(s.product(XOI_GA.id)).toBe(true);
+    expect(s.topping(CHA.id)).toBe(true);
+    expect(s.topping(TRUNG.id)).toBe(false); // hôm qua / điểm khác
+    expect(s.combo(COMBO_XOI_FULL)).toBe(true);
+    expect(s.combo({ product_id: 'khac', topping_ids: [TRUNG.id] })).toBe(false);
+    expect(s.combo({ product_id: 'khac', topping_ids: [CHA.id] })).toBe(true);
+    expect(soldOutAt(undefined, 'xoi-a', '2026-11-20').product(XOI_GA.id)).toBe(false);
   });
 });

@@ -23,7 +23,8 @@ export type OpKind =
   | 'serve_order'
   | 'pay_order'
   | 'delete_order'
-  | 'debt_payment';
+  | 'debt_payment'
+  | 'set_sold_out';
 
 /** Một thao tác gửi lên RPC `sync_push`. `op_id` là khóa idempotent: gửi lại sau khi mất phản hồi không bị ghi hai lần. */
 export interface WireOp {

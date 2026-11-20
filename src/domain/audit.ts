@@ -57,6 +57,8 @@ export const ACTION_LABELS: Record<string, string> = {
   print_failed: 'In lỗi',
   print_expired: 'Lệnh in hết hạn (không máy nào nhận)',
   print_template_update: 'Sửa mẫu in',
+  sold_out_set: 'Báo hết món',
+  sold_out_clear: 'Bán lại món',
 };
 
 const PRINT_KIND: Record<string, string> = { kitchen: 'Phiếu bếp', bill: 'Bill', test: 'In thử' };
@@ -74,6 +76,7 @@ export const ACTION_GROUPS: Array<{ id: string; label: string; actions: string[]
   { id: 'debts', label: 'Nợ', actions: ['customer_create', 'debt_payment', 'debt_transfer'] },
   { id: 'owner', label: 'Chủ', actions: ['owner_mode', 'owner_pin_set', 'owner_pin_removed', 'owner_edit_order', 'shift_adjust', 'settings_create', 'settings_update', 'payroll_add', 'payroll_void', 'day_off_add', 'day_off_update', 'day_off_remove', 'day_work_add', 'day_work_update', 'day_work_remove'] },
   { id: 'print', label: 'In phiếu bếp / bill', actions: ['print_request', 'print_printed', 'print_failed', 'print_expired', 'print_template_update'] },
+  { id: 'sold_out', label: 'Hết món', actions: ['sold_out_set', 'sold_out_clear'] },
   { id: 'print_issues', label: 'In lỗi / hết hạn', actions: ['print_failed', 'print_expired'] },
   { id: 'alerts', label: 'Cảnh báo (thiếu số đơn, bị từ chối, đăng nhập)', actions: ['seq_gap', 'sync_rejected', 'tablet_login', 'owner_pin_locked'] },
 ];
@@ -163,6 +166,10 @@ export function describeAudit(e: Pick<AuditEntry, 'action' | 'before' | 'after' 
       break;
     case 'debt_payment':
       lines.push(`${formatVnd(Number(after.amount ?? 0))} · ${after.method === 'cash' ? 'tiền mặt' : 'chuyển khoản'}`);
+      break;
+    case 'sold_out_set':
+    case 'sold_out_clear':
+      lines.push(`${after.item_kind === 'topping' ? 'Topping ' : ''}${String(after.name ?? '')} · ${String(after.point_name ?? '')}`);
       break;
     case 'customer_create':
       lines.push([after.name, after.description, after.phone].filter(Boolean).join(' · '));

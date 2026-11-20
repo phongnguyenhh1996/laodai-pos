@@ -43,6 +43,31 @@ export function activeStaff(staff: readonly Staff[]): Staff[] {
   return sortCatalog(staff.filter((s) => s.active));
 }
 
+/** Món / topping nhân viên báo hết trong ngày ở một điểm bán (SPEC mục 4.8). */
+export interface SoldOut {
+  point_id: string;
+  item_kind: 'product' | 'topping';
+  item_id: string;
+  /** Ngày kinh doanh "YYYY-MM-DD" (giờ VN): sang ngày mới thì tự bán lại. */
+  day: string;
+  at: string;
+}
+
+/** Thứ đang hết ở một điểm bán hôm nay. */
+export interface SoldOutSet {
+  product(id: string): boolean;
+  topping(id: string): boolean;
+  /** Combo hết khi món chính hoặc một topping của combo đang hết. */
+  combo(c: Pick<Combo, 'product_id' | 'topping_ids'>): boolean;
+}
+
+export function soldOutAt(rows: readonly SoldOut[] | undefined, pointId: string, today: string): SoldOutSet {
+  const keys = new Set((rows ?? []).filter((r) => r.point_id === pointId && r.day === today).map((r) => `${r.item_kind}:${r.item_id}`));
+  const product = (id: string) => keys.has(`product:${id}`);
+  const topping = (id: string) => keys.has(`topping:${id}`);
+  return { product, topping, combo: (c) => product(c.product_id) || c.topping_ids.some(topping) };
+}
+
 export interface MenuBoard {
   combos: Array<{ combo: Combo; price: Money }>;
   products: Product[];

@@ -238,6 +238,11 @@ export class TabletStore {
     this.patchOpen((o) => ({ shift: o.shift, orders: o.orders.filter((x) => x.id !== id) }));
   }
 
+  /** Đổi danh mục trong bộ nhớ ngay sau thao tác (vd. báo hết món), trước khi tải lại từ server. */
+  patchCatalog(fn: (c: Catalog) => Catalog): void {
+    if (this.snap.catalog) this.emit({ catalog: fn(this.snap.catalog) });
+  }
+
   /** Gọi server thành công / thất bại vì mạng (thao tác của màn bán hàng báo về để chỉ báo kết nối đúng). */
   reportOk(): void {
     if (this.snap.error) this.emit({ error: null });

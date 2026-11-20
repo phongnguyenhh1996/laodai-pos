@@ -1,6 +1,8 @@
 import { v7 as uuidv7 } from 'uuid';
+import type { SoldOut } from '@/domain/catalog';
 import { canConfirmCash } from '@/domain/cash';
 import { assertQty, orderTotal } from '@/domain/pricing';
+import { businessDate } from '@/domain/time';
 import type { DeleteReason, DineType, Money, Order, OrderItem } from '@/domain/types';
 import { PosNetworkError } from './backend';
 import type { TabletStore } from './store';
@@ -45,6 +47,7 @@ const REJECT_MESSAGES: Record<string, string> = {
   bad_customer: 'Không tìm thấy khách nợ.',
   bad_staff: 'Nhân viên không còn làm.',
   empty_items: 'Đơn chưa có món',
+  bad_item: 'Món này không còn trong menu của điểm bán.',
 };
 
 export function rejectMessage(reason: string): string {
@@ -391,6 +394,27 @@ export class Pos {
     await this.send('debt_payment', intent, () => ({ entity_id: id, payload: { id, ...input, shift_id: shift.id } }));
     await this.store.refreshCatalog();
     return id;
+  }
+
+  // ---------------------------------------------------------------- hết món
+
+  /**
+   * Báo một món / topping hết (hoặc bán lại) trong ngày ở một điểm bán. Mọi máy thấy ngay qua Realtime;
+   * sang ngày mới thì tự bán lại. Cần ca đang mở (nhật ký ghi tên nhân viên).
+   */
+  async setSoldOut(input: { point_id: string; item_kind: 'product' | 'topping'; item_id: string; sold_out: boolean }): Promise<void> {
+    const shift = this.shift();
+    const intent = `${input.point_id}:${input.item_kind}:${input.item_id}:${input.sold_out}`;
+    await this.send('set_sold_out', intent, () => ({ entity_id: input.item_id, payload: { ...input, shift_id: shift.id } }));
+    const tz = this.store.getSnapshot().catalog?.config.timezone;
+    const day = businessDate(new Date(), tz);
+    const same = (r: SoldOut) => r.point_id === input.point_id && r.item_kind === input.item_kind && r.item_id === input.item_id;
+    this.store.patchCatalog((c) => {
+      const rest = (c.sold_out ?? []).filter((r) => !same(r));
+      const { point_id, item_kind, item_id } = input;
+      return { ...c, sold_out: input.sold_out ? [...rest, { point_id, item_kind, item_id, day, at: new Date().toISOString() }] : rest };
+    });
+    void this.store.refreshCatalog();
   }
 
   // ---------------------------------------------------------------- nội bộ

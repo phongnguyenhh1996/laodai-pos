@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import type { SoldOut } from '@/domain/catalog';
 import type { Combo, Customer, Menu, Money, Point, Product, Staff, TabletProfile, Topping } from '@/domain/types';
 
 /**
@@ -25,6 +26,8 @@ export interface CatalogData {
   /** Danh sách khách (gợi ý khi ghi nợ / thu nợ / chọn khách đơn ship) và dư nợ theo khách gốc. */
   customers: Customer[];
   balances: Record<string, Money>;
+  /** Món / topping báo hết hôm nay ở các điểm bán của quầy (thiếu ⇒ không có gì hết). */
+  sold_out?: SoldOut[];
 }
 
 export interface Catalog extends CatalogData {
@@ -76,7 +79,12 @@ export function createSupabaseCatalogSource(client: SupabaseClient): CatalogSour
       if (error) throw new CatalogFetchError(`Không tải được dư nợ: ${error.message}`);
       return Object.fromEntries(((data ?? []) as Array<{ customer_id: string; balance: number }>).map((r) => [r.customer_id, r.balance]));
     };
-    const [profile, config, menus, points, products, toppings, combos, staff, customers, balances] = await Promise.all([
+    const soldOutQuery = async (): Promise<SoldOut[]> => {
+      const { data, error } = await client.rpc('sold_out_today');
+      if (error) throw new CatalogFetchError(`Không tải được món hết: ${error.message}`);
+      return (data ?? []) as SoldOut[];
+    };
+    const [profile, config, menus, points, products, toppings, combos, staff, customers, balances, sold_out] = await Promise.all([
       profileQuery(),
       configQuery(),
       table<Menu>('menus'),
@@ -87,7 +95,8 @@ export function createSupabaseCatalogSource(client: SupabaseClient): CatalogSour
       table<Staff>('staff'),
       table<Customer>('customers'),
       balancesQuery(),
+      soldOutQuery(),
     ]);
-    return { profile, config, menus, points, products, toppings, combos, staff, customers, balances };
+    return { profile, config, menus, points, products, toppings, combos, staff, customers, balances, sold_out };
   };
 }

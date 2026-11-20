@@ -25,9 +25,10 @@ import {
   type DraftCustomer,
 } from '@/domain/cart';
 import { DELETE_REASON_LABELS } from '@/domain/audit';
-import { tabletPoints } from '@/domain/catalog';
+import { soldOutAt, tabletPoints, type SoldOutSet } from '@/domain/catalog';
 import { formatVnd } from '@/domain/money';
 import { lineTotal, selectableToppings } from '@/domain/pricing';
+import { businessDate } from '@/domain/time';
 import { DINE_LABELS, type Combo, type DeleteReason, type DineType, type Order, type Point, type Product, type Topping } from '@/domain/types';
 import { pos } from '@/lib/pos';
 import { Splash, errorMessage } from '@/app/ui';
@@ -73,6 +74,9 @@ export function OrderScreen() {
   const [cartOpen, setCartOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  /** Chế độ báo hết món (mục 4.8) + món đang gửi lên server. */
+  const [marking, setMarking] = useState(false);
+  const [markingPending, setMarkingPending] = useState<string | null>(null);
   /** Đang gõ địa chỉ: chưa tự lưu (mỗi lần đổi địa chỉ đơn ship là một tin Telegram), lưu khi rời ô. */
   const [typingAddress, setTypingAddress] = useState(false);
   const busyRef = useRef(false);
@@ -236,6 +240,20 @@ export function OrderScreen() {
   const blocked = empty || noAddress || busy;
   // Dòng đang chọn đã bị bớt hết / đổi đi ⇒ coi như không chọn.
   const swapLine = swapId ? d.items.find((it) => it.id === swapId) ?? null : null;
+  const soldOut = soldOutAt(cat.sold_out, d.point_id, businessDate(new Date(), cat.config.timezone));
+
+  async function toggleSoldOut(kind: 'product' | 'topping', id: string, sold_out: boolean) {
+    if (markingPending) return;
+    setError(null);
+    setMarkingPending(`${kind}:${id}`);
+    try {
+      await pos.setSoldOut({ point_id: d.point_id, item_kind: kind, item_id: id, sold_out });
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setMarkingPending(null);
+    }
+  }
 
   function edit(fn: (d: CartDraft) => CartDraft) {
     setError(null);
@@ -415,6 +433,16 @@ export function OrderScreen() {
           canSelectPoint={(p) => canSwitchPoint(d, cat.points, p)}
           onCombo={onCombo}
           onProduct={onProduct}
+          soldOut={soldOut}
+          marking={{
+            active: marking,
+            onToggleActive: () => {
+              setSwapId(null);
+              setMarking((m) => !m);
+            },
+            onToggle: (kind, id, v) => void toggleSoldOut(kind, id, v),
+            pending: markingPending,
+          }}
         />
       </div>
 
@@ -622,6 +650,7 @@ export function OrderScreen() {
           product={dialog.product}
           toppings={selectableToppings(cat.toppings, menuId)}
           initial={dialog.initial}
+          soldOut={soldOut}
           swapping={!!swapLine}
           onAdd={(ids) => addWithToppings(dialog.product, ids)}
           onCancel={() => setDialog(null)}
@@ -663,6 +692,7 @@ function ToppingSheet({
   product,
   toppings,
   initial,
+  soldOut,
   swapping,
   onAdd,
   onCancel,
@@ -670,6 +700,8 @@ function ToppingSheet({
   product: Product;
   toppings: Topping[];
   initial: string[];
+  /** Topping đang hết: không chọn thêm được (đã có sẵn trong món đang đổi thì vẫn bỏ được). */
+  soldOut: SoldOutSet;
   /** Đang đổi món ⇒ nút xác nhận thay dòng đã chọn chứ không thêm dòng mới. */
   swapping: boolean;
   onAdd: (ids: string[]) => void;
@@ -683,18 +715,21 @@ function ToppingSheet({
       <div className="grid grid-cols-2 gap-2.5 md:gap-3">
         {toppings.map((t) => {
           const on = picked.includes(t.id);
+          const out = soldOut.topping(t.id);
           return (
             <button
               key={t.id}
               type="button"
               aria-pressed={on}
+              disabled={out && !on}
+              data-sold-out={out || undefined}
               onClick={() => toggle(t.id)}
               className="btn btn-choice min-h-[64px] justify-between gap-2 px-3.5 text-left md:min-h-[68px]"
               data-testid={`topping-option-${t.id}`}
             >
               <span className="flex min-w-0 flex-col">
-                <span className="truncate text-base md:text-[17px]">{t.name}</span>
-                <span className="num text-sm font-normal opacity-80">+{formatVnd(t.price)}</span>
+                <span className={`truncate text-base md:text-[17px] ${out ? 'line-through' : ''}`}>{t.name}</span>
+                <span className="num text-sm font-normal opacity-80">{out ? 'Hết' : `+${formatVnd(t.price)}`}</span>
               </span>
               <span
                 aria-hidden

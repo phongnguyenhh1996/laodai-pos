@@ -71,6 +71,8 @@ products          id, menu_id, name, price, sort, active,
 toppings          id, menu_id, name, price, extra_box_takeaway bool, sort, active
 combos            id, menu_id, name, product_id, topping_ids[], sort, active
 price_history     id, entity_type, entity_id, old_price, new_price, changed_at
+sold_out          point_id, item_kind (product|topping), item_id, day, at, shift_id, tablet_profile_id,
+                  cleared_at, cleared_shift_id                -- hết món trong ngày (mục 4.8); bán lại = ghi cleared_at
 
 shifts            id, tablet_profile_id, staff_id, opened_at, closed_at,
                   open_boxes, open_plates, open_float,           -- lấy từ mặc định
@@ -148,6 +150,14 @@ Chọn khách → thấy dư nợ của khách đó → nhập số tiền + hì
 ### 4.7 Chủ sửa đơn đã thanh toán
 Chỉ trên chế độ chủ. Sửa món / hình thức thanh toán / khách nợ, có log trước/sau, `owner_edited = true`. Nếu ca đã đóng → **tính lại** đối soát, đánh dấu "đã điều chỉnh".
 
+### 4.8 Hết món
+- Màn đơn có nút **"Báo hết món"** → chế độ đánh dấu: bấm món hoặc topping để báo **hết** / **bán lại**. Bấm **Xong** để về bán tiếp.
+- Hết món tính **theo điểm bán đang chọn** (Xôi A hết xôi gấc thì Xôi B vẫn bán) và **chỉ trong ngày kinh doanh** (giờ VN): sang ngày mới thì tự bán lại, không cần ai bỏ.
+- Món hết: mờ, gạch tên, nhãn **"Hết"**, không bấm được. Combo có món chính hoặc topping đang hết cũng bị khóa. Topping hết không chọn thêm được trong bảng topping.
+- Cần ca đang mở. Ghi qua `sync_push` (`set_sold_out`), mọi máy cập nhật ngay qua `live_pulse`. Tablet đọc bằng RPC `sold_out_today()` (chỉ điểm bán của quầy mình).
+- Server **không chặn** đơn có món đang hết (máy khác có thể vừa báo hết lúc nhân viên đang bấm đơn). Chỉ khóa trên giao diện.
+- Báo hết / bán lại ghi `audit_log` (kèm tên nhân viên, điểm bán), xem ở Nhật ký, lọc "Hết món". Không báo Telegram.
+
 ---
 
 ## 5. Đối soát cuối ca (tính ở server)
@@ -196,6 +206,7 @@ Gửi vào **một nhóm Telegram**, đồng thời lưu `audit_log` và xem đ�
 | Chủ sửa đơn đã thanh toán | ✅ |
 | Phát hiện lỗ hổng `device_seq` | ✅ |
 | Sửa món trong đơn đang mở | chỉ log |
+| Báo hết món / bán lại (mục 4.8) | chỉ log |
 | In / in lại / in lỗi phiếu bếp, bill; đổi mẫu in | chỉ log (mục 12) |
 | Tổng kết ngày (giờ chủ đặt) | ✅ theo lịch (`pg_cron`) |
 
@@ -209,7 +220,7 @@ Mỗi tin có link mở thẳng chi tiết trong app chủ.
 1. **Đăng nhập**: đăng nhập chủ → chọn quầy (chỉ một lần).
 2. **Mở ca**: danh sách tên nhân viên → Mở ca.
 3. **Hàng đợi** (màn hình chính): hai nhóm đơn, nút lớn **+ Đơn mới**, menu phụ: Thu nợ · Đóng ca · Chế độ chủ.
-4. **Đơn**: tab điểm bán, combo, món, topping, Tại chỗ/Mang về, nhãn → Lưu / Đã ra món / Thanh toán / Xóa.
+4. **Đơn**: tab điểm bán, combo, món, topping, Tại chỗ/Mang về, nhãn → Lưu / Đã ra món / Thanh toán / Xóa; nút **Báo hết món** (mục 4.8).
 5. **Thanh toán**: TM / CK / Ghi nợ.
 6. **Thu nợ**.
 7. **Đóng ca**: 3 ô số → Xác nhận.

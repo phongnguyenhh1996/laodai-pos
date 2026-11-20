@@ -28,7 +28,12 @@ const data = (over: Partial<CatalogData> = {}): CatalogData => ({
 
 type Result = { data: unknown; error: { message: string } | null };
 
-function fakeClient(tables: Record<string, Result>, rpc: Result, balances: Result = { data: [], error: null }) {
+function fakeClient(
+  tables: Record<string, Result>,
+  rpc: Result,
+  balances: Result = { data: [], error: null },
+  soldOut: Result = { data: [], error: null },
+) {
   const calls: Array<{ table: string; cols: string; eq?: [string, string] }> = [];
   const client = {
     from(table: string) {
@@ -46,7 +51,7 @@ function fakeClient(tables: Record<string, Result>, rpc: Result, balances: Resul
         },
       };
     },
-    rpc: vi.fn(async (fn: string) => (fn === 'customer_balances' ? balances : rpc)),
+    rpc: vi.fn(async (fn: string) => (fn === 'customer_balances' ? balances : fn === 'sold_out_today' ? soldOut : rpc)),
   };
   return { client: client as unknown as SupabaseClient, calls };
 }
@@ -66,7 +71,7 @@ describe('createSupabaseCatalogSource', () => {
 
   it('đọc đủ các bảng danh mục + hồ sơ của chính tablet + cấu hình', async () => {
     const { client, calls } = fakeClient(tables(), ok(d.config));
-    expect(await createSupabaseCatalogSource(client)('tab-a')).toEqual(d);
+    expect(await createSupabaseCatalogSource(client)('tab-a')).toEqual({ ...d, sold_out: [] });
     expect(calls.find((c) => c.table === 'tablet_profiles')?.eq).toEqual(['id', 'tab-a']);
     expect(client.rpc).toHaveBeenCalledWith('tablet_config');
   });
@@ -99,6 +104,14 @@ describe('createSupabaseCatalogSource', () => {
     expect((await createSupabaseCatalogSource(nul.client)('tab-a')).balances).toEqual({});
     const bad = fakeClient(tables(), ok(d.config), { data: null, error: { message: 'boom' } });
     await expect(createSupabaseCatalogSource(bad.client)('tab-a')).rejects.toThrow('dư nợ');
+  });
+
+  it('món hết hôm nay (sold_out_today); lỗi ⇒ báo lỗi', async () => {
+    const rows = [{ point_id: 'xoi-a', item_kind: 'product', item_id: 'xoi-ga', day: '2026-11-20', at: '2026-11-20T01:00:00Z' }];
+    const { client } = fakeClient(tables(), ok(d.config), ok([]), ok(rows));
+    expect((await createSupabaseCatalogSource(client)('tab-a')).sold_out).toEqual(rows);
+    const bad = fakeClient(tables(), ok(d.config), ok([]), { data: null, error: { message: 'boom' } });
+    await expect(createSupabaseCatalogSource(bad.client)('tab-a')).rejects.toThrow('món hết');
   });
 
   it('bảng trả null ⇒ danh sách rỗng', async () => {
