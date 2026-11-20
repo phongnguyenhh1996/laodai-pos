@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useActivation } from './useActivation';
 import { Splash } from './ui';
+import { NativeBackButton } from './NativeBackButton';
 import { ActivateScreen } from '@/tablet/ActivateScreen';
 import { OwnerGate } from '@/owner/OwnerGate';
 import { TabletHome } from '@/tablet/TabletHome';
@@ -21,6 +22,7 @@ export function App() {
         <Route path="/owner/*" element={<OwnerGate />} />
         <Route path="*" element={<TabletGate />} />
       </Routes>
+      <NativeBackButton />
     </BrowserRouter>
   );
 }
