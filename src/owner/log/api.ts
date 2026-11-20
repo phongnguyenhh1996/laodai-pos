@@ -72,6 +72,7 @@ export async function loadLogNames(client: SupabaseClient): Promise<LogNames> {
 export interface OrderDetail extends Omit<ShiftOrderRow, 'items'> {
   point_name: string;
   tablet_name: string;
+  tablet_profile_id: string;
   customer_label: string | null;
   cash_given: number | null;
   address: string | null;
@@ -83,7 +84,7 @@ export async function loadOrderDetail(client: SupabaseClient, orderId: string): 
     .from('orders')
     .select(
       'id,code,label,dine_type,address,status,total,payment_method,cash_given,created_at,served_at,paid_at,deleted_at,delete_reason,' +
-        'owner_edited,opened_shift_id,paid_shift_id,points(name),tablet_profiles(name),customers(name,description),' +
+        'owner_edited,opened_shift_id,paid_shift_id,tablet_profile_id,points(name),tablet_profiles(name),customers(name,description),' +
         'opened:shifts!orders_opened_shift_id_fkey(staff(name)),paid:shifts!orders_paid_shift_id_fkey(staff(name)),' +
         'order_items(name_snap,qty,unit_price_snap,toppings_snap,sort,removed_at)',
     )
@@ -112,4 +113,25 @@ export async function loadOrderDetail(client: SupabaseClient, orderId: string): 
       .sort((a, b) => a.sort - b.sort)
       .map(({ name_snap, qty, unit_price_snap, toppings_snap }) => ({ name_snap, qty, unit_price_snap, toppings_snap })),
   };
+}
+
+/** Các lần in của một đơn (phiếu bếp + bill), mới nhất trước. */
+export interface OrderPrintRow {
+  id: string;
+  kind: 'kitchen' | 'bill' | 'test';
+  source: 'auto' | 'staff' | 'owner';
+  status: 'pending' | 'claimed' | 'printed' | 'failed' | 'expired';
+  created_at: string;
+  error: string | null;
+  tablet_profiles: { name: string } | null;
+}
+
+export async function loadOrderPrints(client: SupabaseClient, orderId: string): Promise<OrderPrintRow[]> {
+  const { data, error } = await client
+    .from('print_jobs')
+    .select('id,kind,source,status,created_at,error,tablet_profiles(name)')
+    .eq('order_id', orderId)
+    .order('created_at', { ascending: false });
+  if (error) throw new LogError(`Không tải được lịch sử in: ${error.message}`);
+  return (data ?? []) as unknown as OrderPrintRow[];
 }

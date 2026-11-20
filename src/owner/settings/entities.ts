@@ -384,6 +384,10 @@ const profiles: EntityDef = {
     { key: 'default_boxes', label: 'Số hộp đầu ca', kind: 'count' },
     { key: 'default_plates', label: 'Số dĩa đầu ca', kind: 'count' },
     { key: 'default_float', label: 'Tiền lẻ đầu ca', kind: 'money' },
+    // SPEC 12.2: chỉ bật / tắt in TỰ ĐỘNG; bấm in tay lúc nào cũng in được.
+    { key: 'auto_print_kitchen', label: 'Tự in phiếu bếp khi tạo đơn', kind: 'bool', section: 'In tự động (app Android có máy in)' },
+    { key: 'auto_reprint_kitchen_on_edit', label: 'Tự in lại phiếu bếp khi sửa đơn', kind: 'bool' },
+    { key: 'auto_print_bill', label: 'Tự in bill khi thanh toán xong', kind: 'bool' },
   ],
   toForm: (r) => {
     const p = r as TabletProfile | null;
@@ -393,6 +397,9 @@ const profiles: EntityDef = {
       default_boxes: String(p?.default_boxes ?? 0),
       default_plates: String(p?.default_plates ?? 0),
       default_float: String(p?.default_float ?? 0),
+      auto_print_kitchen: p?.auto_print_kitchen !== false,
+      auto_reprint_kitchen_on_edit: p?.auto_reprint_kitchen_on_edit !== false,
+      auto_print_bill: p?.auto_print_bill !== false,
     };
   },
   fromForm: (f, c, selfId) => {
@@ -403,6 +410,9 @@ const profiles: EntityDef = {
       default_boxes: count(f, 'default_boxes', 'Số hộp đầu ca'),
       default_plates: count(f, 'default_plates', 'Số dĩa đầu ca'),
       default_float: money(f, 'default_float', 'Tiền lẻ đầu ca'),
+      auto_print_kitchen: f.auto_print_kitchen === true,
+      auto_reprint_kitchen_on_edit: f.auto_reprint_kitchen_on_edit === true,
+      auto_print_bill: f.auto_print_bill === true,
     };
     checkTabletProfile(v, c, selfId);
     return v;

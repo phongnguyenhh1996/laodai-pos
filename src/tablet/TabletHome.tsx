@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } fr
 import { Link, NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { CloudOff, HandCoins, KeyRound, ListOrdered, Plus, Power, RefreshCw, Store, UserRound, type LucideIcon } from 'lucide-react';
 import { startTablet, tabletStore } from '@/lib/pos';
+import { startPrinting } from '@/lib/print';
 import { ConnectionBadge } from '@/app/ConnectionBadge';
 import { APP_VERSION } from '@/app/version';
 import { useTabletName } from '@/app/useActivation';
@@ -37,6 +38,7 @@ export function TabletHome({ activation }: { activation: Activation }) {
   // Mỗi lần quay lại màn bán hàng (vd. vừa thoát chế độ chủ) thì tải lại ngay.
   useEffect(() => {
     startTablet(activation.tablet_profile_id);
+    startPrinting(activation.tablet_profile_id);
     void tabletStore.refresh();
   }, [activation.tablet_profile_id]);
 

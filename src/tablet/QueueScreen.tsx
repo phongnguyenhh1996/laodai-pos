@@ -11,6 +11,7 @@ import { pos } from '@/lib/pos';
 import { errorMessage } from '@/app/ui';
 import { useNow } from '@/app/useLive';
 import { Notice, useTablet } from './parts';
+import { PrintBar, ReprintKitchenButton } from './PrintBar';
 import { ENTER_MS, EXIT_MS, canAnimate, playEnter, playExit, useFlip } from './useQueueMotion';
 
 const DEFAULT_WAIT = { wait_yellow_min: 5, wait_red_min: 10 };
@@ -214,6 +215,7 @@ export function QueueScreen() {
           <Stat icon={ChefHat} tone="warning" label="Chờ ra món" value={serveCount} />
           <Stat icon={Wallet} tone="brand" label="Chờ thanh toán" value={payCount} />
         </div>
+        <PrintBar canReprint={(id) => orders.some((o) => o.id === id)} />
         <Notice testId="queue-flash" tone="ok">
           {flash}
         </Notice>
@@ -375,17 +377,20 @@ function Card({
           {formatVnd(o.total)}
         </b>
       </div>
-      {card.group === 'serve' ? (
-        <button type="button" onClick={onServe} className="btn btn-success min-h-[48px] w-full text-base" data-testid={tid('serve-btn')}>
-          <ChefHat aria-hidden className="h-5 w-5" />
-          Đã ra món
-        </button>
-      ) : (
-        <button type="button" onClick={onPay} className="btn btn-primary min-h-[48px] w-full text-base" data-testid={tid('pay-btn')}>
-          <Wallet aria-hidden className="h-5 w-5" />
-          Thanh toán
-        </button>
-      )}
+      <div className="flex gap-2">
+        {card.group === 'serve' ? (
+          <button type="button" onClick={onServe} className="btn btn-success min-h-[48px] flex-1 text-base" data-testid={tid('serve-btn')}>
+            <ChefHat aria-hidden className="h-5 w-5" />
+            Đã ra món
+          </button>
+        ) : (
+          <button type="button" onClick={onPay} className="btn btn-primary min-h-[48px] flex-1 text-base" data-testid={tid('pay-btn')}>
+            <Wallet aria-hidden className="h-5 w-5" />
+            Thanh toán
+          </button>
+        )}
+        {!leaving && <ReprintKitchenButton orderId={id} code={o.code} testId={tid('reprint')} />}
+      </div>
     </article>
   );
 }

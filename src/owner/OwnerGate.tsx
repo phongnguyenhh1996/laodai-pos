@@ -6,6 +6,7 @@ import { ErrorText, Splash, TextField, errorMessage } from '@/app/ui';
 import { useActivation, useTabletName } from '@/app/useActivation';
 import { useIdleTimeout } from '@/app/useIdleTimeout';
 import { AuthError, enterOwnerModeOnTablet, enterOwnerModeWithPin, exitOwnerMode, hasOwnerPin, setupOwnerPin } from '@/lib/auth';
+import { startPrinting } from '@/lib/print';
 import { declineOwnerPin, ownerPinDeclined, type Activation } from '@/pos';
 import { OwnerPinSetup, PinPad } from './pin/OwnerPin';
 import { OwnerContext, type OwnerSession } from './OwnerContext';
@@ -56,6 +57,9 @@ function OwnerMode({ activation }: { activation: Activation }) {
   // Vừa vào bằng mật khẩu trên máy chưa có PIN ⇒ hỏi cài PIN trước khi vào.
   const [askPin, setAskPin] = useState(false);
   const tabletName = useTabletName(activation);
+
+  // Tablet có máy in vẫn nhận lệnh in từ xa khi đang ở chế độ chủ (kể cả khi mở thẳng / tải lại trang chủ).
+  useEffect(() => startPrinting(activation.tablet_profile_id), [activation.tablet_profile_id]);
 
   // Rời chế độ chủ bằng bất kỳ đường nào (nút Thoát, hết giờ, nút Back) ⇒ thu hồi phiên tạm.
   useEffect(() => (owner ? () => exitOwnerMode(owner) : undefined), [owner]);

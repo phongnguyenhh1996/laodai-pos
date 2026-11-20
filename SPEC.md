@@ -59,7 +59,13 @@ payroll_entries   id, staff_id, month (ngày 1), kind (bonus|deduction|advance|p
 staff_day_marks   id, staff_id, day, kind (off|work), reason, at   -- đánh dấu ngày trên lịch (1/ngày); work = có làm không mở ca ⇒ +1 công
 menus             id, name                                   -- "Xôi", "Cơm gà"
 points            id, name, menu_id, active                  -- Xôi A, Xôi B, Cơm gà
-tablet_profiles   id, name, point_ids[], default_boxes, default_plates, default_float
+tablet_profiles   id, name, point_ids[], default_boxes, default_plates, default_float,
+                  auto_print_kitchen, auto_reprint_kitchen_on_edit, auto_print_bill  -- bool, mục 12
+print_template    (singleton) jsonb mẫu in chung cho phiếu bếp + bill (mục 12.4)
+print_jobs        id, kind (kitchen|bill|test), order_id, order_rev, tablet_profile_id,
+                  source (auto|staff|owner), status (pending|claimed|printed|failed|expired),
+                  device_id, detail (jsonb: món thêm/bớt của phiếu "ĐÃ SỬA"),
+                  created_at, claimed_at, finished_at, error  -- mục 12.6
 products          id, menu_id, name, price, sort, active,
                   boxes_takeaway, boxes_dinein, plates_dinein -- định mức bao bì
 toppings          id, menu_id, name, price, extra_box_takeaway bool, sort, active
@@ -190,6 +196,7 @@ Gửi vào **một nhóm Telegram**, đồng thời lưu `audit_log` và xem đ�
 | Chủ sửa đơn đã thanh toán | ✅ |
 | Phát hiện lỗ hổng `device_seq` | ✅ |
 | Sửa món trong đơn đang mở | chỉ log |
+| In / in lại / in lỗi phiếu bếp, bill; đổi mẫu in | chỉ log (mục 12) |
 | Tổng kết ngày (giờ chủ đặt) | ✅ theo lịch (`pg_cron`) |
 
 Mỗi tin có link mở thẳng chi tiết trong app chủ.
@@ -207,6 +214,8 @@ Mỗi tin có link mở thẳng chi tiết trong app chủ.
 6. **Thu nợ**.
 7. **Đóng ca**: 3 ô số → Xác nhận.
 
+In ấn (mục 12): trạng thái máy in + "Kết nối lại" trên hàng đợi, nút "In lại phiếu bếp" trên thẻ đơn, báo đỏ khi in lỗi.
+
 Thiết kế: nút ≥ 56px, chữ to, tối đa 2–3 chạm cho một đơn combo, hiện trạng thái kết nối (đã kết nối / đang kết nối / mất kết nối; mất kết nối thì có dải báo đỏ).
 
 ### Chế độ chủ (vào bằng mật khẩu chủ trên bất kỳ máy nào đã chọn quầy; giao diện tối ưu cho điện thoại)
@@ -217,7 +226,7 @@ Thiết kế: nút ≥ 56px, chữ to, tối đa 2–3 chạm cho một đơn co
 5. **Sổ nợ**: khách, dư nợ, lịch sử; **chuyển khoản nợ** sang khách khác; ghi thu nợ.
 6. **Nhật ký**.
 7. **Lương** (theo tháng, **chỉ tính theo ngày**, không tính theo giờ): ngày công = số ngày nhân viên có mở ca (giờ VN, mở nhiều ca trong ngày vẫn là 1 ngày; ca tính vào tháng của ngày mở ca) + ngày chủ đánh "có làm" trên lịch (không trùng ngày có ca) ± ngày công chủ chỉnh (khi nhân viên làm mà không mở ca, hoặc mở ca nhầm). Lương tháng = ngày công × lương một ngày + thưởng − trừ; còn phải trả = lương tháng − ứng − đã trả. Sinh nhật trong tháng. Lịch tháng của từng nhân viên: ngày có mở ca (tổng giờ), bấm ngày để xem ca hoặc đánh dấu "nghỉ" / "có làm" kèm lý do không bắt buộc (đổi qua lại / bỏ được; nghỉ không đổi lương, có làm +1 công; đánh trước được cho ngày sắp tới).
-8. **Cài đặt**: menu / món / topping (cờ "thêm hộp") / combo / giá (có lịch sử), nhân viên (SĐT, CCCD, sinh nhật, lương một ngày), điểm bán, hồ sơ tablet + mặc định đầu ca, Telegram, ngưỡng màu chờ, giờ tổng kết ngày, mật khẩu.
+8. **Cài đặt**: menu / món / topping (cờ "thêm hộp") / combo / giá (có lịch sử), nhân viên (SĐT, CCCD, sinh nhật, lương một ngày), điểm bán, hồ sơ tablet + mặc định đầu ca + 3 công tắc in tự động, **mẫu in** (xem trước, in thử — mục 12.5), Telegram, ngưỡng màu chờ, giờ tổng kết ngày, mật khẩu.
 
 ---
 
@@ -237,7 +246,7 @@ Mỗi bước chỉ được tính là **xong** khi các test ghi trong ngoặc 
 10. Chạy toàn bộ E2E nhiều máy / mất kết nối (F28–F31) và gian lận (E21–E27); thử trên tablet thật theo checklist: mất mạng, ghim màn hình, tốc độ.
 
 ## 9. Đợt 2
-Sơ đồ bàn (tùy chọn theo điểm bán), in bill Bluetooth 58mm (Web Bluetooth/ESC-POS) kèm biển "không bill = miễn phí", **gộp khách nợ**, báo cáo nâng cao (thời gian ra món trung bình, so sánh nhân viên).
+Sơ đồ bàn (tùy chọn theo điểm bán), ~~in bill Bluetooth 58mm~~ (đã chốt thiết kế, xem **mục 12**), **gộp khách nợ**, báo cáo nâng cao (thời gian ra món trung bình, so sánh nhân viên).
 
 ---
 
@@ -425,3 +434,74 @@ Mỗi kịch bản bắt đầu bằng `cy.task('db:reset')` để reset và see
 4. Bao bì tính theo **ca mở đơn**, tiền tính theo **ca thu tiền**.
 5. Vai trò `tablet` riêng ở tầng dữ liệu, để nhân viên rành kỹ thuật cũng không lấy được doanh thu từ tablet.
 6. Giờ tổng kết ngày mặc định **14:30** (sau ca cơm gà), chủ chỉnh được.
+
+---
+
+## 12. In phiếu bếp & bill thanh toán
+
+Chốt thiết kế ngày 2026-11-20. Kế hoạch triển khai: [`docs/plans/in-phieu-bep-va-bill.md`](docs/plans/in-phieu-bep-va-bill.md).
+
+Mục đích: **làm không nhầm, đưa đúng khách** (phiếu bếp) và **bill giấy cho khách** (bill thanh toán). Bill đồng thời chống gian lận theo biển **"Không có bill = miễn phí"**: bill chỉ in được từ đơn đã lưu trên server, nên thu tiền mà không bấm đơn thì không có bill đưa khách.
+
+### 12.1 Nền tảng & máy in
+- Tablet quầy chạy **app Android (Capacitor)**. App mở thẳng web trên Vercel, nên push `main` thì tablet vẫn tự cập nhật. Chỉ khi đổi phần native mới phải cài lại APK (cài trực tiếp, không qua Play Store).
+- In qua **Bluetooth Classic (SPP)**, lệnh **ESC/POS**, chỉ hỗ trợ **khổ 58mm**. Không yêu cầu máy in hỗ trợ BLE, không cài app trung gian.
+- Phiếu được **vẽ thành ảnh đen trắng rộng 384 điểm** rồi gửi lệnh in ảnh, để giữ đúng dấu tiếng Việt và in được chữ to.
+- Điện thoại chủ và trình duyệt vẫn dùng PWA, **không in trực tiếp được**. Muốn in thì gửi lệnh in từ xa (12.6).
+- **Ghép nối máy in theo từng máy** (lưu trên máy, không lưu theo quầy). Chỉ chọn hoặc đổi máy in trong **chế độ chủ**: Quầy của máy này → Máy in → chọn máy Bluetooth đã ghép → In thử. Nhân viên chỉ thấy trạng thái máy in (đã kết nối hay chưa) và nút "Kết nối lại".
+
+### 12.2 Cài đặt theo quầy (`tablet_profiles`)
+Có 3 công tắc. Công tắc **chỉ bật hoặc tắt việc in tự động**. Bấm in tay lúc nào cũng in được.
+| Công tắc | Khi bật |
+|---|---|
+| `auto_print_kitchen` | Tự in phiếu bếp khi tạo đơn |
+| `auto_reprint_kitchen_on_edit` | Tự in lại phiếu bếp khi sửa đơn đang mở |
+| `auto_print_bill` | Tự in bill khi thanh toán xong |
+
+### 12.3 Phiếu bếp
+- Tự in **sau khi server trả mã đơn** (nếu bật công tắc).
+- **Sửa đơn** thì in lại nguyên phiếu, có dòng **"ĐÃ SỬA" kèm giờ sửa**, ghi rõ món thêm hoặc bớt (nếu bật công tắc). **Xóa đơn** thì không in.
+  - Màn đơn tự lưu từng chạm ⇒ các lần sửa liên tiếp được **gom thành một phiếu** (in sau khi ngừng sửa khoảng 4 giây, hoặc ngay khi thu tiền). Sửa rồi sửa lại như cũ thì không in.
+  - Sửa rồi thu tiền ngay: phiếu "ĐÃ SỬA" vẫn in được trong 10 phút sau khi thanh toán.
+- Nội dung: **mã đơn chữ to**, số thứ tự hàng đợi, Tại chỗ/Mang về, nhãn hoặc bàn, giờ tạo, món kèm topping và số lượng. **Không in giá.**
+- Nút **"In lại phiếu bếp"** trên thẻ đơn **luôn hiện** khi đơn còn trong hàng đợi, bất kể công tắc. Chủ in lại được từ xa.
+
+### 12.4 Bill thanh toán
+- Tự in **sau khi thanh toán thành công**, kể cả đơn ghi nợ (nếu bật công tắc).
+- Nội dung: tên quán, tên điểm bán, SĐT, địa chỉ, **mã đơn chữ to**, giờ thanh toán, Tại chỗ/Mang về, nhãn hoặc bàn, các dòng món (số lượng, đơn giá, thành tiền), **Tổng**, "Cảm ơn quý khách", dòng chân trang tự nhập, "Không có bill = miễn phí".
+- **Không in**: hình thức thanh toán, tiền khách đưa và tiền thối, thông tin nợ, tên nhân viên.
+- **Tablet không có nút in hay in lại bill.** Bill in lỗi thì chỉ ghi lại (12.7). Server cũng chặn: tablet chỉ tạo được **một** lệnh bill cho mỗi đơn, trong 10 phút sau khi thanh toán (gọi API trực tiếp cũng không in lại được bill cũ). Chỉ **chủ in lại từ xa**. Bản in lại **giống hệt bản gốc** (không đóng dấu "bản in lại"), theo nội dung hiện tại của đơn (kể cả khi chủ đã sửa đơn sau thanh toán) và mẫu hiện tại.
+
+### 12.5 Mẫu in (`print_template`, một mẫu chung)
+Chủ chỉnh trong **Cài đặt → Mẫu in**:
+- **Bật/tắt từng dòng**:
+  - Bill: tên quán, điểm bán, SĐT, địa chỉ, giờ, Tại chỗ/Mang về, nhãn hoặc bàn, đơn giá, "Cảm ơn quý khách", "Không có bill = miễn phí".
+  - Phiếu bếp: số thứ tự hàng đợi, Tại chỗ/Mang về, nhãn hoặc bàn, giờ tạo, topping.
+- **Chữ tự nhập**: tên quán, SĐT, địa chỉ, 1–3 dòng chân trang. Tên điểm bán tự lấy theo điểm bán của đơn.
+- **Cỡ chữ mã đơn**: to hoặc rất to.
+- **Luôn in, không tắt được**: mã đơn, món kèm số lượng, Tổng (trên bill), "ĐÃ SỬA" kèm giờ sửa (trên phiếu bếp).
+- **Xem trước**: hiện chính ảnh sẽ gửi sang máy in, vẽ bằng một đơn mẫu, đổi ngay khi chỉnh. Có nút **"In thử"**: trên tablet có máy in thì in luôn, trên điện thoại thì gửi lệnh in thử (`kind = test`) tới một quầy.
+- Mỗi lần đổi mẫu đều ghi `audit_log`.
+
+### 12.6 In từ xa (`print_jobs`)
+- Ở chi tiết đơn trong app chủ có nút **"In lại bill"** và **"In lại phiếu bếp"**.
+- Mặc định gửi tới **quầy đã bán đơn**, chủ đổi được quầy.
+- Tablet nghe Realtime. **Máy đầu tiên** thuộc quầy đó đang mở app và có máy in kết nối sẽ **nhận lệnh**. Server khóa lệnh (`pending → claimed`, nguyên tử) để chỉ một máy in.
+- Chủ thấy trạng thái theo thời gian thực: *đang chờ → đã in* hoặc *lỗi (kèm lý do)*.
+- Sau **2 phút** không có máy nào nhận thì lệnh **hết hạn** (`expired`), chủ được báo "Không có máy in nào sẵn sàng". Lệnh **không bao giờ in muộn**.
+- Lệnh in tại chỗ (tự in, nhân viên bấm in lại phiếu bếp) cũng ghi vào `print_jobs` (máy tự nhận luôn), để mọi lần in nằm chung một chỗ.
+- Nội dung in do server dựng từ đơn hiện tại lúc nhận lệnh (`print_doc`, kèm mẫu in hiện tại). Tablet không đọc được đơn đã thanh toán, nhưng nhận được nội dung bill qua lệnh in của chính quầy mình.
+- Máy nhận lệnh rồi không báo kết quả sau 5 phút ⇒ server ghi lỗi "Máy in không báo kết quả".
+
+### 12.7 Lỗi & theo dõi
+- Máy in lỗi, hết giấy hoặc mất kết nối thì **không bao giờ chặn** tạo đơn hay thanh toán. Tablet hiện báo đỏ. Với phiếu bếp thì có nút "In lại".
+- Mọi lần in, in lại, in lỗi đều ghi `print_jobs` và `audit_log`, xem được trong Nhật ký. **Không báo Telegram.**
+- **Báo cáo ca** có dòng **"bill in lỗi / không in"**, tức số đơn thanh toán trong ca mà không có lệnh bill nào in thành công, kèm danh sách mã đơn.
+
+### 12.8 App Android
+- Plugin Java `LaodaiPrinter` (Bluetooth Classic SPP, RFCOMM `00001101-…`): chỉ liệt kê máy **đã ghép đôi** trong Cài đặt Android (không quét) ⇒ Android 12+ chỉ hỏi quyền "Thiết bị ở gần" (`BLUETOOTH_CONNECT`), Android ≤ 11 dùng `BLUETOOTH` có sẵn khi cài.
+- Màn hình luôn sáng trong app; ghim màn hình dùng tính năng của Android như trước.
+- Web nhận biết app native bằng `Capacitor.isNativePlatform()` + plugin có mặt; trình duyệt / PWA ⇒ không có máy in, không tự tạo lệnh in.
+
+### 12.9 Chưa làm
+Phiếu tạm tính có VietQR chuyển khoản, bill điện tử hoặc chia sẻ online, phiếu thu nợ, khổ 80mm, máy in LAN/WiFi.

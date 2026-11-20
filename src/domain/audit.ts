@@ -52,7 +52,15 @@ export const ACTION_LABELS: Record<string, string> = {
   day_work_add: 'Đánh ngày có làm',
   day_work_update: 'Sửa ngày có làm',
   day_work_remove: 'Bỏ ngày có làm',
+  print_request: 'Chủ gửi lệnh in',
+  print_printed: 'Đã in',
+  print_failed: 'In lỗi',
+  print_expired: 'Lệnh in hết hạn (không máy nào nhận)',
+  print_template_update: 'Sửa mẫu in',
 };
+
+const PRINT_KIND: Record<string, string> = { kitchen: 'Phiếu bếp', bill: 'Bill', test: 'In thử' };
+const PRINT_SOURCE: Record<string, string> = { auto: 'tự in', staff: 'nhân viên in lại', owner: 'chủ gửi' };
 
 export function actionLabel(action: string): string {
   return ACTION_LABELS[action] ?? action;
@@ -65,6 +73,8 @@ export const ACTION_GROUPS: Array<{ id: string; label: string; actions: string[]
   { id: 'shifts', label: 'Ca', actions: ['shift_open', 'shift_close', 'shift_adjust'] },
   { id: 'debts', label: 'Nợ', actions: ['customer_create', 'debt_payment', 'debt_transfer'] },
   { id: 'owner', label: 'Chủ', actions: ['owner_mode', 'owner_pin_set', 'owner_pin_removed', 'owner_edit_order', 'shift_adjust', 'settings_create', 'settings_update', 'payroll_add', 'payroll_void', 'day_off_add', 'day_off_update', 'day_off_remove', 'day_work_add', 'day_work_update', 'day_work_remove'] },
+  { id: 'print', label: 'In phiếu bếp / bill', actions: ['print_request', 'print_printed', 'print_failed', 'print_expired', 'print_template_update'] },
+  { id: 'print_issues', label: 'In lỗi / hết hạn', actions: ['print_failed', 'print_expired'] },
   { id: 'alerts', label: 'Cảnh báo (thiếu số đơn, bị từ chối, đăng nhập)', actions: ['seq_gap', 'sync_rejected', 'tablet_login', 'owner_pin_locked'] },
 ];
 
@@ -132,6 +142,14 @@ export function describeAudit(e: Pick<AuditEntry, 'action' | 'before' | 'after' 
   }
 
   const after = (e.after ?? {}) as Record<string, unknown>;
+  if (e.entity === 'print_job') {
+    const kind = PRINT_KIND[String(after.kind)] ?? String(after.kind ?? '');
+    const code = after.order_code ? ` đơn ${String(after.order_code)}` : '';
+    const where = after.tablet_name ? ` · ${String(after.tablet_name)}` : '';
+    lines.push(`${kind}${code} · ${PRINT_SOURCE[String(after.source)] ?? String(after.source ?? '')}${where}`);
+    if (e.action === 'print_failed' && e.reason) lines.push(`Lỗi: ${e.reason}`);
+    return lines;
+  }
   switch (e.action) {
     case 'shift_close':
       // Nhật ký chỉ ghi số nhân viên đếm; đối soát xem ở báo cáo ca.

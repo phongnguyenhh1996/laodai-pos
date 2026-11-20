@@ -162,3 +162,19 @@ describe('đánh dấu ngày', () => {
     expect(actionLabel('day_work_add')).toBe('Đánh ngày có làm');
   });
 });
+
+describe('nhật ký in (SPEC 12.7)', () => {
+  it('mô tả lệnh in: loại phiếu, mã đơn, nguồn, quầy, lý do lỗi; có nhóm lọc riêng', () => {
+    const e = {
+      action: 'print_failed',
+      entity: 'print_job',
+      before: null,
+      after: { kind: 'bill', order_code: 'A30', source: 'auto', tablet_name: 'Tablet A' },
+      reason: 'Hết giấy',
+    };
+    expect(describeAudit(e)).toEqual(['Bill đơn A30 · tự in · Tablet A', 'Lỗi: Hết giấy']);
+    expect(describeAudit({ ...e, action: 'print_printed', after: { kind: 'test', source: 'owner' }, reason: null })).toEqual(['In thử · chủ gửi']);
+    expect(actionLabel('print_expired')).toMatch(/hết hạn/);
+    expect(actionsForFilter('print_issues')).toEqual(['print_failed', 'print_expired']);
+  });
+});

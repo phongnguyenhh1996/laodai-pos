@@ -7,8 +7,10 @@ describe('tổng kết ngày (pg_cron)', () => {
 
   it('cron được lên lịch', async () => {
     const jobs = await sql<{ jobname: string; schedule: string; command: string }>('select jobname, schedule, command from cron.job order by jobname');
-    expect(jobs.map((j) => j.jobname)).toEqual(['laodai-daily-summary', 'laodai-retry-notifications']);
+    expect(jobs.map((j) => j.jobname)).toEqual(['laodai-daily-summary', 'laodai-expire-print-jobs', 'laodai-retry-notifications']);
     expect(jobs[0].command).toContain('daily_summary_tick');
+    // Lệnh in quá 2 phút không ai nhận ⇒ hết hạn (SPEC 12.6), chạy mỗi phút.
+    expect(jobs[1]).toMatchObject({ schedule: '* * * * *', command: expect.stringContaining('expire_print_jobs') });
   });
 
   it('khoảng thời gian theo múi giờ Asia/Ho_Chi_Minh', async () => {

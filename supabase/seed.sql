@@ -79,3 +79,6 @@ values (
   '{"sub":"aaaaaaaa-0000-4000-8000-000000000901","email":"owner@laodai.test","email_verified":true}',
   'email', now(), now(), now()
 );
+
+-- Mẫu in chung (mục 12.5): giá trị mặc định của migration.
+insert into public.print_template (id) values (true) on conflict (id) do nothing;

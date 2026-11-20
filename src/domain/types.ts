@@ -41,6 +41,10 @@ export interface TabletProfile {
   default_boxes: number;
   default_plates: number;
   default_float: Money;
+  /** Công tắc in tự động (SPEC 12.2). Thiếu (dữ liệu cũ) ⇒ coi như bật. In tay lúc nào cũng in được. */
+  auto_print_kitchen?: boolean;
+  auto_reprint_kitchen_on_edit?: boolean;
+  auto_print_bill?: boolean;
 }
 
 export interface Staff {

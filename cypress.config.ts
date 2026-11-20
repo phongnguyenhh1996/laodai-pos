@@ -183,6 +183,26 @@ export default defineConfig({
           return r;
         },
         /** Đơn của tablet trên server (theo device_seq), kèm dòng đơn còn hiệu lực. */
+        /** Lệnh in (SPEC 12): mới nhất sau cùng. */
+        'print:jobs': () =>
+          sql(
+            `select j.id, j.kind, j.source, j.status, j.error, o.code order_code, t.name tablet_name, j.detail
+               from print_jobs j left join orders o on o.id = j.order_id join tablet_profiles t on t.id = j.tablet_profile_id
+              order by j.created_at`,
+          ),
+        /** Tắt / bật công tắc in tự động của quầy (SPEC 12.2). */
+        'print:autoFlags': async ({ tablet, flags }: { tablet: TabletKey; flags: Record<string, boolean> }) => {
+          await sql(
+            `update tablet_profiles set auto_print_kitchen = $2, auto_reprint_kitchen_on_edit = $3, auto_print_bill = $4 where id = $1`,
+            [SEED.tablets[tablet], flags.auto_print_kitchen ?? true, flags.auto_reprint_kitchen_on_edit ?? true, flags.auto_print_bill ?? true],
+          );
+          return null;
+        },
+        /** Lùi giờ tạo các lệnh đang chờ (giả lập 2 phút trôi qua mà không máy nào nhận). */
+        'print:age': async (seconds: number) => {
+          await sql(`update print_jobs set created_at = created_at - make_interval(secs => $1) where status = 'pending'`, [seconds]);
+          return null;
+        },
         'db:orders': (tablet: keyof typeof SEED.tablets) =>
           sql(
             `select o.id, o.device_seq, o.code, o.point_id, o.dine_type, o.status, o.total, o.label,

@@ -47,7 +47,8 @@ const COLUMNS = {
   customers: 'id,name,description,phone,address,merged_into_id',
 } as const;
 
-const PROFILE_COLUMNS = 'id,name,point_ids,default_boxes,default_plates,default_float';
+const PROFILE_COLUMNS =
+  'id,name,point_ids,default_boxes,default_plates,default_float,auto_print_kitchen,auto_reprint_kitchen_on_edit,auto_print_bill';
 
 export function createSupabaseCatalogSource(client: SupabaseClient): CatalogSource {
   return async (profileId) => {

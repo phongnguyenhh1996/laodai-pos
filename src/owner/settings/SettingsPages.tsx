@@ -7,6 +7,7 @@ import { TZ } from '@/domain/time';
 import { useOwner } from '../OwnerContext';
 import { NavItem, NavList, OwnerLayout } from '../OwnerLayout';
 import { loadOwnerCatalog, loadPriceHistory, saveSetting, saveStaffDetails, type OwnerCatalog, type PriceChange } from './api';
+import { PrintTemplatePage } from './PrintTemplatePage';
 import { ENTITIES, entityByKey, type EntityDef, type FieldDef, type Form, type FormValue } from './entities';
 
 /** `/owner/settings/*` (mục 7, màn chủ số 7). */
@@ -14,6 +15,7 @@ export function SettingsRoutes() {
   return (
     <Routes>
       <Route index element={<SettingsHome />} />
+      <Route path="print-template" element={<PrintTemplatePage />} />
       <Route path=":entity" element={<EntityListRoute />} />
       <Route path=":entity/:id" element={<EditorRoute />} />
     </Routes>
@@ -46,6 +48,7 @@ function SettingsHome() {
         {ENTITIES.map((e) => (
           <NavItem key={e.key} to={`${SETTINGS}/${e.key}`} testId={`settings-section-${e.key}`} title={e.title} />
         ))}
+        <NavItem to={`${SETTINGS}/print-template`} testId="settings-section-print-template" title="Mẫu in" subtitle="Phiếu bếp + bill, xem trước, in thử" />
       </NavList>
       <p className="text-sm text-ink-subtle">
         Không có xóa: món, topping, combo ngừng bán hoặc nhân viên nghỉ thì bỏ chọn “Đang bán” / “Đang làm”. Các máy bán hàng nhận thay đổi ở lần

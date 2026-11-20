@@ -15,6 +15,23 @@ npm run dev
 
 Tài khoản chủ local (seed): `owner@laodai.test` / `laodai-owner-123`.
 
+## App Android cho tablet quầy (in phiếu bếp + bill, SPEC mục 12)
+
+App Capacitor (`android/`) mở thẳng web production (`capacitor.config.ts` → `server.url`), nên push `main` thì tablet tự cập nhật.
+Chỉ khi đổi phần native (plugin máy in `LaodaiPrinterPlugin.java`, quyền, `capacitor.config.ts`) mới phải build + cài lại APK.
+
+Cần Android Studio (Android SDK + JDK 21).
+
+```bash
+npm run android:apk          # build web + cap sync + gradlew assembleDebug
+```
+
+APK nằm ở `android/app/build/outputs/apk/debug/app-debug.apk`: chép sang tablet rồi mở để cài (bật "Cài ứng dụng không rõ nguồn gốc"),
+hoặc `adb install -r` qua cáp. Cài đè bản cũ giữ nguyên dữ liệu (phiên tablet, máy in đã chọn).
+Thử với bản local: `CAP_SERVER_URL=http://<ip-máy-dev>:5173 npm run android:apk`.
+
+Trên tablet: ghép đôi máy in trong Cài đặt Android → Bluetooth, rồi trong app vào Chế độ chủ → Quầy của máy này → Máy in → chọn máy → In thử.
+
 ## Kiểm thử (mục 10)
 
 | Lệnh | Nội dung |
@@ -38,6 +55,10 @@ src/pos/           tablet realtime (không lưu dữ liệu bán hàng trên má
                    `legacy.ts` (chuyển tiếp một lần từ bản offline: gửi nốt outbox IndexedDB cũ rồi xóa)
 src/lib/pos.ts     store + Pos của app (chạy từ lúc vào màn bán hàng) + chỉ báo `conn-status`
 src/lib/auth.ts    đăng nhập chủ, kích hoạt tablet, chế độ chủ trên tablet (phiên tạm, tự thoát 2 phút)
+src/print/         in phiếu (SPEC mục 12): `layout.ts` (phiếu → dòng, hàm thuần), `diff.ts` (món thêm / bớt khi sửa),
+                   `render.ts` (canvas 384 điểm → ảnh 1-bit), `escpos.ts` (GS v 0), `printer.ts` (máy in: SPP thật / giả / không có),
+                   `service.ts` (tạo / nhận / báo kết quả lệnh `print_jobs`, nghe lệnh từ xa), `native.ts` (cầu nối plugin Capacitor)
+src/lib/print.ts   nối in vào bán hàng: tự in theo công tắc quầy, gom phiếu "ĐÃ SỬA", `usePrint()` cho giao diện
 src/tablet/        màn bán hàng: mở ca → hàng đợi → tạo / sửa / xóa đơn → thanh toán (TM, CK, ghi nợ) → thu nợ → đóng ca (đếm mù)
 src/app|owner      khung app, chế độ chủ; trang đầu = Tổng quan hôm nay (realtime, `owner/live.ts`),
                    `owner/orders/` = Đơn (lọc ngày / điểm / nhân viên / hình thức / trạng thái) + sửa đơn đã thanh toán,

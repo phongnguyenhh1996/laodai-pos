@@ -112,6 +112,13 @@ export type PaymentInput =
 
 type Ok = Extract<PushResult, { status: 'ok' | 'duplicate' }>;
 
+/** Thao tác đã được server ghi (để in phiếu bếp / bill — SPEC mục 12). Lỗi trong người nghe không ảnh hưởng thao tác. */
+export type PosEvent =
+  | { type: 'order_created'; order: Order }
+  | { type: 'order_updated'; before: Order; after: Order }
+  | { type: 'order_paid'; order: Order }
+  | { type: 'order_deleted'; order: Order };
+
 export interface PosOptions {
   /** Chờ trước mỗi lần gửi lại khi lỗi mạng (cùng op_id ⇒ server không ghi hai lần). */
   retryDelaysMs?: number[];
@@ -129,6 +136,7 @@ export class Pos {
    * (và id khoản thu / ca) để server trả "đã nhận" thay vì ghi lần hai.
    */
   private unsure = new Map<string, { op: WireOp; body: string }>();
+  private listeners = new Set<(e: PosEvent) => void>();
 
   constructor(
     private store: TabletStore,
@@ -136,6 +144,22 @@ export class Pos {
   ) {
     this.retryDelaysMs = opts.retryDelaysMs ?? [400, 1500];
     this.sleep = opts.sleep ?? realSleep;
+  }
+
+  /** Nghe các thao tác vừa ghi xong. Trả hàm hủy. */
+  onEvent(fn: (e: PosEvent) => void): () => void {
+    this.listeners.add(fn);
+    return () => this.listeners.delete(fn);
+  }
+
+  private emit(e: PosEvent): void {
+    for (const fn of this.listeners) {
+      try {
+        fn(e);
+      } catch (err) {
+        console.warn('Lỗi khi xử lý sự kiện bán hàng', err);
+      }
+    }
   }
 
   /** Quên các thao tác còn chờ bấm lại (đổi máy / trong test). */
@@ -250,7 +274,9 @@ export class Pos {
       total: orderTotal(draft.items),
     };
     const res = await this.send('create_order', id, () => ({ entity_id: id, payload: { order, customer, items: draft.items } }));
-    return this.applied(res, id, !!customer?.is_new);
+    const created = await this.applied(res, id, !!customer?.is_new);
+    this.emit({ type: 'order_created', order: created });
+    return created;
   }
 
   async updateOrder(
@@ -288,7 +314,9 @@ export class Pos {
         total: after.total,
       },
     }));
-    return this.applied(res, orderId, !!customer?.is_new);
+    const updated = await this.applied(res, orderId, !!customer?.is_new);
+    this.emit({ type: 'order_updated', before, after: updated });
+    return updated;
   }
 
   async serveOrder(orderId: string): Promise<Order> {
@@ -316,6 +344,7 @@ export class Pos {
       payload: { order_id: orderId, reason, status_before: o.status },
     }));
     this.store.removeOrder(orderId);
+    this.emit({ type: 'order_deleted', order: o });
   }
 
   /** Thanh toán: tiền tính vào ca đang mở lúc thu. Sau đó đơn biến mất khỏi hàng đợi (trên mọi máy). */
@@ -347,6 +376,7 @@ export class Pos {
       payload: { order_id: orderId, paid_shift_id: shift.id, method: payment.method, cash_given, total: o.total, customer },
     }));
     this.store.removeOrder(orderId);
+    this.emit({ type: 'order_paid', order: o });
     // Ghi nợ ⇒ dư nợ (và khách mới) có ngay trong sổ nợ.
     if (customer) await this.store.refreshCatalog();
   }

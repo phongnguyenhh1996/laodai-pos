@@ -150,6 +150,16 @@ function ShiftBody({ detail, onChanged }: { detail: ShiftDetail; onChanged: () =
           />
         )}
         <Row label="Đơn còn mở" value={String(r.open_orders)} testId="rep-open-orders" />
+        <Row
+          label="Bill in lỗi / không in"
+          value={
+            detail.billIssues.length === 0
+              ? '0'
+              : `${detail.billIssues.length}: ${detail.billIssues.map((b) => `${b.code}${b.status === 'failed' ? ' (lỗi)' : ''}`).join(', ')}`
+          }
+          testId="rep-bill-issues"
+          alert={detail.billIssues.length > 0}
+        />
         <p className="flex items-baseline justify-between gap-3">
           <span className="text-ink-muted">Sửa đơn đang mở</span>
           <Link to={`/owner/log?type=edits&staff=${s.staff_id}`} className="underline" data-testid="rep-edits">

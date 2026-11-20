@@ -25,7 +25,8 @@ const COLUMNS: Record<SettingsTable, string> = {
   toppings: 'id,menu_id,name,price,extra_box_takeaway,sort,active',
   combos: 'id,menu_id,name,product_id,topping_ids,sort,active',
   staff: 'id,name,active,sort',
-  tablet_profiles: 'id,name,point_ids,default_boxes,default_plates,default_float',
+  tablet_profiles:
+    'id,name,point_ids,default_boxes,default_plates,default_float,auto_print_kitchen,auto_reprint_kitchen_on_edit,auto_print_bill',
 };
 
 export class SettingsError extends Error {}

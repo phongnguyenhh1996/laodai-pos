@@ -8,7 +8,8 @@ import { hhmm } from '@/domain/time';
 import { DINE_LABELS, type DeleteReason } from '@/domain/types';
 import { useOwner } from '../OwnerContext';
 import { OwnerLayout } from '../OwnerLayout';
-import { PAGE_SIZE, loadLog, loadLogNames, loadOrderDetail, type LogNames, type OrderDetail } from './api';
+import { PAGE_SIZE, loadLog, loadLogNames, loadOrderDetail, loadOrderPrints, type LogNames, type OrderDetail, type OrderPrintRow } from './api';
+import { RemotePrint, shownStatus } from '../print/RemotePrint';
 
 const day = (at: string) =>
   new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', day: '2-digit', month: '2-digit' }).format(new Date(at)) + ' ' + hhmm(at);
@@ -273,6 +274,7 @@ export function OrderDetailPage() {
           )}
         </section>
       )}
+      {o && o.status !== 'deleted' && <OrderPrintSection client={client} order={o} />}
       <h2 className="text-lg font-semibold">Nhật ký của đơn</h2>
       {log.rows && names && (
         <ol className="flex flex-col divide-y divide-line overflow-hidden card" data-testid="log-list">
@@ -282,5 +284,52 @@ export function OrderDetailPage() {
         </ol>
       )}
     </OwnerLayout>
+  );
+}
+
+const PRINT_KIND = { kitchen: 'Phiếu bếp', bill: 'Bill', test: 'In thử' } as const;
+const PRINT_SOURCE = { auto: 'tự in', staff: 'nhân viên in lại', owner: 'chủ gửi' } as const;
+const PRINT_STATUS = { pending: 'đang chờ', claimed: 'đang in', printed: 'đã in', failed: 'lỗi', expired: 'hết hạn' } as const;
+
+/** In lại từ xa (SPEC 12.6) + lịch sử in của đơn. Bill: chỉ khi đã thanh toán (bản in lại giống hệt bản gốc). */
+function OrderPrintSection({ client, order }: { client: ReturnType<typeof useOwner>['client']; order: OrderDetail }) {
+  const [rows, setRows] = useState<OrderPrintRow[] | null>(null);
+  const reload = useCallback(() => {
+    loadOrderPrints(client, order.id)
+      .then(setRows)
+      .catch(() => setRows([]));
+  }, [client, order.id]);
+  useEffect(() => {
+    reload();
+    const t = setInterval(reload, 5000);
+    return () => clearInterval(t);
+  }, [reload]);
+  return (
+    <section className="flex flex-col gap-3" data-testid="order-print">
+      <h2 className="text-lg font-semibold">In</h2>
+      {order.status === 'paid' && (
+        <RemotePrint client={client} kind="bill" orderId={order.id} defaultProfileId={order.tablet_profile_id} label="In lại bill" testId="reprint-bill" />
+      )}
+      <RemotePrint client={client} kind="kitchen" orderId={order.id} defaultProfileId={order.tablet_profile_id} label="In lại phiếu bếp" testId="reprint-kitchen" />
+      {rows && rows.length > 0 && (
+        <ul className="card flex flex-col divide-y divide-line overflow-hidden" data-testid="order-print-history">
+          {rows.map((r) => {
+            const st = shownStatus(r);
+            return (
+              <li key={r.id} className="flex flex-wrap justify-between gap-2 px-4 py-2 text-base" data-testid="order-print-row" data-status={st}>
+                <span>
+                  {PRINT_KIND[r.kind]} · {PRINT_SOURCE[r.source]}
+                  {r.tablet_profiles ? ` · ${r.tablet_profiles.name}` : ''}
+                </span>
+                <span className={st === 'printed' ? 'text-success-strong' : st === 'failed' || st === 'expired' ? 'text-danger-strong' : 'text-ink-muted'}>
+                  {day(r.created_at)} · {PRINT_STATUS[st]}
+                  {r.error ? ` (${r.error})` : ''}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
   );
 }

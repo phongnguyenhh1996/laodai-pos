@@ -20,6 +20,7 @@ import { businessDate, hhmm } from '@/domain/time';
 import { useOwner } from '../OwnerContext';
 import { OwnerLayout } from '../OwnerLayout';
 import { OwnerPinSetup } from '../pin/OwnerPin';
+import { PrinterSection } from './PrinterSection';
 
 /**
  * `/owner/device`: đổi quầy cho máy đang dùng. Dùng luôn phiên chủ tạm (không đăng nhập lại).
@@ -126,6 +127,7 @@ export function DevicePage() {
           )}
         </>
       )}
+      <PrinterSection />
       <OwnerPinSection />
     </OwnerLayout>
   );
