@@ -313,7 +313,9 @@ describe('đổi quầy cho máy này (chế độ chủ)', () => {
     fireEvent.change(await screen.findByTestId('owner-password'), { target: { value: 'pw' } });
     fireEvent.click(screen.getByTestId('owner-unlock-submit'));
     fireEvent.click(await screen.findByTestId('owner-pin-later'));
-    expect(await screen.findByTestId('owner-nav-device')).toHaveTextContent('Đang ở Tablet A');
+    // Điện thoại: "Quầy của máy này" nằm trong màn Thêm.
+    fireEvent.click(await screen.findByTestId('owner-nav-more'));
+    expect(await screen.findByTestId('owner-nav-device')).toHaveTextContent('Tablet A');
     fireEvent.click(screen.getByTestId('owner-nav-device'));
     await screen.findByTestId('device-profiles');
   }

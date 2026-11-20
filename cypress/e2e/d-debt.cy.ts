@@ -119,7 +119,7 @@ describe('D. Ghi nợ & thu nợ', () => {
       { customer: 'dungGv', product: 'xoiTc' }, // 30.000
     ]).then(([o1, o2, o3]) => {
       cy.loginOwner();
-      cy.get(tid('owner-nav-debts')).click();
+      cy.ownerNav('debts');
       cy.get(tid('debt-total')).should('have.text', '90.000');
       cy.get(tid(`debt-row-${PB}`)).should('contain.text', 'Dũng (phường B) · 60.000');
       cy.get(tid(`debt-row-${GV}`)).should('contain.text', 'Dũng (giáo viên) · 30.000');

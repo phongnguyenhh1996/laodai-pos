@@ -25,6 +25,8 @@ declare global {
       loginOwner(): Chainable<null>;
       /** Mở trang chủ `path`: chế độ chủ là phiên tạm nên mỗi lần tải trang phải nhập lại mật khẩu. */
       ownerVisit(path: string): Chainable<null>;
+      /** Mở mục chế độ chủ `owner-nav-<key>`; trên điện thoại các mục ngoài thanh tab nằm trong màn "Thêm". */
+      ownerNav(key: string): Chainable<null>;
       /** Tải lại trang đang ở chế độ chủ rồi nhập lại mật khẩu. */
       ownerReload(): Chainable<null>;
       /** Token phiên chính đang lưu trên máy (tablet: phiên vai trò `tablet`). */
@@ -83,6 +85,14 @@ Cypress.Commands.add('ownerVisit', (path: string) => {
 Cypress.Commands.add('ownerReload', () => {
   cy.reload();
   return unlockOwnerMode();
+});
+
+Cypress.Commands.add('ownerNav', (key: string) => {
+  cy.get('body').then(($b) => {
+    if ($b.find(`[data-testid=owner-nav-${key}]`).length === 0) cy.get('[data-testid=owner-nav-more]').click();
+  });
+  cy.get(`[data-testid=owner-nav-${key}]`).click();
+  return cy.wrap(null, { log: false });
 });
 
 Cypress.Commands.add('loginOwner', () => {

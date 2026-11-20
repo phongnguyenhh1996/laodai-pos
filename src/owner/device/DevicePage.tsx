@@ -174,6 +174,7 @@ function OwnerPinSection() {
     return (
       <div className="fixed inset-0 z-20 overflow-y-auto bg-canvas">
         <OwnerPinSetup
+          tabletName={owner.tabletName}
           title={hasPin ? 'Đổi mã PIN máy này' : 'Cài mã PIN máy này'}
           intro="Mã PIN chỉ dùng được trên máy này. Máy khác có mã riêng."
           laterLabel="Thôi"

@@ -1,16 +1,18 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
-import { LockKeyhole } from 'lucide-react';
-import { ErrorText, Splash, TextField, errorMessage } from '@/app/ui';
+import { ChevronLeft, LockKeyhole, LogOut } from 'lucide-react';
+import { ErrorText, Splash, errorMessage } from '@/app/ui';
 import { useActivation, useTabletName } from '@/app/useActivation';
 import { useIdleTimeout } from '@/app/useIdleTimeout';
 import { AuthError, enterOwnerModeOnTablet, enterOwnerModeWithPin, exitOwnerMode, hasOwnerPin, setupOwnerPin } from '@/lib/auth';
 import { startPrinting } from '@/lib/print';
 import { declineOwnerPin, ownerPinDeclined, type Activation } from '@/pos';
-import { OwnerPinSetup, PinPad } from './pin/OwnerPin';
+import { OwnerPinSetup, PinHeader, PinPad } from './pin/OwnerPin';
+import { IdleNote, OwnerAuthShell, authBtnPrimary, authBtnSecondary, authLink } from './OwnerAuthShell';
 import { OwnerContext, type OwnerSession } from './OwnerContext';
 import { OwnerHome } from './OwnerHome';
+import { OwnerMore } from './OwnerMore';
 import { SettingsRoutes } from './settings/SettingsPages';
 import { ShiftRoutes } from './shifts/ShiftPages';
 import { DebtRoutes } from './debts/DebtPages';
@@ -34,6 +36,7 @@ function OwnerRoutes() {
       <Route path="orders/*" element={<OrderRoutes />} />
       <Route path="reports" element={<ReportPage />} />
       <Route path="device" element={<DevicePage />} />
+      <Route path="more" element={<OwnerMore />} />
       <Route path="*" element={<OwnerHome />} />
     </Routes>
   );
@@ -82,6 +85,7 @@ function OwnerMode({ activation }: { activation: Activation }) {
     return (
       <OwnerUnlock
         activation={activation}
+        tabletName={tabletName}
         onUnlocked={(c, via) => {
           setAskPin(via === 'password' && !hasOwnerPin() && !ownerPinDeclined());
           setOwner(c);
@@ -93,6 +97,7 @@ function OwnerMode({ activation }: { activation: Activation }) {
   if (askPin) {
     return (
       <OwnerPinSetup
+        tabletName={tabletName}
         save={(pin) => setupOwnerPin(session.client, activation, pin)}
         onDone={() => setAskPin(false)}
         onLater={() => setAskPin(false)}
@@ -112,15 +117,18 @@ function OwnerMode({ activation }: { activation: Activation }) {
 
 function OwnerUnlock({
   activation,
+  tabletName,
   onUnlocked,
   onCancel,
 }: {
   activation: Activation;
+  tabletName: string;
   onUnlocked: (c: SupabaseClient, via: 'pin' | 'password') => void;
   onCancel: () => void;
 }) {
   const [mode, setMode] = useState<'pin' | 'password'>(() => (hasOwnerPin() ? 'pin' : 'password'));
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -154,32 +162,26 @@ function OwnerUnlock({
     }
   }
 
-  const header = (
-    <header className="flex flex-col gap-3">
-      <span aria-hidden className="flex h-14 w-14 items-center justify-center rounded-2xl bg-ink text-white shadow-card">
-        <LockKeyhole className="h-7 w-7" />
-      </span>
-      <h1 className="text-3xl font-bold">Chế độ chủ</h1>
-      <p className="text-lg text-ink-muted">
-        {mode === 'pin' ? 'Nhập mã PIN chế độ chủ của máy này.' : 'Nhập mật khẩu chủ. Lần đầu vào trên máy này sẽ được báo cho chủ.'}
-      </p>
-    </header>
+  const back = (
+    <button type="button" className={authBtnSecondary} onClick={onCancel} data-testid="owner-cancel">
+      <ChevronLeft aria-hidden className="h-[17px] w-[17px]" />
+      Quay lại bán hàng
+    </button>
   );
 
+  // Máy đã cài PIN: cùng bố cục với màn cài PIN (Figma R11b / T19b).
   if (mode === 'pin') {
     return (
-      <main data-testid="owner-unlock" className="mx-auto flex h-full max-w-md flex-col justify-center gap-6 p-6">
-        {header}
-        <section className="card flex flex-col gap-5 p-6">
+      <OwnerAuthShell tabletName={tabletName} testId="owner-unlock">
+        <div className="flex w-full flex-col gap-[22px] md:max-w-[400px]">
+          <PinHeader icon={LockKeyhole} title="Nhập mã PIN" intro="Nhập mã PIN chế độ chủ của máy này." />
           <PinPad onComplete={(p) => void submitPin(p)} disabled={busy} busyLabel="Đang kiểm tra…" testId="owner-pin" />
           <ErrorText testId="owner-error">{error}</ErrorText>
-          <div className="flex gap-3">
-            <button type="button" className="btn btn-secondary flex-1" onClick={onCancel} data-testid="owner-cancel">
-              Quay lại bán hàng
-            </button>
+          <div className="flex flex-col gap-2.5">
+            {back}
             <button
               type="button"
-              className="btn btn-segment flex-1"
+              className={authLink}
               disabled={busy}
               onClick={() => {
                 setMode('password');
@@ -190,38 +192,57 @@ function OwnerUnlock({
               Dùng mật khẩu
             </button>
           </div>
-        </section>
-      </main>
+        </div>
+      </OwnerAuthShell>
     );
   }
 
+  // Figma R11 (điện thoại) / T19 (tablet).
   return (
-    <main data-testid="owner-unlock" className="mx-auto flex h-full max-w-md flex-col justify-center gap-6 p-6">
-      {header}
-      <form className="card flex flex-col gap-4 p-6" onSubmit={submit}>
-        <TextField
-          label="Mật khẩu chủ"
-          type="password"
-          autoComplete="current-password"
-          autoFocus
-          required
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          data-testid="owner-password"
-        />
+    <OwnerAuthShell tabletName={tabletName} mobileHeader testId="owner-unlock">
+      <form
+        className="flex w-full flex-col gap-4 rounded-3xl bg-white px-5 py-6 shadow-[0_4px_16px_rgb(0_0_0/0.06)] md:max-w-[420px] md:shadow-[0_8px_32px_rgb(0_0_0/0.06)]"
+        onSubmit={submit}
+      >
+        <header className="flex flex-col gap-1">
+          <h2 className="text-xl font-bold leading-[25px] tracking-normal">Đăng nhập</h2>
+          <p className="text-[13px] leading-[19px] text-[#888]">Nhập mật khẩu chủ. Lần đầu vào trên máy này sẽ được báo cho chủ.</p>
+        </header>
+        <label className="flex flex-col gap-1.5">
+          <span className="text-[13px] font-medium leading-4 text-[#6d6d6d]">Mật khẩu chủ</span>
+          <span className="flex min-h-[45px] items-center gap-2 rounded-xl border border-line bg-white px-3.5 transition-[border-color,box-shadow] duration-fast focus-within:border-brand focus-within:ring-1 focus-within:ring-inset focus-within:ring-brand">
+            <LockKeyhole aria-hidden className="h-4 w-4 shrink-0 text-[#888]" />
+            <input
+              className="min-w-0 flex-1 bg-transparent py-2.5 text-[15px] leading-[19px] font-medium text-[#111] outline-none placeholder:font-normal placeholder:text-[#888]"
+              type={showPassword ? 'text' : 'password'}
+              autoComplete="current-password"
+              autoFocus
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              data-testid="owner-password"
+            />
+            <button
+              type="button"
+              className="-mr-1 shrink-0 rounded-md px-1 py-1 text-[13px] text-[#888] hover:text-[#6d6d6d]"
+              onClick={() => setShowPassword((v) => !v)}
+              aria-pressed={showPassword}
+              data-testid="owner-password-toggle"
+            >
+              {showPassword ? 'Ẩn' : 'Hiện'}
+            </button>
+          </span>
+        </label>
         <ErrorText testId="owner-error">{error}</ErrorText>
-        <div className="flex gap-3">
-          <button type="button" className="btn btn-secondary flex-1" onClick={onCancel} data-testid="owner-cancel">
-            Quay lại bán hàng
-          </button>
-          <button type="submit" className="btn btn-primary flex-1" disabled={busy} data-testid="owner-unlock-submit">
-            {busy ? 'Đang kiểm tra…' : 'Vào'}
-          </button>
-        </div>
+        <button type="submit" className={authBtnPrimary} disabled={busy} data-testid="owner-unlock-submit">
+          <LogOut aria-hidden className="h-[17px] w-[17px]" />
+          {busy ? 'Đang kiểm tra…' : 'Vào chế độ chủ'}
+        </button>
+        {back}
         {hasOwnerPin() && (
           <button
             type="button"
-            className="btn btn-segment"
+            className={authLink}
             onClick={() => {
               setMode('pin');
               setError(null);
@@ -231,7 +252,8 @@ function OwnerUnlock({
             Dùng mã PIN
           </button>
         )}
+        <IdleNote />
       </form>
-    </main>
+    </OwnerAuthShell>
   );
 }

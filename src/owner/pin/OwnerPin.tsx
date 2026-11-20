@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Delete, KeyRound } from 'lucide-react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { Delete, KeyRound, type LucideIcon } from 'lucide-react';
 import { ErrorText, errorMessage } from '@/app/ui';
+import { OwnerAuthShell, authBtnSecondary, authLink } from '../OwnerAuthShell';
 
 /** Mã PIN chế độ chủ: 6 chữ số (server cũng kiểm). */
 export const PIN_LENGTH = 6;
@@ -15,11 +16,16 @@ export function PinPad({
   onComplete,
   disabled,
   busyLabel,
+  label,
+  labelTestId,
   testId = 'pin-pad',
 }: {
   onComplete: (pin: string) => void;
   disabled?: boolean;
   busyLabel?: string;
+  /** Dòng nhắc trên hàng chấm (vd. "Nhập mã PIN mới (6 số)"). */
+  label?: string;
+  labelTestId?: string;
   testId?: string;
 }) {
   const [pin, setPin] = useState('');
@@ -62,48 +68,69 @@ export function PinPad({
   }, [press, back]);
 
   return (
-    <div className="flex flex-col items-center gap-6" data-testid={testId} aria-busy={busy || undefined}>
-      <div className={`flex gap-3 ${busy ? 'animate-pulse' : ''}`} aria-label={`Đã nhập ${pin.length} trên ${PIN_LENGTH} số`} data-testid={`${testId}-dots`}>
-        {Array.from({ length: PIN_LENGTH }, (_, i) => (
-          <span
-            key={i}
-            aria-hidden
-            className={`h-4 w-4 rounded-full border-2 transition-colors duration-fast ${
-              i < pin.length ? 'border-ink bg-ink' : 'border-line-strong bg-surface'
-            }`}
-          />
-        ))}
+    <div className="flex w-full flex-col items-center gap-[22px]" data-testid={testId} aria-busy={busy || undefined}>
+      <div className="flex flex-col items-center gap-3">
+        {label && (
+          <p className="text-center text-[13px] font-semibold leading-4 text-[#6d6d6d]" data-testid={labelTestId}>
+            {label}
+          </p>
+        )}
+        <div className={`flex gap-3 ${busy ? 'animate-pulse' : ''}`} aria-label={`Đã nhập ${pin.length} trên ${PIN_LENGTH} số`} data-testid={`${testId}-dots`}>
+          {Array.from({ length: PIN_LENGTH }, (_, i) => (
+            <span
+              key={i}
+              aria-hidden
+              className={`h-3.5 w-3.5 rounded-full transition-colors duration-fast ${i < pin.length ? 'bg-brand' : 'bg-[#e3e3e3]'}`}
+            />
+          ))}
+        </div>
+        {busy && busyLabel && (
+          <p role="status" className="text-center text-[13px] text-[#888]" data-testid={`${testId}-busy`}>
+            {busyLabel}
+          </p>
+        )}
       </div>
-      {busy && busyLabel && (
-        <p role="status" className="-my-3 text-center text-ink-muted" data-testid={`${testId}-busy`}>
-          {busyLabel}
-        </p>
-      )}
-      <div className="grid w-full max-w-xs grid-cols-3 gap-3">
+      <div className="grid w-full grid-cols-3 gap-3">
         {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((d) => (
-          <PinKey key={d} label={d} onPress={() => press(d)} disabled={disabled} testId={`${testId}-${d}`} />
+          <PinKey key={d} onClick={() => press(d)} disabled={disabled} testId={`${testId}-${d}`}>
+            {d}
+          </PinKey>
         ))}
         <span />
-        <PinKey label="0" onPress={() => press('0')} disabled={disabled} testId={`${testId}-0`} />
-        <button
-          type="button"
-          className="btn btn-segment h-16 text-ink-muted"
-          onClick={back}
-          disabled={disabled || pin.length === 0}
-          aria-label="Xóa số vừa nhập"
-          data-testid={`${testId}-back`}
-        >
-          <Delete aria-hidden className="h-7 w-7" />
-        </button>
+        <PinKey onClick={() => press('0')} disabled={disabled} testId={`${testId}-0`}>
+          0
+        </PinKey>
+        <PinKey onClick={back} disabled={disabled || pin.length === 0} testId={`${testId}-back`} label="Xóa số vừa nhập">
+          <Delete aria-hidden className="h-[22px] w-[22px]" />
+        </PinKey>
       </div>
     </div>
   );
 }
 
-function PinKey({ label, onPress, disabled, testId }: { label: string; onPress: () => void; disabled?: boolean; testId: string }) {
+function PinKey({
+  children,
+  onClick,
+  disabled,
+  testId,
+  label,
+}: {
+  children: ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+  testId: string;
+  label?: string;
+}) {
   return (
-    <button type="button" className="btn btn-secondary h-16 text-2xl tabular-nums" onClick={onPress} disabled={disabled} data-testid={testId}>
-      {label}
+    <button
+      type="button"
+      className="flex h-[58px] select-none items-center justify-center rounded-[14px] border border-line bg-white text-[22px] font-semibold tabular-nums text-[#111] transition-colors duration-fast hover:bg-surface-muted active:bg-brand-soft disabled:cursor-not-allowed disabled:opacity-40"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      data-testid={testId}
+    >
+      {children}
     </button>
   );
 }
@@ -120,6 +147,7 @@ export function OwnerPinSetup({
   onLater,
   laterLabel = 'Để sau',
   onDecline,
+  tabletName,
 }: {
   title?: string;
   intro?: string;
@@ -128,6 +156,8 @@ export function OwnerPinSetup({
   onLater: () => void;
   laterLabel?: string;
   onDecline?: () => void;
+  /** Tên quầy của máy này (hiện ở nửa trái trên tablet). */
+  tabletName: string;
 }) {
   const [first, setFirst] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -160,32 +190,46 @@ export function OwnerPinSetup({
   );
 
   return (
-    <main data-testid="owner-pin-setup" className="mx-auto flex h-full max-w-md flex-col justify-center gap-6 p-6">
-      <header className="flex flex-col gap-3">
-        <span aria-hidden className="flex h-14 w-14 items-center justify-center rounded-2xl bg-ink text-white shadow-card">
-          <KeyRound className="h-7 w-7" />
-        </span>
-        <h1 className="text-3xl font-bold">{title}</h1>
-        <p className="text-lg text-ink-muted">{intro}</p>
-      </header>
-      <section className="card flex flex-col gap-5 p-6">
-        <p className="text-center text-lg font-semibold" data-testid="owner-pin-setup-step">
-          {first === null ? 'Nhập mã PIN mới (6 số)' : 'Nhập lại mã PIN để xác nhận'}
-        </p>
+    <OwnerAuthShell tabletName={tabletName} testId="owner-pin-setup">
+      <div className="flex w-full flex-col gap-[22px] md:max-w-[400px]">
+        <PinHeader icon={KeyRound} title={title} intro={intro} />
         {/* key: đổi bước ⇒ bàn phím mới, chấm trống */}
-        <PinPad key={first === null ? 'new' : 'confirm'} onComplete={(p) => void onComplete(p)} disabled={busy} busyLabel="Đang lưu mã PIN…" testId="owner-pin-new" />
+        <PinPad
+          key={first === null ? 'new' : 'confirm'}
+          onComplete={(p) => void onComplete(p)}
+          disabled={busy}
+          busyLabel="Đang lưu mã PIN…"
+          label={first === null ? 'Nhập mã PIN mới (6 số)' : 'Nhập lại mã PIN để xác nhận'}
+          labelTestId="owner-pin-setup-step"
+          testId="owner-pin-new"
+        />
         <ErrorText testId="owner-pin-setup-error">{error}</ErrorText>
-        <div className="flex flex-col gap-2">
-          <button type="button" className="btn btn-secondary" onClick={onLater} disabled={busy} data-testid="owner-pin-later">
+        <div className="flex flex-col gap-2.5">
+          <button type="button" className={authBtnSecondary} onClick={onLater} disabled={busy} data-testid="owner-pin-later">
             {laterLabel}
           </button>
           {onDecline && (
-            <button type="button" className="btn btn-segment text-base" onClick={onDecline} disabled={busy} data-testid="owner-pin-decline">
+            <button type="button" className={authLink} onClick={onDecline} disabled={busy} data-testid="owner-pin-decline">
               Không dùng PIN trên máy này
             </button>
           )}
         </div>
-      </section>
-    </main>
+      </div>
+    </OwnerAuthShell>
+  );
+}
+
+/** Ô icon cam nhạt + tiêu đề + mô tả (Figma R11b / T19b). */
+export function PinHeader({ icon: Icon, title, intro }: { icon: LucideIcon; title: string; intro: string }) {
+  return (
+    <>
+      <span aria-hidden className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#ffeee7] text-[#c2380a]">
+        <Icon className="h-[26px] w-[26px]" />
+      </span>
+      <header className="flex flex-col gap-1.5">
+        <h1 className="text-2xl font-bold leading-[30px] tracking-normal">{title}</h1>
+        <p className="text-sm leading-[21px] text-[#888]">{intro}</p>
+      </header>
+    </>
   );
 }

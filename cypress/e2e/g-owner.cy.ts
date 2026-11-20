@@ -12,7 +12,7 @@ interface Sold {
 }
 
 function openSettings(section: string, rowId: string) {
-  cy.get(tid('owner-nav-settings')).click();
+  cy.ownerNav('settings');
   cy.get(tid(`settings-section-${section}`)).click();
   cy.get(tid(`settings-row-${rowId}`)).click();
   cy.get(tid('settings-editor')).should('be.visible');
@@ -133,7 +133,7 @@ describe('G. Chủ', () => {
       // Đếm đủ: 500.000 + 50.000 + 15.000 ⇒ chênh lệch 0
       cy.task<string>('sim:close', { tablet: 'A', boxes: 197, plates: 60, cash: 565_000 }).then((shiftId) => {
         cy.loginOwner();
-        cy.get(tid('owner-nav-orders')).click();
+        cy.ownerNav('orders');
         cy.get(tid('orders-row')).should('have.length', 2);
         cy.get(`[data-testid=orders-row][data-id="${big.id}"]`).click();
         cy.get(tid('order-detail-total')).should('have.text', '50.000');
@@ -194,7 +194,7 @@ describe('G. Chủ', () => {
     cy.window().then((w) => ((w as unknown as { __noReload: boolean }).__noReload = true));
     cy.get(tid('dash-live'), { timeout: 20_000 }).should('have.attr', 'data-state', 'live');
     cy.get(tid('dash-revenue')).should('have.text', '0');
-    cy.get(tid('dash-shifts')).should('contain.text', 'Lan – Tablet A');
+    cy.get(tid('dash-shifts')).should('contain.text', 'Lan').and('contain.text', 'Tablet A');
 
     // Thời gian chờ ngắn hơn chu kỳ làm mới dự phòng (60 giây) ⇒ chỉ Realtime mới cập nhật kịp
     const live = { timeout: 10_000 };
@@ -205,7 +205,7 @@ describe('G. Chủ', () => {
 
     cy.task('sim:sell', { tablet: 'A', product: 'comGa', point: 'com', method: 'transfer' });
     cy.get(tid('dash-revenue'), live).should('have.text', '60.000');
-    cy.get(tid('dash-revenue-split')).should('have.text', 'TM 25.000 · CK 35.000 · Nợ 0');
+    cy.get(tid('dash-revenue-split')).should('have.text', 'Tiền mặt 25.000 · CK 35.000 · Ghi nợ 0');
     cy.get(tid(`dash-point-${SEED.points.com}-total`)).should('have.text', '35.000');
     cy.get(tid(`dash-point-${SEED.points.com}-transfer`)).should('have.text', 'CK 35.000');
 
@@ -220,7 +220,7 @@ describe('G. Chủ', () => {
   it('G35: báo cáo theo nhân viên: tỷ lệ TM / CK / Nợ và số lần sửa / xóa khớp dữ liệu', () => {
     cy.task('scenario:staffReport');
     cy.loginOwner();
-    cy.get(tid('owner-nav-reports')).click();
+    cy.ownerNav('reports');
     cy.get(tid('report-from')).should('have.value', today());
     cy.get(tid('report-revenue')).should('have.text', '90.000');
     cy.get(tid('report-revenue-shares')).should('have.text', 'TM 28% · CK 50% · Nợ 22%');
@@ -274,7 +274,7 @@ describe('G. Chủ', () => {
   it('G36: nhật ký: lọc theo nhân viên và loại sự kiện ra đúng kết quả', () => {
     cy.task<Record<string, string>>('scenario:staffReport').then((ids) => {
       cy.loginOwner();
-      cy.get(tid('owner-nav-reports')).click();
+      cy.ownerNav('reports');
       // Từ báo cáo: số lần sửa của Mai ⇒ nhật ký đã lọc sẵn
       cy.get(tid(`report-staff-${SEED.staff.Mai}-edits`)).click();
       cy.location('pathname').should('eq', '/owner/log');

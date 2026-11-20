@@ -43,7 +43,7 @@ function closeShift(boxes: number, plates: number, cash: string) {
 function ownerOpensOnlyShift() {
   cy.task<Array<{ id: string }>>('db:shifts', 'A').then(([shift]) => {
     cy.loginOwner();
-    cy.get(tid('owner-nav-shifts')).click();
+    cy.ownerNav('shifts');
     cy.get(tid(`shift-row-${shift.id}`)).click();
     cy.get(tid('shift-report')).should('have.attr', 'data-status', 'closed');
   });
@@ -193,12 +193,12 @@ describe('E. Kịch bản gian lận', () => {
     // Chủ: dashboard tách CK theo điểm
     cy.loginOwner();
     cy.get(tid('dash-revenue')).should('have.text', '99.000');
-    cy.get(tid('dash-revenue-split')).should('have.text', 'TM 28.000 · CK 71.000 · Nợ 0');
+    cy.get(tid('dash-revenue-split')).should('have.text', 'Tiền mặt 28.000 · CK 71.000 · Ghi nợ 0');
     cy.get(tid(`dash-point-${SEED.points.xoiA}-transfer`)).should('have.text', 'CK 31.000');
     cy.get(tid(`dash-point-${SEED.points.com}-transfer`)).should('have.text', 'CK 40.000');
 
     // Báo cáo: đối chiếu chuyển khoản theo ngày / điểm
-    cy.get(tid('owner-nav-reports')).click();
+    cy.ownerNav('reports');
     cy.get(tid(`report-bank-day-${today}`)).should('be.visible');
     cy.get(tid(`report-bank-${today}-${SEED.points.xoiA}`)).should('have.text', '31.000');
     cy.get(tid(`report-bank-${today}-${SEED.points.com}`)).should('have.text', '40.000');

@@ -34,7 +34,7 @@ function sellCombo(combo: keyof typeof SEED.combos) {
 
 /** Chủ (điện thoại) mở báo cáo ca đang mở / vừa đóng của tablet. */
 function ownerOpensShift(shiftId: string) {
-  cy.get(tid('owner-nav-shifts')).click();
+  cy.ownerNav('shifts');
   cy.get(tid(`shift-row-${shiftId}`)).click();
   cy.get(tid('shift-report')).should('be.visible');
 }
