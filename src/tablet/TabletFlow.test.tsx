@@ -366,7 +366,7 @@ describe('hàng đợi', () => {
     const serveCards = () => within(tid('queue-serve')).queryAllByTestId(/^queue-card-/);
     expect(serveCards().map((c) => within(c).getByTestId(/^queue-label-/).textContent)).toEqual(['một', 'hai', 'ba']);
     expect(serveCards().map((c) => c.dataset.position)).toEqual(['1', '2', '3']);
-    for (const c of serveCards()) expect(within(c).getByTestId(/^queue-code-/).textContent).toMatch(/^[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{3}$/);
+    for (const c of serveCards()) expect(within(c).getByTestId(/^queue-code-/).textContent).toMatch(/^[ABCDEFGHJKMNPQRSTUVWXYZ][0-9]{2}$/);
     expect(serveCards().map((c) => c.dataset.color)).toEqual(['normal', 'normal', 'normal']);
 
     // t0 + 5 phút: đơn đầu (tạo lúc t0) vàng

@@ -25,13 +25,13 @@ Dư nợ còn: 70.000
 
 exports[`định dạng Telegram > debt_recorded 1`] = `
 "📒 Ghi nợ 35.000 – Dũng (giáo viên)
-Đơn 7KQ – Lan – Tablet A
+Đơn K72 – Lan – Tablet A
 Dư nợ: 120.000
 🔗 https://pos.laodai.vn/owner/debts/c1"
 `;
 
 exports[`định dạng Telegram > delivery_order 1`] = `
-"🛵 Đơn ship mới #3F5 – Xôi A
+"🛵 Đơn ship mới #F35 – Xôi A
 📍 12 Lê Lợi, P.3 – 0909 123 456
 • 2× Xôi gà (+Trứng) — 62.000
 Tổng: 62.000
@@ -40,7 +40,7 @@ Lan – Tablet A
 `;
 
 exports[`định dạng Telegram > order_deleted 1`] = `
-"🗑 Xóa đơn 3F5 – Lan – Tablet A
+"🗑 Xóa đơn F35 – Lan – Tablet A
 Lý do: Khách bỏ về
 Trạng thái lúc xóa: ⚠️ ĐÃ RA MÓN
 • 2× Xôi gà (+Trứng) — 62.000
@@ -49,7 +49,7 @@ Tổng: 62.000
 `;
 
 exports[`định dạng Telegram > owner_edit 1`] = `
-"✏️ Chủ sửa đơn 3F5 (đã thanh toán) – Tablet A
+"✏️ Chủ sửa đơn F35 (đã thanh toán) – Tablet A
 Trước: 62.000 · TM
 • 2× Xôi gà (+Trứng) — 62.000
 Sau: 62.000 · CK
@@ -77,7 +77,7 @@ Tiền mặt: đếm 2.080.000 / kỳ vọng 2.100.000 → −20.000
 Hộp: dùng 118 / theo đơn 112 → +6
 Dĩa: dùng 0 / theo đơn 0
 Xóa: 2 đơn (1 đã ra món) · Đơn còn mở: 1
-Bao bì của đơn bị xóa sau khi ra món: 3F5 (2 hộp)
+Bao bì của đơn bị xóa sau khi ra món: F35 (2 hộp)
 🔗 https://pos.laodai.vn/owner/shifts/s1"
 `;
 

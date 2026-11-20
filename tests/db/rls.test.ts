@@ -175,7 +175,7 @@ describe('vai trò tablet ĐƯỢC', () => {
     expect(error).toBeNull();
     const row = (data as { orders: Array<{ id: string; code: string; paid_at: string; total: number; items: unknown[] }> }).orders.find((x) => x.id === o.id);
     expect(row).toMatchObject({ total: o.total, items: [{ qty: 2, toppings: [] }] });
-    expect(row!.code).toMatch(/^[A-Z0-9]{3}$/);
+    expect(row!.code).toMatch(/^[ABCDEFGHJKMNPQRSTUVWXYZ][0-9]{2}$/);
     expect(row!.paid_at).toBeTruthy();
     expect((await anonClient().rpc('customer_debt_history', { p_customer: SEED.customers.dungPhuongB })).error).not.toBeNull();
   });

@@ -120,7 +120,7 @@ Chủ có thể **bổ sung giữa ca** (vd. "+50 hộp", "+200k tiền lẻ") t
 - Mỗi thẻ đơn: **số thứ tự trong hàng đợi** (1, 2, 3… đánh lại liên tục), **mã đơn** `3F5`, nhãn/bàn, giờ tạo, **đồng hồ chờ**, tóm tắt món, tổng tiền đơn.
 - Chờ ra món đổi màu: vàng ≥ 5 phút, đỏ ≥ 10 phút (chủ chỉnh).
 - Bấm **Đã ra món** → chuyển nhóm, lưu `served_at`.
-- Mã đơn: 3 ký tự từ bảng chữ không gây nhầm (`23456789ABCDEFGHJKMNPQRSTUVWXYZ`), không trùng trong ngày của tablet. Không phản ánh số lượng đơn.
+- Mã đơn: 1 chữ + 2 số, ví dụ `A30` (chữ đầu bỏ `I L O`), ngẫu nhiên, không trùng trong ngày của tablet. Không phản ánh số lượng đơn.
 
 ### 4.4 Thanh toán
 Chọn một hình thức (không chia, không nợ một phần):
@@ -286,8 +286,8 @@ Toàn bộ logic nghiệp vụ phía client nằm trong `src/domain/` dưới d�
 - Các nút mệnh giá nhanh chỉ hiện mệnh giá ≥ tổng đơn. "Khách đưa" nhỏ hơn tổng thì không cho xác nhận.
 
 **Mã đơn** (`domain/orderCode`)
-- Đúng 3 ký tự, chỉ dùng bảng chữ cho phép (không có `0 O 1 I L`).
-- Không trùng với các mã đã dùng trong ngày của tablet. Có test sinh 5.000 mã liên tiếp, không mã nào trùng.
+- Dạng 1 chữ + 2 số, ví dụ `A30`, `F15`. Chữ đầu không có `I L O` ⇒ 23 × 100 = 2.300 mã mỗi ngày cho mỗi hồ sơ tablet. Đơn cũ (trước 20/11/2026) giữ mã 3 ký tự cũ.
+- Không trùng với các mã đã dùng trong ngày của tablet. Có test sinh 2.000 mã liên tiếp, không mã nào trùng.
 - Không suy ra được số thứ tự đơn: dùng hàm sinh ngẫu nhiên có seed để kiểm tra.
 
 **Hàng đợi** (`domain/queue`)
@@ -369,7 +369,7 @@ Mỗi kịch bản bắt đầu bằng `cy.task('db:reset')` để reset và see
 12. Chuyển tab Xôi ↔ Cơm gà trong cùng ca: đơn được gắn nhãn điểm bán đúng.
 13. Nhân viên không có ô nào để sửa giá hay giảm giá.
 14. Hàng đợi: tạo 3 đơn, đơn cũ nhất ở trên. Sau 5 phút đơn chuyển vàng, sau 10 phút chuyển đỏ (`cy.clock`). Bấm "Đã ra món" thì đơn xuống nhóm "Chờ thanh toán".
-15. Mã đơn hiển thị đúng dạng 3 ký tự. Số thứ tự trong hàng đợi đánh lại sau khi thanh toán một đơn.
+15. Mã đơn hiển thị đúng dạng 1 chữ + 2 số. Số thứ tự trong hàng đợi đánh lại sau khi thanh toán một đơn.
 16. Thanh toán xong, đơn biến mất khỏi tablet. Không có màn hình nào cho xem lại đơn đã thanh toán.
 
 **D. Ghi nợ & thu nợ**

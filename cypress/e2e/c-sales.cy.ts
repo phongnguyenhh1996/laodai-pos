@@ -3,7 +3,7 @@ import { SEED } from '../../tests/support/seed-ids';
 // C. Bán hàng (mục 10.4), bước 5.
 
 const tid = (id: string) => `[data-testid=${id}]`;
-const CODE = /^[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{3}$/;
+const CODE = /^[ABCDEFGHJKMNPQRSTUVWXYZ][0-9]{2}$/;
 
 interface DbOrder {
   id: string;
@@ -170,7 +170,7 @@ describe('C. Bán hàng', () => {
     });
   });
 
-  it('C15: mã đơn đúng dạng 3 ký tự; số thứ tự trong hàng đợi đánh lại sau khi thanh toán một đơn', () => {
+  it('C15: mã đơn đúng dạng 1 chữ + 2 số; số thứ tự trong hàng đợi đánh lại sau khi thanh toán một đơn', () => {
     cy.openShift('Lan');
     comboOrder('xoiGaTrung', 'một');
     comboOrder('xoiXeoChaRuoc', 'hai');

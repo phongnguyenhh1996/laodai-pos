@@ -1,32 +1,40 @@
 import { describe, expect, it } from 'vitest';
-import { ORDER_CODE_ALPHABET, ORDER_CODE_SPACE, cryptoRng, generateOrderCode, isValidOrderCode, seededRng } from './orderCode';
+import {
+  ORDER_CODE_LETTERS,
+  ORDER_CODE_SPACE,
+  allOrderCodes,
+  cryptoRng,
+  generateOrderCode,
+  isValidOrderCode,
+  seededRng,
+} from './orderCode';
 
 describe('orderCode', () => {
-  it('bảng chữ không có 0 O 1 I L', () => {
-    for (const c of '0O1IL') expect(ORDER_CODE_ALPHABET).not.toContain(c);
+  it('chữ đầu không có I L O', () => {
+    for (const c of 'ILO') expect(ORDER_CODE_LETTERS).not.toContain(c);
+    expect(ORDER_CODE_SPACE).toBe(2300);
   });
 
-  it('đúng 3 ký tự, chỉ dùng bảng chữ cho phép', () => {
+  it('đúng 1 chữ + 2 số', () => {
     const rng = seededRng(42);
     for (let i = 0; i < 500; i++) {
       const c = generateOrderCode(new Set(), rng);
-      expect(c).toMatch(/^[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{3}$/);
+      expect(c).toMatch(/^[ABCDEFGHJKMNPQRSTUVWXYZ][0-9]{2}$/);
       expect(isValidOrderCode(c)).toBe(true);
     }
-    expect(isValidOrderCode('AB')).toBe(false);
-    expect(isValidOrderCode('A0B')).toBe(false);
-    expect(isValidOrderCode('ABI')).toBe(false);
+    for (const ok of ['A00', 'A30', 'F15', 'Z99']) expect(isValidOrderCode(ok)).toBe(true);
+    for (const bad of ['A3', 'A300', 'I30', 'L30', 'O30', 'a30', '3A0', 'AB1', '7KQ']) expect(isValidOrderCode(bad)).toBe(false);
   });
 
-  it('5.000 mã liên tiếp không mã nào trùng', () => {
+  it('2.000 mã liên tiếp không mã nào trùng', () => {
     const used = new Set<string>();
     const rng = seededRng(7);
-    for (let i = 0; i < 5000; i++) {
+    for (let i = 0; i < 2000; i++) {
       const c = generateOrderCode(used, rng);
       expect(used.has(c)).toBe(false);
       used.add(c);
     }
-    expect(used.size).toBe(5000);
+    expect(used.size).toBe(2000);
   });
 
   it('dùng crypto mặc định', () => {
@@ -39,8 +47,7 @@ describe('orderCode', () => {
   it('không suy ra được số thứ tự đơn: mã chỉ phụ thuộc nguồn ngẫu nhiên, không phụ thuộc số đơn', () => {
     // Cùng seed ⇒ cùng mã, dù đã bán 0 hay 300 đơn (mã đã dùng không chứa mã sinh ra)
     const fresh = generateOrderCode(new Set(), seededRng(123));
-    const busy = new Set(Array.from({ length: 300 }, (_, i) => `Z${ORDER_CODE_ALPHABET[i % 31]}${ORDER_CODE_ALPHABET[Math.floor(i / 31)]}`));
-    busy.delete(fresh);
+    const busy = new Set(allOrderCodes().filter((c) => c !== fresh).slice(-300));
     expect(generateOrderCode(busy, seededRng(123))).toBe(fresh);
 
     // Dãy mã liên tiếp không đơn điệu (không phải bộ đếm)
@@ -51,24 +58,22 @@ describe('orderCode', () => {
       used.add(c);
       return c;
     });
-    const sorted = [...seqCodes].sort();
-    expect(seqCodes).not.toEqual(sorted);
+    expect(seqCodes).not.toEqual([...seqCodes].sort());
     // Seed khác ⇒ dãy khác
     expect(generateOrderCode(new Set(), seededRng(1))).not.toBe(generateOrderCode(new Set(), seededRng(2)));
   });
 
   it('khi gần hết mã vẫn chọn được mã còn trống; hết hẳn thì báo lỗi', () => {
-    const A = ORDER_CODE_ALPHABET;
-    const all: string[] = [];
-    for (const a of A) for (const b of A) for (const c of A) all.push(a + b + c);
+    const all = allOrderCodes();
     expect(all.length).toBe(ORDER_CODE_SPACE);
+    expect(new Set(all).size).toBe(ORDER_CODE_SPACE);
     const used = new Set(all);
-    used.delete('ZZZ');
-    expect(generateOrderCode(used, seededRng(5))).toBe('ZZZ');
-    used.add('ZZZ');
+    used.delete('Z99');
+    expect(generateOrderCode(used, seededRng(5))).toBe('Z99');
+    used.add('Z99');
     expect(() => generateOrderCode(used, seededRng(5))).toThrow();
     // Rng luôn trả cùng một mã đã dùng ⇒ rơi xuống nhánh danh sách mã trống
-    const stuck = new Set(['222']);
-    expect(generateOrderCode(stuck, () => 0)).not.toBe('222');
+    const stuck = new Set(['A00']);
+    expect(generateOrderCode(stuck, () => 0)).not.toBe('A00');
   });
 });

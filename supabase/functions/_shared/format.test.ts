@@ -16,12 +16,12 @@ const rec: Reconcile = {
   boxes: { used: 118, by_orders: 112, diff: 6 },
   plates: { used: 0, by_orders: 0, diff: 0 },
   deleted_count: 2,
-  deleted_after_served: [{ order_id: 'o9', code: '3F5', boxes: 2, plates: 0 }],
+  deleted_after_served: [{ order_id: 'o9', code: 'F35', boxes: 2, plates: 0 }],
   open_orders: 1,
 };
 
 const order = {
-  id: 'o1', code: '3F5', total: 62_000, status: 'served', dine_type: 'takeaway', label: null, table_no: null,
+  id: 'o1', code: 'F35', total: 62_000, status: 'served', dine_type: 'takeaway', label: null, table_no: null,
   payment_method: 'cash', customer_id: null,
   items: [{ name_snap: 'Xôi gà', qty: 2, unit_price_snap: 25_000, toppings_snap: [{ name: 'Trứng', price: 6_000 }] }],
 };
@@ -38,7 +38,7 @@ const samples: Notification[] = [
   },
   {
     kind: 'debt_recorded',
-    payload: { ...base, ...ctx, order_code: '7KQ', order_id: 'o2', customer_id: 'c1', amount: 35_000, customer_label: 'Dũng (giáo viên)', balance: 120_000 },
+    payload: { ...base, ...ctx, order_code: 'K72', order_id: 'o2', customer_id: 'c1', amount: 35_000, customer_label: 'Dũng (giáo viên)', balance: 120_000 },
   },
   {
     kind: 'debt_paid',
@@ -47,7 +47,7 @@ const samples: Notification[] = [
   {
     kind: 'owner_edit',
     payload: {
-      ...base, order_id: 'o1', order_code: '3F5', tablet_name: 'Tablet A',
+      ...base, order_id: 'o1', order_code: 'F35', tablet_name: 'Tablet A',
       before: { ...order, status: 'paid' },
       after: { ...order, status: 'paid', payment_method: 'transfer' },
       recalculated: { before: { s1: rec }, after: { s1: { ...rec, cash: { expected: 2_038_000, counted: 2_080_000, diff: 42_000 } } } },

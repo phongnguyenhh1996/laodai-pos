@@ -82,7 +82,7 @@ describe('đơn', () => {
     await expect(pos.createOrder(draft({ dine_type: 'delivery', address: '  ' }))).rejects.toThrow('Đơn ship cần địa chỉ');
     const o = await pos.createOrder(draft({ label: '  bàn 1 ', table_no: ' ', dine_type: 'delivery', address: ' 12 Lê Lợi ' }));
     expect(o).toMatchObject({ device_seq: 1, label: 'bàn 1', table_no: null, address: '12 Lê Lợi', total: 39_000, status: 'open' });
-    expect(o.code).toMatch(/^[23456789A-Z]{3}$/);
+    expect(o.code).toMatch(/^[ABCDEFGHJKMNPQRSTUVWXYZ][0-9]{2}$/);
     expect(server.ops.at(-1)).not.toHaveProperty('performed_at');
     expect(store.getSnapshot().open?.orders).toEqual([o]);
     const o2 = await pos.createOrder(draft());

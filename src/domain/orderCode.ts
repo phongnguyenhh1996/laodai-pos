@@ -1,7 +1,12 @@
-/** Bảng chữ không gây nhầm: không có 0 O 1 I L. */
-export const ORDER_CODE_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
+/**
+ * Mã đơn dạng 1 chữ + 2 số, ví dụ `A30`, `F15`.
+ * Chữ bỏ I L O (dễ nhầm khi đọc / viết tay). Số dùng đủ 0–9: vị trí 2–3 luôn là số nên không nhầm với chữ.
+ */
+export const ORDER_CODE_LETTERS = 'ABCDEFGHJKMNPQRSTUVWXYZ';
+export const ORDER_CODE_DIGITS = '0123456789';
 export const ORDER_CODE_LENGTH = 3;
-export const ORDER_CODE_SPACE = ORDER_CODE_ALPHABET.length ** ORDER_CODE_LENGTH;
+export const ORDER_CODE_SPACE = ORDER_CODE_LETTERS.length * ORDER_CODE_DIGITS.length ** 2;
+const ORDER_CODE_RE = /^[ABCDEFGHJKMNPQRSTUVWXYZ][0-9]{2}$/;
 
 export type Rng = () => number;
 
@@ -24,16 +29,20 @@ export function cryptoRng(): number {
 }
 
 export function isValidOrderCode(code: string): boolean {
-  if (code.length !== ORDER_CODE_LENGTH) return false;
-  return [...code].every((c) => ORDER_CODE_ALPHABET.includes(c));
+  return ORDER_CODE_RE.test(code);
 }
 
+const pick = (s: string, rng: Rng) => s[Math.floor(rng() * s.length)];
+
 function randomCode(rng: Rng): string {
-  let s = '';
-  for (let i = 0; i < ORDER_CODE_LENGTH; i++) {
-    s += ORDER_CODE_ALPHABET[Math.floor(rng() * ORDER_CODE_ALPHABET.length)];
-  }
-  return s;
+  return pick(ORDER_CODE_LETTERS, rng) + pick(ORDER_CODE_DIGITS, rng) + pick(ORDER_CODE_DIGITS, rng);
+}
+
+/** Mọi mã hợp lệ, theo thứ tự A00 … Z99. */
+export function allOrderCodes(): string[] {
+  const out: string[] = [];
+  for (const l of ORDER_CODE_LETTERS) for (let n = 0; n < 100; n++) out.push(l + String(n).padStart(2, '0'));
+  return out;
 }
 
 /**
@@ -49,11 +58,7 @@ export function generateOrderCode(used: ReadonlySet<string>, rng: Rng = cryptoRn
       if (!used.has(c)) return c;
     }
   }
-  const free: string[] = [];
-  const A = ORDER_CODE_ALPHABET;
-  for (const a of A) for (const b of A) for (const c of A) {
-    const code = a + b + c;
-    if (!used.has(code)) free.push(code);
-  }
+  const free = allOrderCodes().filter((c) => !used.has(c));
+  if (free.length === 0) throw new Error('Hết mã đơn trong ngày');
   return free[Math.floor(rng() * free.length)];
 }
