@@ -444,7 +444,7 @@ Mỗi kịch bản bắt đầu bằng `cy.task('db:reset')` để reset và see
 3. **Xóa đơn** bắt chọn lý do 1 chạm (không bắt gõ chữ).
 4. Bao bì tính theo **ca mở đơn**, tiền tính theo **ca thu tiền**.
 5. Vai trò `tablet` riêng ở tầng dữ liệu, để nhân viên rành kỹ thuật cũng không lấy được doanh thu từ tablet.
-6. Giờ tổng kết ngày mặc định **14:30** (sau ca cơm gà), chủ chỉnh được.
+6. Giờ tổng kết ngày mặc định **14:30** (sau ca cơm gà), chủ chỉnh được. *(20/11/2026: tạm tắt cron tự gửi tổng kết ngày — chủ xem báo cáo trong app; hàm vẫn giữ để bật lại.)*
 
 ---
 

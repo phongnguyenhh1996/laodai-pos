@@ -7,10 +7,10 @@ describe('tổng kết ngày (pg_cron)', () => {
 
   it('cron được lên lịch', async () => {
     const jobs = await sql<{ jobname: string; schedule: string; command: string }>('select jobname, schedule, command from cron.job order by jobname');
-    expect(jobs.map((j) => j.jobname)).toEqual(['laodai-daily-summary', 'laodai-expire-print-jobs', 'laodai-retry-notifications']);
-    expect(jobs[0].command).toContain('daily_summary_tick');
+    // Tổng kết ngày không tự chạy nữa (chủ quán xem trong app); hàm vẫn giữ để bật lại khi cần.
+    expect(jobs.map((j) => j.jobname)).toEqual(['laodai-expire-print-jobs', 'laodai-retry-notifications']);
     // Lệnh in quá 2 phút không ai nhận ⇒ hết hạn (SPEC 12.6), chạy mỗi phút.
-    expect(jobs[1]).toMatchObject({ schedule: '* * * * *', command: expect.stringContaining('expire_print_jobs') });
+    expect(jobs[0]).toMatchObject({ schedule: '* * * * *', command: expect.stringContaining('expire_print_jobs') });
   });
 
   it('khoảng thời gian theo múi giờ Asia/Ho_Chi_Minh', async () => {
