@@ -7,8 +7,8 @@ import { Sheet } from './parts';
 import { ShipCustomerPicker } from './ShipCustomer';
 
 /**
- * Điện thoại (Figma MS2): bảng nhập địa chỉ giao + khách của đơn ship. Chỉ mở khi bấm dòng "Địa chỉ, khách"
- * ⇒ bàn phím chỉ hiện ở bước này, không che thực đơn. Sửa thẳng vào bản nháp; Xong / X đều đóng bảng.
+ * Điện thoại (Figma MS2): bảng nhập khách + địa chỉ giao của đơn ship. Khách ở trên vì chọn khách
+ * điền sẵn địa chỉ. Chỉ mở khi bấm dòng "Địa chỉ, khách" ⇒ bàn phím chỉ hiện ở bước này. Xong / X đều đóng bảng.
  */
 export function ShipSheet({
   address,
@@ -41,6 +41,10 @@ export function ShipSheet({
       }
       onClose={onClose}
     >
+      <div className="flex flex-col gap-1.5">
+        <span className="text-[13px] font-semibold text-ink-muted">Khách (tuỳ chọn)</span>
+        <ShipCustomerPicker book={book} customer={customer} autoFocus={missing && !customer} onChange={onCustomer} />
+      </div>
       <label className="flex flex-col gap-1.5">
         <span className="text-[13px] font-semibold text-ink-muted">Địa chỉ giao</span>
         <span className="relative">
@@ -51,7 +55,6 @@ export function ShipSheet({
             aria-invalid={missing}
             placeholder={customer?.phone ? 'Địa chỉ giao (bắt buộc)' : 'Địa chỉ giao, SĐT (bắt buộc)'}
             maxLength={200}
-            autoFocus
             value={address}
             onChange={(e) => onAddress(e.target.value)}
             onKeyDown={(e) => {
@@ -61,10 +64,6 @@ export function ShipSheet({
           />
         </span>
       </label>
-      <div className="flex flex-col gap-1.5">
-        <span className="text-[13px] font-semibold text-ink-muted">Khách (tuỳ chọn)</span>
-        <ShipCustomerPicker book={book} customer={customer} onChange={onCustomer} />
-      </div>
       <button type="button" className="btn btn-primary min-h-[52px] shrink-0 text-[17px]" disabled={missing} onClick={onClose} data-testid="ship-sheet-done">
         Xong
       </button>

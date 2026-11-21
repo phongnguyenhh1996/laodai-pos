@@ -322,7 +322,8 @@ describe('C. Bán hàng', () => {
     cy.get(tid('order-ship-details')).click();
     cy.get(tid('ship-sheet-summary')).should('contain.text', '+15.000').and('contain.text', '46.000');
     cy.get(tid('ship-sheet-done')).should('be.disabled');
-    cy.get(tid('order-address')).should('be.focused').type('12 Lê Lợi');
+    cy.get(tid('ship-customer-search')).should('be.focused');
+    cy.get(tid('order-address')).type('12 Lê Lợi');
     cy.get(tid('ship-sheet-done')).click();
     cy.get(tid('order-ship-summary')).should('contain.text', '12 Lê Lợi');
 

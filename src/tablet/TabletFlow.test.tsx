@@ -142,7 +142,7 @@ describe('tạo đơn & thanh toán', () => {
 
     click('order-ship-details');
     expect(tid('ship-sheet')).toBeInTheDocument();
-    expect(tid('order-address')).toHaveFocus();
+    expect(tid('ship-customer-search')).toHaveFocus(); // khách trước, chọn xong mới điền địa chỉ
     expect(tid('ship-sheet-done')).toBeDisabled(); // địa chỉ bắt buộc
     fireEvent.change(tid('order-address'), { target: { value: '  12 Lê Lợi – 0909 123 456 ' } });
     click('ship-sheet-done');
