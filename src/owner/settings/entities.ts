@@ -1,4 +1,5 @@
 // Mô tả từng loại cài đặt cho màn danh sách + màn sửa dùng chung (SettingsPages.tsx).
+import { Printer, type LucideIcon } from 'lucide-react';
 import {
   CatalogError, checkCombo, checkMenu, checkPoint, checkProduct, checkStaff, checkTabletProfile, checkTopping,
   parseCountInput, parseMoneyInput,
@@ -27,8 +28,18 @@ export interface FieldDef {
   /** Ô text: bàn phím số (vd. CCCD) hoặc bàn phím điện thoại. */
   numeric?: boolean;
   tel?: boolean;
-  /** Tiêu đề nhóm hiện phía trên ô này. */
+  /** Ô này mở một thẻ mới với tiêu đề này (ô đầu tiên không có ⇒ thẻ "Thông tin <noun>"). */
   section?: string;
+  /** Dòng phụ dưới tiêu đề thẻ. */
+  sectionHint?: string;
+  /** Icon góc phải tiêu đề thẻ (Figma R32 "In tự động"). */
+  sectionIcon?: LucideIcon;
+  /** Tablet: thẻ này nằm cột phải. */
+  side?: boolean;
+  /** Ô nửa bề ngang: hai ô `half` liền nhau nằm chung một hàng. */
+  half?: boolean;
+  /** Đơn vị bên phải ô số (hộp, dĩa…). Ô tiền luôn có "đ". */
+  unit?: string;
 }
 
 type Row = { id: string; name: string; active?: boolean };
@@ -80,6 +91,8 @@ const nextSort = (rows: Array<{ sort: number }>) => String(rows.reduce((m, r) =>
 const inactive = (label: string, active: boolean) => (active ? label : `${label} (ngừng)`);
 
 const SORT_FIELD: FieldDef = { key: 'sort', label: 'Thứ tự hiển thị', kind: 'count' };
+/** Thẻ "Hiển thị" ở cột phải tablet: thứ tự + đang bán / đang làm. */
+const SHOW_SECTION: Partial<FieldDef> = { section: 'Hiển thị', side: true };
 const PRICE_HINT = 'Giá mới chỉ áp dụng cho đơn tạo sau khi lưu; đơn đang mở giữ giá cũ.';
 
 // ---------------------------------------------------------------- các loại cài đặt
@@ -98,10 +111,10 @@ const products: EntityDef = {
     { key: 'menu_id', label: 'Menu', kind: 'select', options: menuOptions, createOnly: true },
     { key: 'name', label: 'Tên món', kind: 'text' },
     { key: 'price', label: 'Giá', kind: 'money', hint: PRICE_HINT },
-    { key: 'boxes_takeaway', label: 'Số hộp mỗi phần khi mang về', kind: 'count' },
-    { key: 'boxes_dinein', label: 'Số hộp mỗi phần khi ăn tại chỗ', kind: 'count' },
-    { key: 'plates_dinein', label: 'Số dĩa mỗi phần khi ăn tại chỗ', kind: 'count' },
-    SORT_FIELD,
+    { key: 'boxes_takeaway', label: 'Hộp khi mang về', kind: 'count', unit: 'hộp', section: 'Hộp & dĩa mỗi phần' },
+    { key: 'boxes_dinein', label: 'Hộp khi ăn tại chỗ', kind: 'count', unit: 'hộp', half: true },
+    { key: 'plates_dinein', label: 'Dĩa khi ăn tại chỗ', kind: 'count', unit: 'dĩa', half: true },
+    { ...SORT_FIELD, ...SHOW_SECTION },
     { key: 'active', label: 'Đang bán', kind: 'bool' },
   ],
   toForm: (r, c) => {
@@ -149,7 +162,7 @@ const toppings: EntityDef = {
     { key: 'name', label: 'Tên topping', kind: 'text' },
     { key: 'price', label: 'Giá', kind: 'money', hint: PRICE_HINT },
     { key: 'extra_box_takeaway', label: 'Thêm 1 hộp khi mang về (canh, dưa…)', kind: 'bool' },
-    SORT_FIELD,
+    { ...SORT_FIELD, ...SHOW_SECTION },
     { key: 'active', label: 'Đang bán', kind: 'bool' },
   ],
   toForm: (r, c) => {
@@ -199,23 +212,20 @@ const combos: EntityDef = {
       key: 'product_id',
       label: 'Món chính',
       kind: 'select',
+      section: 'Thành phần',
+      sectionHint: 'Giá combo = tổng giá các thành phần',
       options: (f, c) => [
         { value: '', label: '— Chọn món —' },
-        ...c.products
-          .filter((p) => p.menu_id === str(f, 'menu_id'))
-          .map((p) => ({ value: p.id, label: `${inactive(p.name, p.active)} · ${formatVnd(p.price)}` })),
+        ...c.products.filter((p) => p.menu_id === str(f, 'menu_id')).map((p) => ({ value: p.id, label: `${inactive(p.name, p.active)} · ${formatVnd(p.price)}` })),
       ],
     },
     {
       key: 'topping_ids',
       label: 'Topping kèm',
       kind: 'multi',
-      options: (f, c) =>
-        c.toppings
-          .filter((t) => t.menu_id === str(f, 'menu_id'))
-          .map((t) => ({ value: t.id, label: `${inactive(t.name, t.active)} · ${formatVnd(t.price)}` })),
+      options: (f, c) => c.toppings.filter((t) => t.menu_id === str(f, 'menu_id')).map((t) => ({ value: t.id, label: `${inactive(t.name, t.active)} · ${formatVnd(t.price)}` })),
     },
-    SORT_FIELD,
+    { ...SORT_FIELD, ...SHOW_SECTION },
     { key: 'active', label: 'Đang bán', kind: 'bool' },
   ],
   toForm: (r, c) => {
@@ -263,11 +273,7 @@ const staff: EntityDef = {
   summary: (r, c) => {
     const d = detailsOf(c, r.id);
     if (!d) return '';
-    return [
-      d.phone ? formatPhone(d.phone) : null,
-      d.day_rate ? `${formatVnd(d.day_rate)} / ngày` : null,
-      d.birthday ? `SN ${formatDate(d.birthday).slice(0, 5)}` : null,
-    ].filter(Boolean).join(' · ');
+    return [d.phone ? formatPhone(d.phone) : null, d.day_rate ? `${formatVnd(d.day_rate)} / ngày` : null, d.birthday ? `SN ${formatDate(d.birthday).slice(0, 5)}` : null].filter(Boolean).join(' · ');
   },
   fields: [
     { key: 'name', label: 'Tên (nhân viên chọn tên khi mở ca)', kind: 'text' },
@@ -279,9 +285,10 @@ const staff: EntityDef = {
       label: 'Lương một ngày',
       kind: 'money',
       section: 'Lương',
+      side: true,
       hint: 'Lương tháng = số ngày có mở ca × lương một ngày (mở nhiều ca trong ngày vẫn tính 1 ngày), chủ cộng / trừ ngày công ở màn Lương. Đổi lương ngày áp dụng cho cả tháng đang tính.',
     },
-    { ...SORT_FIELD, section: 'Khác' },
+    { ...SORT_FIELD, ...SHOW_SECTION },
     { key: 'active', label: 'Đang làm', kind: 'bool' },
   ],
   toForm: (r, c) => {
@@ -336,7 +343,7 @@ const points: EntityDef = {
     { key: 'name', label: 'Tên điểm bán', kind: 'text' },
     { key: 'menu_id', label: 'Menu', kind: 'select', options: menuOptions },
     { key: 'default_dine_type', label: 'Mặc định khi tạo đơn', kind: 'select', options: () => DINE_OPTIONS },
-    SORT_FIELD,
+    { ...SORT_FIELD, ...SHOW_SECTION },
     { key: 'active', label: 'Đang hoạt động', kind: 'bool' },
   ],
   toForm: (r, c) => {
@@ -377,15 +384,25 @@ const profiles: EntityDef = {
     { key: 'name', label: 'Tên quầy', kind: 'text' },
     {
       key: 'point_ids',
-      label: 'Điểm bán ở quầy này (thành tab khi tạo đơn)',
+      label: 'Điểm bán ở quầy này',
       kind: 'multi',
+      section: 'Điểm bán ở quầy này',
+      sectionHint: 'Mỗi điểm thành một tab khi tạo đơn',
       options: (_f, c) => c.points.map((p) => ({ value: p.id, label: inactive(p.name, p.active) })),
     },
-    { key: 'default_boxes', label: 'Số hộp đầu ca', kind: 'count' },
-    { key: 'default_plates', label: 'Số dĩa đầu ca', kind: 'count' },
+    { key: 'default_boxes', label: 'Số hộp', kind: 'count', unit: 'hộp', half: true, section: 'Đầu ca mặc định', sectionHint: 'Nhân viên xác nhận lại khi mở ca' },
+    { key: 'default_plates', label: 'Số dĩa', kind: 'count', unit: 'dĩa', half: true },
     { key: 'default_float', label: 'Tiền lẻ đầu ca', kind: 'money' },
     // SPEC 12.2: chỉ bật / tắt in TỰ ĐỘNG; bấm in tay lúc nào cũng in được.
-    { key: 'auto_print_kitchen', label: 'Tự in phiếu bếp khi tạo đơn', kind: 'bool', section: 'In tự động (app Android có máy in)' },
+    {
+      key: 'auto_print_kitchen',
+      label: 'Tự in phiếu bếp khi tạo đơn',
+      kind: 'bool',
+      section: 'In tự động',
+      sectionHint: 'Chỉ áp dụng app Android có máy in',
+      sectionIcon: Printer,
+      side: true,
+    },
     { key: 'auto_reprint_kitchen_on_edit', label: 'Tự in lại phiếu bếp khi sửa đơn', kind: 'bool' },
     { key: 'auto_print_bill', label: 'Tự in bill khi thanh toán xong', kind: 'bool' },
   ],

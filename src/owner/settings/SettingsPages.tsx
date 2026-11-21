@@ -1,16 +1,19 @@
-import { useEffect, useState, type FormEvent } from 'react';
-import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { ErrorText, Splash, TextField, errorMessage } from '@/app/ui';
+import { Fragment, useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { Link, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { Boxes, Check, ChevronRight, Layers, ListChecks, MapPin, Plus, Printer, Store, Users, UtensilsCrossed, type LucideIcon } from 'lucide-react';
+import { useIsTablet } from '@/app/useMediaQuery';
+import { ErrorText, Splash, errorMessage } from '@/app/ui';
 import { parseMoneyInput } from '@/domain/catalog';
 import { formatVnd } from '@/domain/money';
 import { TZ } from '@/domain/time';
 import { useOwner } from '../OwnerContext';
-import { NavItem, NavList, OwnerLayout } from '../OwnerLayout';
+import { OwnerLayout } from '../OwnerLayout';
+import { CheckMark, FormInput, FormSelect, IconTile, Note, PageHead, Section, Switch, TONE, btn, card, type Tone } from '../ui';
 import { loadOwnerCatalog, loadPriceHistory, saveSetting, saveStaffDetails, type OwnerCatalog, type PriceChange } from './api';
 import { PrintTemplatePage } from './PrintTemplatePage';
-import { ENTITIES, entityByKey, type EntityDef, type FieldDef, type Form, type FormValue } from './entities';
+import { entityByKey, type EntityDef, type FieldDef, type Form, type FormValue } from './entities';
 
-/** `/owner/settings/*` (mục 7, màn chủ số 7). */
+/** `/owner/settings/*` (mục 7, màn chủ số 7; Figma R31–R33 / T32–T34). */
 export function SettingsRoutes() {
   return (
     <Routes>
@@ -39,22 +42,107 @@ function useOwnerCatalog(): { cat: OwnerCatalog | null; error: string | null } {
   return state;
 }
 
-// ---------------------------------------------------------------- trang đầu
+/** Icon + màu + dòng mô tả của từng mục (Figma R31). */
+const VISUAL: Record<string, { icon: LucideIcon; tone: Tone; desc: (cat: OwnerCatalog | null) => string }> = {
+  products: { icon: UtensilsCrossed, tone: 'orange', desc: () => 'Tên, giá, đang bán' },
+  toppings: { icon: Layers, tone: 'orange', desc: () => 'Giá thêm theo món' },
+  combos: { icon: Boxes, tone: 'orange', desc: () => 'Món chính + topping kèm' },
+  menus: { icon: ListChecks, tone: 'orange', desc: () => 'Món hiện ở từng điểm bán' },
+  points: { icon: MapPin, tone: 'blue', desc: (c) => names(c?.points.filter((p) => p.active)) || 'Nơi bán, mỗi nơi một menu' },
+  profiles: { icon: Store, tone: 'blue', desc: (c) => names(c?.profiles) || 'Máy bán hàng và điểm bán của nó' },
+  staff: { icon: Users, tone: 'green', desc: () => 'CCCD, sinh nhật, lương ngày' },
+  'print-template': { icon: Printer, tone: 'gray', desc: () => 'Phiếu bếp + bill, xem trước, in thử' },
+};
+const names = (rows: Array<{ name: string }> | undefined) => (rows ?? []).map((r) => r.name).join(' · ');
+
+const GROUPS: Array<{ title: string; keys: string[] }> = [
+  { title: 'Bán hàng', keys: ['products', 'toppings', 'combos', 'menus'] },
+  { title: 'Cửa hàng', keys: ['points', 'profiles', 'staff', 'print-template'] },
+];
+
+// ---------------------------------------------------------------- trang đầu (R31 / T32)
 
 function SettingsHome() {
+  const isTablet = useIsTablet();
+  const { cat } = useOwnerCatalog(); // chỉ để hiện tên điểm bán / quầy: lỗi thì bỏ qua
+  const subtitle = 'Thay đổi tự đồng bộ về các máy bán hàng';
+  const note = (
+    <Note testId="settings-note">
+      Không có xóa: món, topping, combo ngừng bán hoặc nhân viên nghỉ thì bỏ chọn “Đang bán” / “Đang làm”. Máy bán hàng nhận thay đổi ở lần đồng bộ kế tiếp (mở lại màn bán hàng, có mạng lại, hoặc sau
+      vài phút).
+    </Note>
+  );
+  const group = (g: (typeof GROUPS)[number]) => (
+    <div key={g.title} className="flex flex-col gap-3.5">
+      <h2 className="text-xs font-semibold uppercase leading-[15px] tracking-normal text-[#888]">{g.title}</h2>
+      <nav className={`${card} overflow-hidden`} aria-label={g.title}>
+        {g.keys.map((key, i) => {
+          const v = VISUAL[key];
+          const def = entityByKey(key);
+          return <MenuRow key={key} to={`${SETTINGS}/${key}`} testId={`settings-section-${key}`} icon={v.icon} tone={v.tone} title={def?.title ?? 'Mẫu in'} subtitle={v.desc(cat)} divider={i > 0} />;
+        })}
+      </nav>
+    </div>
+  );
   return (
-    <OwnerLayout title="Cài đặt" back="/owner" testId="settings-home">
-      <NavList>
-        {ENTITIES.map((e) => (
-          <NavItem key={e.key} to={`${SETTINGS}/${e.key}`} testId={`settings-section-${e.key}`} title={e.title} />
-        ))}
-        <NavItem to={`${SETTINGS}/print-template`} testId="settings-section-print-template" title="Mẫu in" subtitle="Phiếu bếp + bill, xem trước, in thử" />
-      </NavList>
-      <p className="text-sm text-ink-subtle">
-        Không có xóa: món, topping, combo ngừng bán hoặc nhân viên nghỉ thì bỏ chọn “Đang bán” / “Đang làm”. Các máy bán hàng nhận thay đổi ở lần
-        đồng bộ kế tiếp (khi mở lại màn bán hàng, khi có mạng lại, hoặc sau vài phút).
-      </p>
+    <OwnerLayout title={isTablet ? 'Cài đặt quán' : 'Cài đặt'} subtitle={isTablet ? subtitle : undefined} back={isTablet ? '/owner' : '/owner/more'} tabBar wide testId="settings-home">
+      {isTablet ? (
+        <div className="grid grid-cols-2 items-start gap-5">
+          <div className="flex flex-col gap-4">
+            {group(GROUPS[0])}
+            {note}
+          </div>
+          {group(GROUPS[1])}
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3.5">
+          <PageHead title="Cài đặt quán" subtitle={subtitle} />
+          {GROUPS.map(group)}
+          {note}
+        </div>
+      )}
     </OwnerLayout>
+  );
+}
+
+/** Dòng trong thẻ: ô icon 38 + tên 15 đậm + dòng phụ 12 + mũi tên (Figma R31). */
+function MenuRow({
+  to,
+  testId,
+  icon,
+  tone,
+  title,
+  subtitle,
+  divider,
+  muted,
+  badge,
+}: {
+  to: string;
+  testId: string;
+  icon: LucideIcon;
+  tone: Tone;
+  title: string;
+  subtitle?: string;
+  divider: boolean;
+  muted?: boolean;
+  badge?: ReactNode;
+}) {
+  return (
+    <Link
+      to={to}
+      data-testid={testId}
+      className={`flex min-h-[63px] items-center gap-3 px-3.5 py-3 transition-colors duration-fast hover:bg-[#fafafa] active:bg-[#f4f4f4] ${divider ? 'border-t border-line' : ''}`}
+    >
+      <IconTile icon={icon} className="h-[38px] w-[38px] rounded-[11px]" iconClass="h-[19px] w-[19px]" tone={muted ? TONE.gray : TONE[tone]} />
+      <span className="flex min-w-0 flex-1 flex-col gap-px">
+        <span className="flex min-w-0 items-center gap-2">
+          <b className={`truncate text-[15px] font-semibold leading-[19px] ${muted ? 'text-[#888]' : ''}`}>{title}</b>
+          {badge}
+        </span>
+        {subtitle && <span className="truncate text-xs leading-[15px] text-[#888]">{subtitle}</span>}
+      </span>
+      <ChevronRight aria-hidden className="h-4 w-4 shrink-0 text-[#888]" />
+    </Link>
   );
 }
 
@@ -67,35 +155,57 @@ function EntityListRoute() {
 }
 
 function EntityList({ def }: { def: EntityDef }) {
+  const isTablet = useIsTablet();
   const { cat, error } = useOwnerCatalog();
+  const v = VISUAL[def.key];
+  const rows = cat ? def.rows(cat) : [];
+  const add = (
+    <Link to={`${SETTINGS}/${def.key}/new`} className={btn(isTablet ? 'brand' : 'soft', isTablet ? '' : 'w-full')} data-testid="settings-new">
+      <Plus aria-hidden className="h-4 w-4" />
+      Thêm {def.noun}
+    </Link>
+  );
   return (
-    <OwnerLayout title={def.title} back={SETTINGS} testId="settings-list">
+    <OwnerLayout
+      title={def.title}
+      subtitle={isTablet && cat ? `${rows.filter((r) => r.active !== false).length} đang dùng · ${rows.length} tất cả` : undefined}
+      actions={isTablet ? add : undefined}
+      back={SETTINGS}
+      wide
+      testId="settings-list"
+    >
       <ErrorText testId="settings-error">{error}</ErrorText>
       {!cat && !error && <Splash />}
       {cat && (
-        <>
-          <NavList>
-            {def.rows(cat).map((r) => (
-              <NavItem
-                key={r.id}
-                to={`${SETTINGS}/${def.key}/${r.id}`}
-                testId={`settings-row-${r.id}`}
-                title={r.active === false ? `${r.name} (ngừng)` : r.name}
-                subtitle={def.summary(r, cat) || undefined}
-                muted={r.active === false}
-              />
-            ))}
-          </NavList>
-          <NavList>
-            <NavItem to={`${SETTINGS}/${def.key}/new`} testId="settings-new" title={`+ Thêm ${def.noun}`} />
-          </NavList>
-        </>
+        <div className="flex flex-col gap-3.5">
+          {rows.length > 0 ? (
+            <nav className={`${card} overflow-hidden`} aria-label={def.title}>
+              {rows.map((r, i) => (
+                <MenuRow
+                  key={r.id}
+                  to={`${SETTINGS}/${def.key}/${r.id}`}
+                  testId={`settings-row-${r.id}`}
+                  icon={v.icon}
+                  tone={v.tone}
+                  title={r.name}
+                  subtitle={def.summary(r, cat) || undefined}
+                  divider={i > 0}
+                  muted={r.active === false}
+                  badge={r.active === false && <span className={`shrink-0 rounded-full px-2 py-px text-[11px] font-semibold leading-[14px] ${TONE.gray}`}>Ngừng</span>}
+                />
+              ))}
+            </nav>
+          ) : (
+            <p className={`${card} p-4 text-sm text-[#888]`}>Chưa có {def.noun} nào.</p>
+          )}
+          {!isTablet && add}
+        </div>
       )}
     </OwnerLayout>
   );
 }
 
-// ---------------------------------------------------------------- sửa / thêm
+// ---------------------------------------------------------------- sửa / thêm (R32 / T33)
 
 function EditorRoute() {
   const { entity, id } = useParams();
@@ -109,17 +219,95 @@ function EditorRoute() {
 
 function EditorLoader({ def, id, saved, initialError }: { def: EntityDef; id: string | null; saved: boolean; initialError: string | null }) {
   const { cat, error } = useOwnerCatalog();
-  const title = id ? `Sửa ${def.noun}` : `Thêm ${def.noun}`;
-  const back = `${SETTINGS}/${def.key}`;
   const row = cat && id ? def.rows(cat).find((r) => r.id === id) : null;
+  if (!cat || (id && !row))
+    return (
+      <EditorShell def={def} id={id} name={undefined} busy={false} disabled>
+        <ErrorText testId="settings-error">{error}</ErrorText>
+        {!cat && !error && <Splash />}
+        {cat && <ErrorText testId="settings-error">Không tìm thấy {def.noun} này.</ErrorText>}
+      </EditorShell>
+    );
+  return <EntityForm def={def} cat={cat} id={id} row={row ?? null} saved={saved} initialError={initialError} />;
+}
+
+const FORM_ID = 'settings-form';
+
+/** Khung trang sửa: tablet nút Hủy / Lưu ở đầu trang, điện thoại ở thanh dính đáy. */
+function EditorShell({
+  def,
+  id,
+  name,
+  busy,
+  disabled = false,
+  children,
+}: {
+  def: EntityDef;
+  id: string | null;
+  name: string | undefined;
+  busy: boolean;
+  /** Chưa có form (đang tải / không tìm thấy): nút Lưu mờ. */
+  disabled?: boolean;
+  children: ReactNode;
+}) {
+  const isTablet = useIsTablet();
+  const back = `${SETTINGS}/${def.key}`;
+  const cancel = (
+    <Link to={back} className={btn('outline', isTablet ? '' : 'min-h-[47px] flex-1 text-[15px]')} data-testid="settings-cancel">
+      Hủy
+    </Link>
+  );
+  const save = (
+    <button type="submit" form={FORM_ID} className={btn('brand', isTablet ? '' : 'min-h-[45px] flex-1 text-[15px]')} disabled={busy || disabled} data-testid="settings-save">
+      <Check aria-hidden className="h-[17px] w-[17px]" />
+      {busy ? 'Đang lưu…' : 'Lưu'}
+    </button>
+  );
   return (
-    <OwnerLayout title={title} back={back} testId="settings-editor">
-      <ErrorText testId="settings-error">{error}</ErrorText>
-      {!cat && !error && <Splash />}
-      {cat && id && !row && <ErrorText testId="settings-error">Không tìm thấy {def.noun} này.</ErrorText>}
-      {cat && (!id || row) && <EntityForm def={def} cat={cat} id={id} row={row ?? null} saved={saved} initialError={initialError} />}
+    <OwnerLayout
+      title={id ? `Sửa ${def.noun}` : `Thêm ${def.noun}`}
+      subtitle={isTablet ? name : undefined}
+      actions={
+        isTablet ? (
+          <>
+            {cancel}
+            {save}
+          </>
+        ) : undefined
+      }
+      bottomBar={
+        isTablet ? undefined : (
+          <>
+            {cancel}
+            {save}
+          </>
+        )
+      }
+      back={back}
+      wide
+      testId="settings-editor"
+    >
+      {children}
     </OwnerLayout>
   );
+}
+
+interface FieldCard {
+  title: string;
+  hint?: string;
+  icon?: LucideIcon;
+  side: boolean;
+  fields: FieldDef[];
+}
+
+/** Chia ô thành thẻ: ô có `section` mở thẻ mới; các ô đầu không có ⇒ thẻ "Thông tin <noun>". */
+function toCards(def: EntityDef): FieldCard[] {
+  const out: FieldCard[] = [];
+  for (const f of def.fields) {
+    if (f.section || out.length === 0) out.push({ title: f.section ?? `Thông tin ${def.noun}`, hint: f.sectionHint, icon: f.sectionIcon, side: f.side === true, fields: [] });
+    out[out.length - 1].fields.push(f);
+  }
+  return out;
 }
 
 function EntityForm({
@@ -139,6 +327,7 @@ function EntityForm({
 }) {
   const { client } = useOwner();
   const navigate = useNavigate();
+  const isTablet = useIsTablet();
   const [form, setForm] = useState<Form>(() => def.toForm(row, cat));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(initialError);
@@ -177,31 +366,102 @@ function EntityForm({
   }
 
   const preview = def.preview?.(form, cat);
+  const cards = toCards(def);
+  const renderCard = (c: FieldCard) => (
+    <Section key={c.title} title={c.title} subtitle={c.hint} right={c.icon && <IconTile icon={c.icon} className="h-[34px] w-[34px] rounded-[10px]" />} testId={`settings-card-${c.fields[0].key}`}>
+      <CardFields card={c} entity={def} form={form} cat={cat} disabled={busy} isNew={id === null} onChange={set} />
+    </Section>
+  );
+  const history = def.priceHistory && id ? <PriceHistory type={def.priceHistory} entityId={id} /> : null;
+  const main = cards.filter((c) => !c.side || !isTablet);
+  const side = isTablet ? cards.filter((c) => c.side) : [];
 
   return (
-    <form className="flex flex-col gap-4" onSubmit={submit} data-testid={`settings-form-${def.key}`}>
-      {saved && !dirty && (
-        <p data-testid="settings-saved" role="status" className="rounded-lg bg-success-soft px-4 py-3 text-success-strong">
-          Đã lưu. Các máy bán hàng nhận thay đổi ở lần đồng bộ kế tiếp.
-        </p>
-      )}
-      {def.fields.map((f) => (
-        <div key={f.key} className="contents">
-          {f.section && <h2 className="mt-2 border-t border-line pt-4 text-lg font-semibold">{f.section}</h2>}
-          <Field def={f} form={form} cat={cat} disabled={busy || (f.createOnly === true && id !== null)} onChange={set} />
+    <EditorShell def={def} id={id} name={row?.name} busy={busy}>
+      <form id={FORM_ID} className="flex flex-col gap-3.5 md:gap-5" onSubmit={submit} data-testid={`settings-form-${def.key}`}>
+        {saved && !dirty && (
+          <p data-testid="settings-saved" role="status" className="flex items-center gap-2 rounded-xl bg-[#e8f7ee] px-3.5 py-3 text-[13px] font-medium leading-4 text-[#15803d]">
+            <Check aria-hidden className="h-4 w-4 shrink-0" />
+            Đã lưu. Các máy bán hàng nhận thay đổi ở lần đồng bộ kế tiếp.
+          </p>
+        )}
+        <ErrorText testId="settings-error">{error}</ErrorText>
+        <div className="flex flex-col gap-3.5 md:grid md:grid-cols-2 md:items-start md:gap-5">
+          <div className="flex flex-col gap-3.5 md:gap-4">
+            {main.map(renderCard)}
+            {preview && (
+              <p data-testid="settings-preview" className="rounded-xl bg-[#f8f8f8] px-3.5 py-3 text-[13px] leading-[19px] text-[#6d6d6d]">
+                {preview}
+              </p>
+            )}
+            {!isTablet && history}
+          </div>
+          {isTablet && (side.length > 0 || history) && (
+            <div className="flex flex-col gap-4">
+              {side.map(renderCard)}
+              {history}
+            </div>
+          )}
         </div>
-      ))}
-      {preview && (
-        <p data-testid="settings-preview" className="rounded-lg bg-surface-sunken px-4 py-3 text-ink">
-          {preview}
-        </p>
+      </form>
+    </EditorShell>
+  );
+}
+
+/** Ô trong một thẻ: hai ô `half` liền nhau chung hàng, các công tắc liền nhau chung một danh sách có vạch ngăn. */
+function CardFields({
+  card: c,
+  entity,
+  form,
+  cat,
+  disabled,
+  isNew,
+  onChange,
+}: {
+  card: FieldCard;
+  entity: EntityDef;
+  form: Form;
+  cat: OwnerCatalog;
+  disabled: boolean;
+  isNew: boolean;
+  onChange: (key: string, v: FormValue) => void;
+}) {
+  const parts: FieldDef[][] = [];
+  for (const f of c.fields) {
+    const last = parts[parts.length - 1];
+    const prev = last?.[last.length - 1];
+    const join = prev && ((f.kind === 'bool' && prev.kind === 'bool') || (f.half && prev.half && last.length < 2));
+    if (join) last.push(f);
+    else parts.push([f]);
+  }
+  const field = (f: FieldDef) => (
+    <Field
+      key={f.key}
+      def={f}
+      form={form}
+      cat={cat}
+      icon={f.key === 'name' ? VISUAL[entity.key]?.icon : undefined}
+      hideLabel={f.label === c.title}
+      disabled={disabled || (f.createOnly === true && !isNew)}
+      onChange={onChange}
+    />
+  );
+  return (
+    <div className="flex flex-col gap-3.5">
+      {parts.map((p) =>
+        p[0].kind === 'bool' ? (
+          <div key={p[0].key} className="-my-2 flex flex-col divide-y divide-line">
+            {p.map(field)}
+          </div>
+        ) : p.length === 2 ? (
+          <div key={p[0].key} className="grid grid-cols-2 gap-2.5">
+            {p.map(field)}
+          </div>
+        ) : (
+          <Fragment key={p[0].key}>{field(p[0])}</Fragment>
+        ),
       )}
-      <ErrorText testId="settings-error">{error}</ErrorText>
-      <button type="submit" className="btn btn-primary" disabled={busy} data-testid="settings-save">
-        {busy ? 'Đang lưu…' : 'Lưu'}
-      </button>
-      {def.priceHistory && id && <PriceHistory type={def.priceHistory} entityId={id} />}
-    </form>
+    </div>
   );
 }
 
@@ -209,121 +469,115 @@ function Field({
   def,
   form,
   cat,
+  icon,
+  hideLabel,
   disabled,
   onChange,
 }: {
   def: FieldDef;
   form: Form;
   cat: OwnerCatalog;
+  icon?: LucideIcon;
+  hideLabel: boolean;
   disabled: boolean;
   onChange: (key: string, v: FormValue) => void;
 }) {
   const testId = `field-${def.key}`;
   const value = form[def.key];
-  const hint = def.hint && <span className="text-sm text-ink-subtle">{def.hint}</span>;
 
   switch (def.kind) {
     case 'text':
       return (
-        <div className="flex flex-col gap-1">
-          <TextField
-            label={def.label}
-            value={String(value)}
-            disabled={disabled}
-            maxLength={60}
-            inputMode={def.numeric ? 'numeric' : def.tel ? 'tel' : undefined}
-            type={def.tel ? 'tel' : undefined}
-            onChange={(e) => onChange(def.key, e.target.value)}
-            data-testid={testId}
-          />
-          {hint}
-        </div>
+        <FormInput
+          label={def.label}
+          icon={icon}
+          hint={def.hint}
+          value={String(value)}
+          disabled={disabled}
+          maxLength={60}
+          inputMode={def.numeric ? 'numeric' : def.tel ? 'tel' : undefined}
+          type={def.tel ? 'tel' : undefined}
+          onChange={(e) => onChange(def.key, e.target.value)}
+          data-testid={testId}
+        />
       );
     case 'date':
-      return (
-        <div className="flex flex-col gap-1">
-          <TextField label={def.label} type="date" value={String(value)} disabled={disabled} onChange={(e) => onChange(def.key, e.target.value)} data-testid={testId} />
-          {hint}
-        </div>
-      );
+      return <FormInput label={def.label} hint={def.hint} type="date" value={String(value)} disabled={disabled} onChange={(e) => onChange(def.key, e.target.value)} data-testid={testId} />;
     case 'money':
     case 'count': {
       const parsed = def.kind === 'money' ? parseMoneyInput(String(value)) : null;
+      const shown = parsed !== null && String(value).trim() !== String(parsed);
       return (
-        <div className="flex flex-col gap-1">
-          <TextField
-            label={def.label}
-            value={String(value)}
-            inputMode="numeric"
-            disabled={disabled}
-            onChange={(e) => onChange(def.key, e.target.value)}
-            data-testid={testId}
-          />
-          {parsed !== null && String(value).trim() !== String(parsed) && (
-            <span className="text-sm text-ink-muted" data-testid={`${testId}-parsed`}>
-              = {formatVnd(parsed)}
-            </span>
-          )}
-          {hint}
-        </div>
+        <FormInput
+          label={def.label}
+          unit={def.kind === 'money' ? 'đ' : def.unit}
+          hint={
+            shown || def.hint ? (
+              <>
+                {shown && (
+                  <span className="block font-medium text-[#6d6d6d]" data-testid={`${testId}-parsed`}>
+                    = {formatVnd(parsed)}
+                  </span>
+                )}
+                {def.hint}
+              </>
+            ) : undefined
+          }
+          value={String(value)}
+          inputMode="numeric"
+          disabled={disabled}
+          onChange={(e) => onChange(def.key, e.target.value)}
+          data-testid={testId}
+        />
       );
     }
     case 'bool':
       return (
-        <label className="flex min-h-tap items-center gap-3 text-lg">
-          <input
-            type="checkbox"
-            className="h-6 w-6 accent-brand-strong"
-            checked={value === true}
-            disabled={disabled}
-            onChange={(e) => onChange(def.key, e.target.checked)}
-            data-testid={testId}
-          />
-          {def.label}
+        <label className="flex min-h-[50px] cursor-pointer items-center justify-between gap-3 py-2">
+          <span className="text-sm font-medium leading-[18px]">{def.label}</span>
+          <Switch checked={value === true} disabled={disabled} onChange={(e) => onChange(def.key, e.target.checked)} data-testid={testId} />
         </label>
       );
     case 'select':
       return (
-        <label className="flex flex-col gap-1">
-          <span className="text-base font-medium text-ink-muted">{def.label}</span>
-          <select
-            className="input px-3"
-            value={String(value)}
-            disabled={disabled}
-            onChange={(e) => onChange(def.key, e.target.value)}
-            data-testid={testId}
-          >
-            {def.options?.(form, cat).map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-          {hint}
-        </label>
+        <FormSelect label={def.label} hint={def.hint} value={String(value)} disabled={disabled} onChange={(e) => onChange(def.key, e.target.value)} data-testid={testId}>
+          {def.options?.(form, cat).map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </FormSelect>
       );
     case 'multi': {
       const selected = Array.isArray(value) ? value : [];
       const options = def.options?.(form, cat) ?? [];
+      const wide = options.some((o) => o.label.length > 12);
       return (
-        <fieldset className="flex flex-col gap-1" data-testid={testId}>
-          <legend className="mb-1 text-base font-medium text-ink-muted">{def.label}</legend>
-          {options.length === 0 && <span className="text-ink-subtle">Chưa có lựa chọn</span>}
-          {options.map((o) => (
-            <label key={o.value} className="flex min-h-tap items-center gap-3 rounded-lg px-1 text-lg">
-              <input
-                type="checkbox"
-                className="h-6 w-6 accent-brand-strong"
-                checked={selected.includes(o.value)}
-                disabled={disabled}
-                onChange={(e) =>
-                  onChange(def.key, e.target.checked ? [...selected, o.value] : selected.filter((v) => v !== o.value))
-                }
-                data-testid={`${testId}-${o.value}`}
-              />
-              {o.label}
-            </label>
-          ))}
+        <fieldset className="flex flex-col gap-1.5" data-testid={testId}>
+          <legend className={hideLabel ? 'sr-only' : 'mb-1.5 text-[13px] font-medium leading-4 text-[#6d6d6d]'}>{def.label}</legend>
+          {options.length === 0 && <span className="text-sm text-[#888]">Chưa có lựa chọn</span>}
+          <div className={`grid gap-2 ${wide ? 'grid-cols-2' : 'grid-cols-3'}`}>
+            {options.map((o) => {
+              const on = selected.includes(o.value);
+              return (
+                <label
+                  key={o.value}
+                  className={`flex min-h-[45px] cursor-pointer items-center justify-center gap-2 rounded-xl px-1.5 py-2 text-sm leading-[18px] transition-colors duration-fast ${
+                    on ? 'border-[1.5px] border-brand bg-[#ffeee7] font-semibold text-[#c2380a]' : 'border border-line bg-white font-medium text-[#111] hover:bg-[#f8f8f8]'
+                  } ${disabled ? 'cursor-not-allowed opacity-60' : ''}`}
+                >
+                  <CheckMark
+                    className="h-[18px] w-[18px] rounded-md"
+                    checked={on}
+                    disabled={disabled}
+                    onChange={(e) => onChange(def.key, e.target.checked ? [...selected, o.value] : selected.filter((v) => v !== o.value))}
+                    data-testid={`${testId}-${o.value}`}
+                  />
+                  <span className="min-w-0">{o.label}</span>
+                </label>
+              );
+            })}
+          </div>
         </fieldset>
       );
     }
@@ -355,20 +609,21 @@ function PriceHistory({ type, entityId }: { type: 'product' | 'topping'; entityI
   }, [client, type, entityId]);
 
   return (
-    <section className="mt-2 flex flex-col gap-2" data-testid="price-history">
-      <h2 className="text-lg font-semibold">Lịch sử giá</h2>
+    <Section title="Lịch sử giá" subtitle="Giá mới chỉ áp dụng cho đơn tạo sau khi lưu" testId="price-history">
       <ErrorText testId="price-history-error">{error}</ErrorText>
-      {rows?.length === 0 && <p className="text-ink-subtle">Chưa đổi giá lần nào.</p>}
-      <ul className="flex flex-col divide-y divide-line card">
-        {rows?.map((r) => (
-          <li key={r.id} className="flex justify-between gap-3 px-4 py-2" data-testid="price-history-row">
-            <span>
-              {formatVnd(r.old_price)} → <strong>{formatVnd(r.new_price)}</strong>
-            </span>
-            <span className="text-ink-subtle">{dateTime.format(new Date(r.changed_at))}</span>
-          </li>
-        ))}
-      </ul>
-    </section>
+      {rows?.length === 0 && <p className="text-sm text-[#888]">Chưa đổi giá lần nào.</p>}
+      {rows && rows.length > 0 && (
+        <ul className="-my-1.5 flex flex-col divide-y divide-line">
+          {rows.map((r) => (
+            <li key={r.id} className="flex items-center justify-between gap-3 py-2.5 text-sm leading-[18px]" data-testid="price-history-row">
+              <span className="num">
+                <span className="text-[#888]">{formatVnd(r.old_price)}</span> → <b className="font-semibold">{formatVnd(r.new_price)}</b>
+              </span>
+              <span className="num text-xs text-[#888]">{dateTime.format(new Date(r.changed_at))}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Section>
   );
 }

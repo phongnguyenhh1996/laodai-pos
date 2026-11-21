@@ -97,6 +97,7 @@ export function RemotePrint({
   label,
   testId,
   variant = 'dark',
+  optionPrefix = '',
 }: {
   client: SupabaseClient;
   kind: PrintKind;
@@ -106,6 +107,8 @@ export function RemotePrint({
   testId: string;
   /** Kiểu nút gửi lệnh (Figma T22: "In lại bill" đen, "Phiếu bếp" viền). */
   variant?: 'dark' | 'outline' | 'brand';
+  /** Chữ đứng trước tên quầy trong ô chọn (Figma R33 "In tại: Tablet A"). */
+  optionPrefix?: string;
 }) {
   const [profiles, setProfiles] = useState<TabletProfileOption[] | null>(null);
   const [target, setTarget] = useState<string>(defaultProfileId ?? '');
@@ -153,15 +156,22 @@ export function RemotePrint({
     <div className="flex flex-col gap-2.5" data-testid={testId}>
       <div className="flex items-center gap-2.5">
         <SelectBox icon={PrinterIcon} className="flex-1" value={target} onChange={(e) => setTarget(e.target.value)} data-testid={`${testId}-target`} aria-label="In tại">
-          {local && <option value="here">Máy này</option>}
+          {local && <option value="here">{optionPrefix}Máy này</option>}
           {profiles?.map((p) => (
             <option key={p.id} value={p.id}>
+              {optionPrefix}
               {p.name}
               {p.id === defaultProfileId ? ' (quầy bán)' : ''}
             </option>
           ))}
         </SelectBox>
-        <button type="button" className={btn(variant, variant === 'outline' ? 'min-h-[46px] shrink-0' : 'shrink-0')} disabled={busy || !target} onClick={() => void send()} data-testid={`${testId}-send`}>
+        <button
+          type="button"
+          className={btn(variant, variant === 'outline' ? 'min-h-[46px] shrink-0' : 'shrink-0')}
+          disabled={busy || !target}
+          onClick={() => void send()}
+          data-testid={`${testId}-send`}
+        >
           <PrinterIcon aria-hidden className="h-4 w-4" />
           {label}
         </button>
