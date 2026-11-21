@@ -121,17 +121,16 @@ describe('D. Ghi nợ & thu nợ', () => {
       cy.loginOwner();
       cy.ownerNav('debts');
       cy.get(tid('debt-total')).should('have.text', '90.000');
-      cy.get(tid(`debt-row-${PB}`)).should('contain.text', 'Dũng (phường B) · 60.000');
-      cy.get(tid(`debt-row-${GV}`)).should('contain.text', 'Dũng (giáo viên) · 30.000');
+      cy.get(tid(`debt-row-${PB}`)).should('contain.text', 'phường B').and('contain.text', '60.000');
+      cy.get(tid(`debt-row-${GV}`)).should('contain.text', 'giáo viên').and('contain.text', '30.000');
 
       cy.get(tid(`debt-row-${PB}`)).click();
       cy.get(tid('debt-balance')).should('have.text', '60.000');
       cy.get(tid(`debt-pick-${o1}`)).check();
       cy.get(tid(`debt-pick-${o2}`)).check();
-      cy.get(tid('transfer-search')).type('giao vien');
-      cy.get(tid(`transfer-to-${PB}`)).should('not.exist'); // không chuyển cho chính mình
-      cy.get(tid(`transfer-to-${GV}`)).click();
-      cy.get(tid('transfer-submit')).should('contain.text', 'Chuyển 2 khoản · 40.000').click();
+      cy.get(`${tid('transfer-select')} option[value="${PB}"]`).should('not.exist'); // không chuyển cho chính mình
+      cy.get(tid('transfer-select')).select(GV);
+      cy.get(tid('transfer-submit')).should('contain.text', 'Chuyển 40.000 sang Dũng (giáo viên)').click();
       cy.get(tid('transfer-done')).should('contain.text', 'Đã chuyển 40.000 sang Dũng (giáo viên)');
       cy.get(tid('debt-balance')).should('have.text', '20.000');
       cy.get(tid(`debt-order-${o1}`)).should('not.exist');

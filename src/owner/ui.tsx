@@ -1,4 +1,4 @@
-import type { ReactNode, SelectHTMLAttributes } from 'react';
+import type { ReactNode, Ref, SelectHTMLAttributes } from 'react';
 import { ChevronDown, Search, type LucideIcon } from 'lucide-react';
 
 /** Mảnh giao diện dùng chung cho các màn chế độ chủ kiểu Makaryo (Figma R2x–R3x / T21–T35). */
@@ -50,17 +50,30 @@ export function IconTile({
 }
 
 /** Ô tìm kiếm cao 44. */
-export function SearchBox({ value, onChange, placeholder, testId }: { value: string; onChange: (v: string) => void; placeholder: string; testId?: string }) {
+export function SearchBox({
+  value,
+  onChange,
+  placeholder,
+  testId,
+  inputRef,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+  testId?: string;
+  inputRef?: Ref<HTMLInputElement>;
+}) {
   return (
     <label className="flex h-11 items-center gap-2 rounded-xl border border-line bg-white px-3.5 focus-within:border-brand">
       <Search aria-hidden className="h-[18px] w-[18px] shrink-0 text-[#888]" />
       <input
+        ref={inputRef}
         type="search"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         aria-label={placeholder}
-        className="min-w-0 flex-1 bg-transparent text-sm leading-[18px] text-[#111] outline-none placeholder:text-[#888]"
+        className="min-w-0 flex-1 bg-transparent text-sm leading-[18px] text-[#111] outline-none placeholder:text-[#888] focus-visible:ring-0"
         data-testid={testId}
       />
     </label>

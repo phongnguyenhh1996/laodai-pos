@@ -62,6 +62,37 @@ export async function listDebts(client: SupabaseClient): Promise<DebtRow[]> {
     .sort((a, b) => b.balance - a.balance || a.customer.name.localeCompare(b.customer.name, 'vi'));
 }
 
+export interface DebtSummary {
+  /** Tổng các đơn ghi nợ hôm nay (ngày kinh doanh, giờ VN). */
+  todayDebt: Money;
+  /** Tổng thu nợ hôm nay (nhân viên + chủ). */
+  todayPaid: Money;
+  /** Lần trả nợ gần nhất của từng khách. */
+  lastPaidAt: Map<string, string>;
+}
+
+/** Số liệu thẻ "Tổng dư nợ" (Figma R26/T27): ghi nợ / thu nợ hôm nay, ngày trả gần nhất. */
+export async function loadDebtSummary(client: SupabaseClient, today: string): Promise<DebtSummary> {
+  const from = new Date(`${today}T00:00:00+07:00`).toISOString();
+  const [oRes, pRes] = await Promise.all([
+    client.from('orders').select('total').eq('status', 'paid').eq('payment_method', 'debt').gte('paid_at', from),
+    client.from('debt_payments').select('customer_id,amount,at').order('at', { ascending: false }),
+  ]);
+  if (oRes.error) fail('đơn ghi nợ', oRes.error);
+  if (pRes.error) fail('lịch sử trả nợ', pRes.error);
+  const lastPaidAt = new Map<string, string>();
+  let todayPaid = 0;
+  for (const p of (pRes.data ?? []) as Array<{ customer_id: string; amount: number; at: string }>) {
+    if (!lastPaidAt.has(p.customer_id)) lastPaidAt.set(p.customer_id, p.at);
+    if (Date.parse(p.at) >= Date.parse(from)) todayPaid += p.amount;
+  }
+  return {
+    todayDebt: ((oRes.data ?? []) as Array<{ total: number }>).reduce((s, o) => s + o.total, 0),
+    todayPaid,
+    lastPaidAt,
+  };
+}
+
 type RawItem = { name_snap: string; qty: number; toppings_snap: ToppingSnap[]; sort: number; removed_at: string | null };
 type RawOrder = { id: string; code: string; total: number; paid_at: string; order_items: RawItem[]; tablet_profiles: { name: string } | null; shift: { staff: { name: string } | null } | null };
 type RawPayment = { id: string; amount: number; method: 'cash' | 'transfer'; at: string; shifts: { staff: { name: string } | null } | null };
