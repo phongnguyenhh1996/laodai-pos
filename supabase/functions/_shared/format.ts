@@ -55,6 +55,8 @@ interface OrderSnap {
   id: string;
   code: string;
   total: number;
+  /** Phí ship (đã nằm trong `total`); bản ghi cũ không có. */
+  ship_fee?: number;
   status: string;
   dine_type: string;
   label: string | null;
@@ -71,8 +73,17 @@ interface CountLine {
   diff: number | null;
 }
 
+interface Revenue {
+  total: number;
+  cash: number;
+  transfer: number;
+  debt: number;
+  /** Phần phí ship nằm trong `total` (bản ghi cũ không có). */
+  ship_fee?: number;
+}
+
 export interface Reconcile {
-  revenue: { total: number; cash: number; transfer: number; debt: number };
+  revenue: Revenue;
   paid_orders: number;
   debt_collected: { cash: number; transfer: number };
   cash: { expected: number; counted: number | null; diff: number | null };
@@ -126,7 +137,7 @@ export type Notification =
       kind: 'daily_summary';
       payload: Base & {
         date: string;
-        revenue: { total: number; cash: number; transfer: number; debt: number };
+        revenue: Revenue;
         by_point: Array<{ point_name: string; total: number }>;
         debt_collected: number;
         deleted: { count: number; served: number };
@@ -185,10 +196,17 @@ function countLine(label: string, c: CountLine): string {
   return `${label}: dùng ${used} / theo đơn ${c.by_orders}${diff}`;
 }
 
+function revenueLines(r: Revenue): string[] {
+  return [
+    `Doanh thu: ${vnd(r.total)} (TM ${vnd(r.cash)} · CK ${vnd(r.transfer)} · Nợ ${vnd(r.debt)})`,
+    ...(r.ship_fee ? [`Trong đó phí ship: ${vnd(r.ship_fee)}`] : []),
+  ];
+}
+
 export function shiftReport(r: Reconcile): string[] {
   const served = r.deleted_after_served.length;
   const lines = [
-    `Doanh thu: ${vnd(r.revenue.total)} (TM ${vnd(r.revenue.cash)} · CK ${vnd(r.revenue.transfer)} · Nợ ${vnd(r.revenue.debt)})`,
+    ...revenueLines(r.revenue),
   ];
   if (r.debt_collected.cash || r.debt_collected.transfer) {
     lines.push(`Thu nợ: TM ${vnd(r.debt_collected.cash)} · CK ${vnd(r.debt_collected.transfer)}`);
@@ -271,6 +289,7 @@ export function formatNotification(n: Notification, opts: FormatOptions): string
         `📍 ${q.order.address ?? '(chưa có địa chỉ)'}`,
         ...(q.order.label ? [`Nhãn: ${q.order.label}`] : []),
         ...q.order.items.map(itemLine),
+        ...(q.order.ship_fee ? [`Phí ship: ${vnd(q.order.ship_fee)}`] : []),
         `Tổng: ${vnd(q.order.total)}`,
         ...(who(q) ? [who(q)] : []),
       ];
@@ -334,7 +353,7 @@ export function formatNotification(n: Notification, opts: FormatOptions): string
       const q = n.payload;
       lines = [
         `📊 Tổng kết ngày ${ddmmyyyy(q.date)}`,
-        `Doanh thu: ${vnd(q.revenue.total)} (TM ${vnd(q.revenue.cash)} · CK ${vnd(q.revenue.transfer)} · Nợ ${vnd(q.revenue.debt)})`,
+        ...revenueLines(q.revenue),
         ...q.by_point.map((b) => `• ${b.point_name}: ${vnd(b.total)}`),
       ];
       if (q.debt_collected) lines.push(`Thu nợ: ${vnd(q.debt_collected)}`);

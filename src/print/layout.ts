@@ -113,6 +113,7 @@ export function layoutBill({ doc, template, tz = TZ }: BillInput): Line[] {
       out.push({ type: 'text', text: `   ${formatVnd(unit)} / phần`, size: 'small', align: 'left' });
     }
   }
+  if (doc.ship_fee) out.push({ type: 'row', left: 'Phí ship', right: formatVnd(doc.ship_fee), size: 'normal' });
   out.push({ type: 'rule' });
   out.push({ type: 'row', left: 'TỔNG', right: formatVnd(doc.total), size: 'large', bold: true });
   out.push({ type: 'rule' });

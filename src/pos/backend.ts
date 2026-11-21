@@ -62,6 +62,7 @@ function normalizeOrder(o: Order): Order {
     paid_at: o.paid_at,
     deleted_at: o.deleted_at,
     delete_reason: o.delete_reason,
+    ship_fee: o.ship_fee ?? 0,
     total: o.total,
     payment_method: o.payment_method,
     cash_given: o.cash_given,
@@ -84,7 +85,7 @@ type RawOrder = Omit<Order, 'items'> & { order_items: RawItem[] };
 
 const ORDER_COLUMNS =
   'id,device_seq,tablet_profile_id,point_id,code,label,table_no,dine_type,address,status,opened_shift_id,paid_shift_id,' +
-  'created_at,served_at,paid_at,deleted_at,delete_reason,total,payment_method,cash_given,customer_id,owner_edited,' +
+  'created_at,served_at,paid_at,deleted_at,delete_reason,ship_fee,total,payment_method,cash_given,customer_id,owner_edited,' +
   'order_items(id,product_id,name_snap,unit_price_snap,qty,toppings_snap,sort,removed_at)';
 
 /** Ca đang mở + đơn đang mở, đọc bằng phiên `tablet` (RLS chỉ cho thấy đúng những thứ này của chính hồ sơ). */

@@ -24,6 +24,8 @@ export interface ReconcileOrder {
   opened_shift_id: string;
   paid_shift_id: string | null;
   payment_method: PaymentMethod | null;
+  /** Phí ship (đã nằm trong `total`); không có ⇒ 0. */
+  ship_fee?: Money;
   total: Money;
   served_at: string | null;
   deleted_at: string | null;
@@ -45,7 +47,8 @@ export interface CountLine {
 }
 
 export interface ReconcileResult {
-  revenue: { total: Money; cash: Money; transfer: Money; debt: Money };
+  /** `ship_fee`: phần phí ship nằm trong `total` (không cộng thêm). */
+  revenue: { total: Money; cash: Money; transfer: Money; debt: Money; ship_fee: Money };
   paid_orders: number;
   debt_collected: { cash: Money; transfer: Money };
   cash: { expected: Money; counted: Money | null; diff: Money | null };
@@ -65,7 +68,13 @@ export function reconcileShift(input: ReconcileInput): ReconcileResult {
   // Tiền: theo ca THU tiền
   const paidHere = input.orders.filter((o) => o.status === 'paid' && o.paid_shift_id === shift.id);
   const sumBy = (m: PaymentMethod) => paidHere.filter((o) => o.payment_method === m).reduce((s, o) => s + o.total, 0);
-  const revenue = { cash: sumBy('cash'), transfer: sumBy('transfer'), debt: sumBy('debt'), total: 0 };
+  const revenue = {
+    total: 0,
+    cash: sumBy('cash'),
+    transfer: sumBy('transfer'),
+    debt: sumBy('debt'),
+    ship_fee: paidHere.reduce((s, o) => s + (o.ship_fee ?? 0), 0),
+  };
   revenue.total = revenue.cash + revenue.transfer + revenue.debt;
 
   const debtHere = input.debt_payments.filter((p) => p.shift_id === shift.id);

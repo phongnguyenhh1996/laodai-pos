@@ -15,6 +15,8 @@ interface DbOrder {
   label: string | null;
   payment_method: string | null;
   cash_given: number | null;
+  address: string | null;
+  ship_fee: number;
   served: boolean;
   items: Array<{ product_id: string; qty: number; unit_price_snap: number; toppings: Array<{ id: string; price: number }> }>;
 }
@@ -288,5 +290,51 @@ describe('C. Bán hàng', () => {
         [P.xoiXeo, 1, [T.cha, T.ruoc].sort().join()],
       ]);
     });
+  });
+
+  it('C18: điện thoại 390×844, đơn ship có phí: bấm Ship không bật bàn phím; phí cộng vào tổng; bảng địa chỉ; 3 nút một hàng', () => {
+    cy.viewport(390, 844);
+    cy.openShift('Lan');
+    cy.get(tid('new-order')).click();
+    cy.get(tid(`menu-combo-${SEED.combos.xoiGaTrung}`)).click(); // 31.000
+    cy.get(tid('order-dine-delivery')).click();
+    cy.document().its('activeElement.tagName').should('not.be.oneOf', ['INPUT', 'TEXTAREA']);
+    cy.get(tid('order-address-missing')).should('be.visible');
+
+    cy.get(tid('order-ship-fee-10000')).click().should('have.attr', 'aria-pressed', 'true');
+    cy.get(tid('order-pay-exact')).should('contain.text', '41.000');
+    cy.get(tid('order-ship-fee-10000')).click().should('have.attr', 'aria-pressed', 'false'); // bấm lại = bỏ phí
+    cy.get(tid('order-pay-exact')).should('contain.text', '31.000');
+    cy.get(tid('order-ship-fee-15000')).click();
+    cy.get(tid('order-pay-exact')).should('contain.text', '46.000');
+
+    // Ba nút dưới cùng nằm trên một hàng, chữ không bị cắt.
+    cy.get(tid('order-pay')).then(($pay) => {
+      const top = $pay[0].getBoundingClientRect().top;
+      for (const id of ['order-serve', 'order-save']) {
+        cy.get(tid(id)).should(($b) => {
+          expect(Math.abs($b[0].getBoundingClientRect().top - top)).to.be.lessThan(2);
+          expect($b[0].scrollWidth).to.be.at.most($b[0].clientWidth);
+        });
+      }
+    });
+
+    cy.get(tid('order-ship-details')).click();
+    cy.get(tid('ship-sheet-summary')).should('contain.text', '+15.000').and('contain.text', '46.000');
+    cy.get(tid('ship-sheet-done')).should('be.disabled');
+    cy.get(tid('order-address')).should('be.focused').type('12 Lê Lợi');
+    cy.get(tid('ship-sheet-done')).click();
+    cy.get(tid('order-ship-summary')).should('contain.text', '12 Lê Lợi');
+
+    cy.get(tid('order-save')).click();
+    cy.get(tid('queue-screen')).should('be.visible');
+    cards().first().find('[data-testid^=queue-ship-fee-]').should('have.text', '+15k ship');
+
+    cy.waitLive();
+    serverOrders().then((os) => {
+      expect(os).to.have.length(1);
+      expect(os[0]).to.include({ dine_type: 'delivery', address: '12 Lê Lợi', ship_fee: 15_000, total: 46_000, status: 'open' });
+    });
+    cy.telegramWaitFor('Phí ship: 15.000');
   });
 });

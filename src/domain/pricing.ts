@@ -7,8 +7,17 @@ export function lineTotal(item: Pick<OrderItem, 'unit_price_snap' | 'qty' | 'top
   return (item.unit_price_snap + toppings) * item.qty;
 }
 
+/** Tiền món (chưa có phí ship). */
 export function orderTotal(items: Array<Pick<OrderItem, 'unit_price_snap' | 'qty' | 'toppings_snap'>>): Money {
   return items.reduce((s, it) => s + lineTotal(it), 0);
+}
+
+/** Các mức phí ship nhân viên bấm được (server nhận 0–50.000, bội số 1.000). */
+export const SHIP_FEES: readonly Money[] = [5000, 10000, 15000, 20000];
+
+/** "+10k" trên nút phí ship. */
+export function shipFeeLabel(fee: Money): string {
+  return `+${fee / 1000}k`;
 }
 
 export function assertQty(qty: number): void {

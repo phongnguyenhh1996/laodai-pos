@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeftRight, Banknote, Bike, ChefHat, ChevronLeft, ChevronUp, Check, MapPin, Minus, Plus, Receipt, Save, ShoppingBag, Soup, Tag, Trash2, UtensilsCrossed, Wallet, X } from 'lucide-react';
+import { ArrowLeftRight, Banknote, Bike, ChefHat, ChevronLeft, ChevronRight, ChevronUp, Check, MapPin, Minus, Plus, Receipt, Save, ShoppingBag, Soup, Tag, Trash2, UtensilsCrossed, Wallet, X } from 'lucide-react';
 import { v7 as uuidv7 } from 'uuid';
 import {
   addCombo,
@@ -9,6 +9,7 @@ import {
   draftAddress,
   draftChanged,
   draftCustomer,
+  draftShipFee,
   draftTotal,
   itemsSummary,
   lineSummary,
@@ -21,21 +22,25 @@ import {
   stepLineQty,
   switchPoint,
   toDraftCustomer,
+  toggleShipFee,
   type CartDraft,
   type DraftCustomer,
 } from '@/domain/cart';
 import { DELETE_REASON_LABELS } from '@/domain/audit';
+import { customerLabel } from '@/domain/debt';
 import { soldOutAt, tabletPoints, type SoldOutSet } from '@/domain/catalog';
 import { formatVnd } from '@/domain/money';
-import { lineTotal, selectableToppings } from '@/domain/pricing';
+import { SHIP_FEES, lineTotal, orderTotal, selectableToppings, shipFeeLabel } from '@/domain/pricing';
 import { businessDate } from '@/domain/time';
 import { DINE_LABELS, type Combo, type DeleteReason, type DineType, type Order, type Point, type Product, type Topping } from '@/domain/types';
 import { pos } from '@/lib/pos';
 import { Splash, errorMessage } from '@/app/ui';
+import { useIsTablet } from '@/app/useMediaQuery';
 import { MenuBoard } from './MenuBoard';
 import { Notice, Sheet, useTablet } from './parts';
 import { useDebtBook } from './debt';
 import { ShipCustomerPicker } from './ShipCustomer';
+import { ShipSheet } from './ShipSheet';
 import type { QueueFlash } from './QueueScreen';
 
 const DINE_TYPES: ReadonlyArray<{ id: DineType; Icon: typeof ShoppingBag }> = [
@@ -46,8 +51,8 @@ const DINE_TYPES: ReadonlyArray<{ id: DineType; Icon: typeof ShoppingBag }> = [
 
 const DELETE_REASONS = (['mistake', 'customer_left', 'customer_changed', 'other'] as const).map((id) => ({ id, label: DELETE_REASON_LABELS[id] }));
 
-/** Nút thao tác phụ: điện thoại xếp biểu tượng trên chữ cho vừa ba nút một hàng. */
-const ACTION_BTN = 'min-h-[64px] flex-col gap-1 px-1 text-sm md:min-h-[52px] md:flex-row md:gap-2 md:px-4 md:text-base';
+/** Nút thao tác phụ: điện thoại ba nút một hàng 44px, biểu tượng cạnh chữ (Figma MS1). */
+const ACTION_BTN = 'min-h-[44px] gap-1.5 px-1 text-[13px] md:min-h-[52px] md:gap-2 md:px-4 md:text-base';
 
 /** Chờ ngần này sau lần sửa cuối mới tự lưu (gõ nhãn, bấm +/− liên tục chỉ ra một update_order). */
 const AUTOSAVE_MS = 800;
@@ -55,7 +60,8 @@ const AUTOSAVE_MS = 800;
 type Dialog = { kind: 'toppings'; product: Product; initial: string[] } | { kind: 'delete' } | { kind: 'discard' } | null;
 
 /**
- * Tạo / sửa đơn (mục 4.2): tab điểm bán, combo (1 chạm), món → topping, Tại chỗ / Mang về / Ship (+ địa chỉ), nhãn.
+ * Tạo / sửa đơn (mục 4.2): tab điểm bán, combo (1 chạm), món → topping, Tại chỗ / Mang về / Ship (+ phí, địa chỉ), nhãn.
+ * Điện thoại (Figma MS1 / MS2): chọn Ship không mở bàn phím; địa chỉ + khách nhập trong bảng riêng.
  * Nhân viên thấy giá nhưng không có ô nào để sửa giá hay giảm giá.
  * Đơn mới chỉ ghi lên server khi bấm Tạo đơn / Đã ra món / Thanh toán.
  * Đơn đã lưu thì tự lưu mỗi khi sửa (gom các chạm liên tiếp thành một update_order).
@@ -79,6 +85,9 @@ export function OrderScreen() {
   const [markingPending, setMarkingPending] = useState<string | null>(null);
   /** Đang gõ địa chỉ: chưa tự lưu (mỗi lần đổi địa chỉ đơn ship là một tin Telegram), lưu khi rời ô. */
   const [typingAddress, setTypingAddress] = useState(false);
+  /** Điện thoại: bảng nhập địa chỉ / khách đơn ship đang mở (cũng tạm dừng tự lưu như đang gõ địa chỉ). */
+  const [shipOpen, setShipOpen] = useState(false);
+  const isTablet = useIsTablet();
   const busyRef = useRef(false);
 
   // Các lần ghi (tự lưu và nút bấm) chạy nối tiếp, luôn đọc bản nháp / đơn mới nhất qua ref.
@@ -103,6 +112,7 @@ export function OrderScreen() {
       label: x.label,
       address: draftAddress(x),
       customer: draftCustomer(x),
+      ship_fee: draftShipFee(x),
       items: x.items,
     };
     let o: Order;
@@ -136,13 +146,13 @@ export function OrderScreen() {
 
   const autoPending = !!saved && !!draft && draft.items.length > 0 && !needsAddress(draft) && draftChanged(draft, saved);
   useEffect(() => {
-    if (!autoPending || typingAddress) return;
+    if (!autoPending || typingAddress || shipOpen) return;
     const t = setTimeout(() => {
       flushAuto().catch((e) => setError(errorMessage(e)));
     }, AUTOSAVE_MS);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoPending, draft, typingAddress]);
+  }, [autoPending, draft, typingAddress, shipOpen]);
 
   // Tablet tắt màn / chuyển app giữa chừng: ghi luôn phần đang chờ.
   useEffect(() => {
@@ -197,6 +207,7 @@ export function OrderScreen() {
       label: o.label ?? '',
       address: o.address ?? '',
       customer: customerOf(o, prev?.customer ?? null),
+      ship_fee: o.ship_fee ?? 0,
       items: o.items,
     }));
   }
@@ -365,6 +376,9 @@ export function OrderScreen() {
   }
 
   const itemCount = d.items.reduce((s, it) => s + it.qty, 0);
+  const isShip = d.dine_type === 'delivery';
+  const shipFee = draftShipFee(d);
+  const cartQty = (productId: string) => d.items.reduce((s, it) => s + (it.product_id === productId ? it.qty : 0), 0);
 
   // Điện thoại: đầu đơn ở trên, thực đơn cuộn ở giữa, giỏ (thu gọn còn một dòng) + nút thao tác luôn ở đáy:
   // bấm món là thấy ngay số món / tổng tiền, không phải cuộn xuống mới tạo đơn được.
@@ -376,7 +390,7 @@ export function OrderScreen() {
       className="grid h-full grid-cols-[auto_minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)_auto] md:grid-cols-[minmax(0,1fr)_380px] md:grid-rows-[auto_minmax(0,1fr)] lg:grid-cols-[minmax(0,1fr)_390px]"
     >
       <div className="col-start-1 row-start-1 flex items-center border-b border-line bg-surface py-2 pl-4 md:h-[76px] md:px-6">
-        <button type="button" className="btn btn-secondary min-h-[44px] pl-3 pr-4 text-[15px]" onClick={back} data-testid="order-back">
+        <button type="button" className="btn btn-secondary min-h-[40px] pl-3 pr-4 text-[15px] md:min-h-[44px]" onClick={back} data-testid="order-back">
           <ChevronLeft aria-hidden className="h-5 w-5" />
           Hàng đợi
         </button>
@@ -413,7 +427,7 @@ export function OrderScreen() {
         )}
       </div>
 
-      <div className="col-span-2 row-start-2 flex min-h-0 flex-col gap-3 overflow-y-auto p-4 md:col-span-1 md:col-start-1 md:p-5">
+      <div className="col-span-2 row-start-2 flex min-h-0 flex-col gap-3 overflow-y-auto px-4 py-3 md:col-span-1 md:col-start-1 md:p-5">
         {swapLine && (
           <div data-testid="swap-banner" role="status" className="sticky top-0 z-10 flex items-center gap-3 rounded-xl border border-brand-line bg-brand-soft px-4 py-3 text-lg font-medium text-brand-deep shadow-card">
             <ArrowLeftRight aria-hidden className="h-5 w-5 shrink-0" />
@@ -433,6 +447,7 @@ export function OrderScreen() {
           canSelectPoint={(p) => canSwitchPoint(d, cat.points, p)}
           onCombo={onCombo}
           onProduct={onProduct}
+          cartQty={cartQty}
           soldOut={soldOut}
           marking={{
             active: marking,
@@ -448,19 +463,19 @@ export function OrderScreen() {
 
       <aside
         data-testid="cart"
-        className="col-span-2 row-start-3 flex max-h-[78vh] flex-col gap-2.5 rounded-t-3xl bg-surface px-4 pb-[max(16px,env(safe-area-inset-bottom))] pt-2 shadow-raised md:col-span-1 md:col-start-2 md:row-start-2 md:max-h-none md:min-h-0 md:gap-3 md:rounded-none md:border-l md:border-line md:px-5 md:pb-5 md:pt-1 md:shadow-none"
+        className="col-span-2 row-start-3 flex max-h-[78vh] flex-col gap-2 rounded-t-3xl bg-surface px-4 pb-[max(16px,env(safe-area-inset-bottom))] pt-2 shadow-raised md:col-span-1 md:col-start-2 md:row-start-2 md:max-h-none md:min-h-0 md:gap-3 md:rounded-none md:border-l md:border-line md:px-5 md:pb-5 md:pt-1 md:shadow-none"
       >
         <span aria-hidden className="mx-auto h-1 w-10 shrink-0 rounded-full bg-line-strong md:hidden" />
-        {/* Chỉ trên điện thoại: một dòng tóm tắt giỏ, bấm để mở / thu gọn chi tiết. */}
+        {/* Chỉ trên điện thoại: một dòng tóm tắt giỏ, bấm để mở / thu gọn chi tiết (dòng món, nhãn). */}
         <button
           type="button"
-          className="flex min-h-[60px] shrink-0 items-center gap-3 rounded-2xl border border-line bg-surface-muted px-3 py-2 text-left md:hidden"
+          className="flex min-h-[56px] shrink-0 items-center gap-3 rounded-2xl border border-line bg-surface-muted px-2 py-1.5 text-left md:hidden"
           aria-expanded={cartOpen}
           onClick={() => setCartOpen((v) => !v)}
           data-testid="cart-toggle"
         >
           <span className="icon-tile relative h-10 w-10 rounded-xl bg-brand-soft text-brand-strong">
-            <ShoppingBag aria-hidden className="h-[22px] w-[22px]" />
+            <ShoppingBag aria-hidden className="h-5 w-5" />
             {itemCount > 0 && (
               <span className="num absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-brand-strong px-1 text-xs font-bold text-white">
                 {itemCount}
@@ -468,62 +483,108 @@ export function OrderScreen() {
             )}
           </span>
           <span className="flex min-w-0 flex-1 flex-col">
-            <span className="truncate text-[15px] font-medium leading-tight">
+            <span className="truncate text-[15px] font-semibold leading-tight">
               {empty ? 'Chưa có món' : `${DINE_LABELS[d.dine_type]}${d.label.trim() ? ` · ${d.label.trim()}` : ''} · ${itemsSummary(d.items)}`}
             </span>
-            {noAddress ? (
-              <span className="text-sm font-medium text-danger-strong">Thiếu địa chỉ ship: bấm để nhập</span>
+            {shipFee > 0 ? (
+              <span className="num text-xs font-medium text-ink-subtle" data-testid="cart-ship-breakdown">
+                {formatVnd(orderTotal(d.items))} + phí {formatVnd(shipFee)}
+              </span>
             ) : (
               <span className="text-xs text-ink-subtle">{cartOpen ? 'Bấm để thu gọn' : 'Bấm để xem giỏ'}</span>
             )}
           </span>
-          <span className="num shrink-0 text-[19px] font-bold">{formatVnd(total)}</span>
+          <span className="num shrink-0 text-xl font-bold" data-testid="cart-total">
+            {formatVnd(total)}
+          </span>
           <ChevronUp aria-hidden className={`h-5 w-5 shrink-0 text-ink-subtle transition-transform duration-fast ${cartOpen ? 'rotate-180' : ''}`} />
         </button>
-        <div className={`${cartOpen ? 'flex' : 'hidden'} min-h-0 flex-col gap-3 overflow-y-auto md:flex md:flex-1 md:overflow-visible`}>
-          <div className="segment-group shrink-0 grid-cols-3" role="group" aria-label="Tại chỗ / Mang về / Ship">
-            {DINE_TYPES.map(({ id: t, Icon }) => (
-              <button
-                key={t}
-                type="button"
-                aria-pressed={d.dine_type === t}
-                onClick={() => edit((x) => setDineType(x, t))}
-                className="btn btn-segment min-h-[44px] gap-1.5 whitespace-nowrap rounded-[9px] px-1 text-[15px] font-medium"
-                data-testid={`order-dine-${t}`}
-              >
-                <Icon aria-hidden className="h-[18px] w-[18px] shrink-0" />
-                {DINE_LABELS[t]}
-              </button>
-            ))}
+        <div className="segment-group shrink-0 grid-cols-3" role="group" aria-label="Tại chỗ / Mang về / Ship">
+          {DINE_TYPES.map(({ id: t, Icon }) => (
+            <button
+              key={t}
+              type="button"
+              aria-pressed={d.dine_type === t}
+              onClick={() => edit((x) => setDineType(x, t))}
+              className="btn btn-segment min-h-[40px] gap-1.5 whitespace-nowrap rounded-[9px] px-1 text-[15px] font-medium md:min-h-[44px]"
+              data-testid={`order-dine-${t}`}
+            >
+              <Icon aria-hidden className="h-[18px] w-[18px] shrink-0" />
+              {DINE_LABELS[t]}
+            </button>
+          ))}
+        </div>
+        {isShip && (
+          <div className="flex shrink-0 flex-col gap-1.5">
+            <span className="text-[13px] font-bold text-ink-subtle">Phí ship</span>
+            {/* Bấm lại mức đang chọn ⇒ bỏ phí. */}
+            <div className="grid grid-cols-4 gap-1.5" role="group" aria-label="Phí ship">
+              {SHIP_FEES.map((fee) => (
+                <button
+                  key={fee}
+                  type="button"
+                  aria-pressed={d.ship_fee === fee}
+                  onClick={() => edit((x) => toggleShipFee(x, fee))}
+                  className="btn btn-choice min-h-[52px] min-w-0 px-1 text-base md:min-h-[48px]"
+                  data-testid={`order-ship-fee-${fee}`}
+                >
+                  {shipFeeLabel(fee)}
+                </button>
+              ))}
+            </div>
           </div>
-          {d.dine_type === 'delivery' && (
-            <ShipCustomerPicker book={book} customer={d.customer} autoFocus={!d.address} onChange={(c) => edit((x) => setCustomer(x, c))} />
-          )}
-          {d.dine_type === 'delivery' && (
-            <label className="flex shrink-0 flex-col gap-1">
-              <span className="relative">
-                <MapPin aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-ink-subtle" />
-                <input
-                  className="input min-h-[48px] pl-11 text-base"
-                  aria-label="Địa chỉ giao"
-                  aria-invalid={noAddress}
-                  placeholder={d.customer?.phone ? 'Địa chỉ giao (bắt buộc)' : 'Địa chỉ giao, SĐT (bắt buộc)'}
-                  maxLength={200}
-                  autoFocus={!d.address && !!d.customer}
-                  value={d.address}
-                  onChange={(e) => edit((x) => ({ ...x, address: e.target.value }))}
-                  onFocus={() => setTypingAddress(true)}
-                  onBlur={() => setTypingAddress(false)}
-                  data-testid="order-address"
-                />
+        )}
+        {/* Điện thoại: chỉ một dòng bấm để mở bảng nhập địa chỉ / khách (không bật bàn phím khi chọn Ship). */}
+        {isShip && !isTablet && (
+          <button
+            type="button"
+            className="flex min-h-[44px] shrink-0 items-center gap-3 rounded-xl border border-line-strong bg-surface px-3 text-left"
+            onClick={() => setShipOpen(true)}
+            data-testid="order-ship-details"
+          >
+            <MapPin aria-hidden className={`h-5 w-5 shrink-0 ${noAddress ? 'text-danger-strong' : 'text-ink-subtle'}`} />
+            {noAddress ? (
+              <span className="min-w-0 flex-1 truncate text-sm font-medium text-danger-strong" data-testid="order-address-missing">
+                Địa chỉ, khách — bấm để nhập
               </span>
-              {noAddress && (
-                <span className="text-sm text-danger-strong" data-testid="order-address-missing">
-                  Nhập địa chỉ giao để lưu đơn ship
-                </span>
-              )}
-            </label>
-          )}
+            ) : (
+              <span className="min-w-0 flex-1 truncate text-sm font-medium" data-testid="order-ship-summary">
+                {d.address.trim()}
+                {d.customer && <span className="text-ink-subtle"> · {customerLabel(d.customer)}</span>}
+              </span>
+            )}
+            <ChevronRight aria-hidden className="h-5 w-5 shrink-0 text-ink-subtle" />
+          </button>
+        )}
+        {isShip && isTablet && (
+          <ShipCustomerPicker book={book} customer={d.customer} autoFocus={!d.address} onChange={(c) => edit((x) => setCustomer(x, c))} />
+        )}
+        {isShip && isTablet && (
+          <label className="flex shrink-0 flex-col gap-1">
+            <span className="relative">
+              <MapPin aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-ink-subtle" />
+              <input
+                className="input min-h-[48px] pl-11 text-base"
+                aria-label="Địa chỉ giao"
+                aria-invalid={noAddress}
+                placeholder={d.customer?.phone ? 'Địa chỉ giao (bắt buộc)' : 'Địa chỉ giao, SĐT (bắt buộc)'}
+                maxLength={200}
+                autoFocus={!d.address && !!d.customer}
+                value={d.address}
+                onChange={(e) => edit((x) => ({ ...x, address: e.target.value }))}
+                onFocus={() => setTypingAddress(true)}
+                onBlur={() => setTypingAddress(false)}
+                data-testid="order-address"
+              />
+            </span>
+            {noAddress && (
+              <span className="text-sm text-danger-strong" data-testid="order-address-missing">
+                Nhập địa chỉ giao để lưu đơn ship
+              </span>
+            )}
+          </label>
+        )}
+        <div className={`${cartOpen ? 'flex' : 'hidden'} min-h-0 flex-col gap-3 overflow-y-auto md:flex md:flex-1 md:overflow-visible`}>
           <span className="relative shrink-0">
             <Tag aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-ink-subtle" />
             <input
@@ -595,6 +656,11 @@ export function OrderScreen() {
             <span className="flex items-center justify-between text-[15px] text-ink-subtle">
               Số món <span className="num text-ink">{itemCount}</span>
             </span>
+            {shipFee > 0 && (
+              <span className="flex items-center justify-between text-[15px] text-ink-subtle">
+                Phí ship <span className="num text-ink" data-testid="order-ship-fee">{formatVnd(shipFee)}</span>
+              </span>
+            )}
             <span className="flex items-baseline justify-between">
               <span className="text-lg font-semibold">Tổng</span>
               <span className="num text-[28px] font-bold text-ink" data-testid="order-total">
@@ -608,11 +674,11 @@ export function OrderScreen() {
           {error ?? (saved && empty ? 'Đơn không còn món nào: thêm món, hoặc bấm Xóa đơn.' : null)}
         </Notice>
 
-        <button type="button" className="btn btn-success min-h-[56px] shrink-0 text-lg md:text-xl" disabled={blocked} onClick={() => void payExact()} data-testid="order-pay-exact">
+        <button type="button" className="btn btn-success min-h-[52px] shrink-0 text-[17px] md:min-h-[56px] md:text-xl" disabled={blocked} onClick={() => void payExact()} data-testid="order-pay-exact">
           <Banknote aria-hidden className="h-6 w-6" />
-          Thu đủ tiền mặt {formatVnd(total)}
+          Thu đủ<span className="hidden md:inline"> tiền mặt</span> {formatVnd(total)}
         </button>
-        {/* Điện thoại: các nút còn lại xếp một hàng (biểu tượng trên, chữ dưới). Tablet: 2 cột, Tạo đơn / Xóa đơn cả hàng. */}
+        {/* Điện thoại: các nút còn lại xếp một hàng. Tablet: 2 cột, Tạo đơn / Xóa đơn cả hàng. */}
         <div className="grid shrink-0 auto-cols-fr grid-flow-col gap-2 md:grid-flow-row md:grid-cols-2 md:gap-2.5">
           <button
             type="button"
@@ -621,29 +687,42 @@ export function OrderScreen() {
             onClick={() => void pay()}
             data-testid="order-pay"
           >
-            <Wallet aria-hidden className="h-5 w-5" />
-            Thanh toán…
+            <Wallet aria-hidden className="h-[18px] w-[18px] shrink-0 md:h-5 md:w-5" />
+            Thanh toán<span className="hidden md:inline">…</span>
           </button>
           {saved?.status !== 'served' && (
             <button type="button" className={`btn btn-dark ${ACTION_BTN}`} disabled={blocked} onClick={() => void serve()} data-testid="order-serve">
-              <ChefHat aria-hidden className="h-5 w-5" />
+              <ChefHat aria-hidden className="h-[18px] w-[18px] shrink-0 md:h-5 md:w-5" />
               Đã ra món
             </button>
           )}
           {!saved && (
             <button type="button" className={`btn btn-secondary ${ACTION_BTN} md:col-span-2 md:min-h-[48px]`} disabled={blocked} onClick={() => void save()} data-testid="order-save">
-              <Save aria-hidden className="h-5 w-5" />
+              <Save aria-hidden className="h-[18px] w-[18px] shrink-0 md:h-5 md:w-5" />
               Tạo đơn
             </button>
           )}
           {saved && (
             <button type="button" className={`btn btn-danger-outline ${ACTION_BTN} md:col-span-2 md:min-h-[48px]`} disabled={busy} onClick={() => setDialog({ kind: 'delete' })} data-testid="order-delete">
-              <Trash2 aria-hidden className="h-5 w-5" />
+              <Trash2 aria-hidden className="h-[18px] w-[18px] shrink-0 md:h-5 md:w-5" />
               Xóa đơn
             </button>
           )}
         </div>
       </aside>
+
+      {shipOpen && isShip && !isTablet && (
+        <ShipSheet
+          address={d.address}
+          customer={d.customer}
+          book={book}
+          shipFee={shipFee}
+          total={total}
+          onAddress={(v) => edit((x) => ({ ...x, address: v }))}
+          onCustomer={(c) => edit((x) => setCustomer(x, c))}
+          onClose={() => setShipOpen(false)}
+        />
+      )}
 
       {dialog?.kind === 'toppings' && (
         <ToppingSheet

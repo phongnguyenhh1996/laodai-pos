@@ -162,6 +162,11 @@ function ReportBody({ r, rangeLabel, isToday }: { r: Report; rangeLabel: string;
             </b>
           </span>
         ))}
+        {(r.revenue.ship_fee ?? 0) > 0 && (
+          <span className="text-[#6d6d6d]" data-testid="report-ship-fee">
+            trong đó phí ship <b className="num font-semibold text-ink">{formatVnd(r.revenue.ship_fee ?? 0)}</b>
+          </span>
+        )}
       </p>
     </Section>
   );

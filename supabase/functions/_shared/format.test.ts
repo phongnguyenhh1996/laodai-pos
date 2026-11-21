@@ -119,6 +119,26 @@ describe('định dạng Telegram', () => {
     expect(msg).toContain('👤 Dũng (giáo viên) – 0909 123 456\n📍 12 Lê Lợi');
   });
 
+  it('phí ship: đơn ship có dòng "Phí ship" trước Tổng; báo cáo ca có "Trong đó phí ship"', () => {
+    const msg = formatNotification(
+      {
+        kind: 'delivery_order',
+        payload: {
+          ...base, ...ctx, order: { ...order, status: 'open', dine_type: 'delivery', address: '12 Lê Lợi', ship_fee: 10_000, total: 72_000 },
+          point_name: 'Xôi A', updated: false,
+        },
+      },
+      opts,
+    );
+    expect(msg).toContain('Phí ship: 10.000\nTổng: 72.000');
+    const close = formatNotification(
+      { kind: 'shift_close', payload: { ...base, ...ctx, reconcile: { ...rec, revenue: { ...rec.revenue, ship_fee: 25_000 } }, adjusted: false } },
+      opts,
+    );
+    expect(close).toContain('Nợ 100.000)\nTrong đó phí ship: 25.000');
+    expect(formatNotification(samples[3]!, opts)).not.toContain('phí ship');
+  });
+
   it('mỗi tin có link mở thẳng chi tiết trong app chủ', () => {
     for (const s of samples) expect(formatNotification(s, opts)).toMatch(/🔗 https:\/\/pos\.laodai\.vn\/owner\/\S+$/);
   });

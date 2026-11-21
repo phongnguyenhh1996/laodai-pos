@@ -101,6 +101,7 @@ type OrderSnap = {
   code?: string;
   status?: OrderStatus;
   total?: number;
+  ship_fee?: number;
   dine_type?: DineType;
   address?: string | null;
   label?: string | null;
@@ -132,6 +133,7 @@ export function describeAudit(e: Pick<AuditEntry, 'action' | 'before' | 'after' 
     }
     if (b && a && b.dine_type !== a.dine_type) lines.push(`${dineLabel(b.dine_type)} → ${dineLabel(a.dine_type)}`);
     if (b && a && (b.address ?? null) !== (a.address ?? null)) lines.push(`Địa chỉ: ${b.address ?? '—'} → ${a.address ?? '—'}`);
+    if (b && a && (b.ship_fee ?? 0) !== (a.ship_fee ?? 0)) lines.push(`Phí ship: ${formatVnd(b.ship_fee ?? 0)} → ${formatVnd(a.ship_fee ?? 0)}`);
     if (b && a && (b.label ?? null) !== (a.label ?? null)) lines.push(`Nhãn: ${b.label ?? '—'} → ${a.label ?? '—'}`);
     const cb = (e.before as { customer_id?: string } | null)?.customer_id;
     const ca = (e.after as { customer_id?: string } | null)?.customer_id;

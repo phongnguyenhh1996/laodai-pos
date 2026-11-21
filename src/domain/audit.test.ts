@@ -71,6 +71,13 @@ describe('nhật ký', () => {
     expect(
       describeAudit({ action: 'order_update', entity: 'order', reason: null, before: order(), after: order({ dine_type: 'dinein', label: 'Bàn 2' }) }),
     ).toEqual(['Mang về → Tại chỗ', 'Nhãn: — → Bàn 2']);
+    expect(
+      describeAudit({
+        action: 'order_update', entity: 'order', reason: null,
+        before: order({ dine_type: 'delivery', address: '12 Lê Lợi', ship_fee: 10_000 }),
+        after: order({ dine_type: 'delivery', address: '12 Lê Lợi', ship_fee: 15_000 }),
+      }),
+    ).toEqual(['Phí ship: 10.000 → 15.000']);
     expect(describeAudit({ action: 'order_update', entity: 'order', reason: null, before: order(), after: order() })).toEqual(['2× Xôi gà (Trứng) · 62.000']);
   });
 

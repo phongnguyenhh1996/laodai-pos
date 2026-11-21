@@ -81,7 +81,8 @@ shifts            id, tablet_profile_id, staff_id, opened_at, closed_at,
 shift_adjustments id, shift_id, kind (boxes|plates|cash), qty, note, at  -- chủ bổ sung giữa ca
 
 orders            id, device_seq, tablet_profile_id, point_id, code,   -- code: "3F5"
-                  label, table_no, dine_type (dinein|takeaway),
+                  label, table_no, dine_type (dinein|takeaway|delivery),
+                  address, ship_fee,                    -- chỉ đơn ship; ship_fee 0–50.000, bội 1.000, đã nằm trong total
                   status (open|served|paid|deleted),
                   opened_shift_id, paid_shift_id,
                   created_at, served_at, paid_at, deleted_at, delete_reason,
@@ -120,6 +121,8 @@ Chủ có thể **bổ sung giữa ca** (vd. "+50 hộp", "+200k tiền lẻ") t
 - Lưới **combo** (bấm 1 lần là thêm) + lưới **món chính** → bảng chọn **topping** (cộng giá).
 - Nút **Tại chỗ / Mang về** (mặc định: Xôi = Mang về, Cơm gà = Tại chỗ); ô **nhãn** ngắn hoặc số bàn (tùy chọn).
 - Nhân viên **thấy giá**, không sửa được giá; không có giảm giá.
+- **Ship**: địa chỉ bắt buộc, khách tùy chọn (Telegram báo khi tạo / đổi địa chỉ / đổi khách). Hàng nút **phí ship** +5k · +10k · +15k · +20k (bấm lại mức đang chọn = bỏ phí); phí cộng vào tổng đơn. Đổi sang Tại chỗ / Mang về ⇒ bỏ địa chỉ, khách và phí. Server kiểm `tổng = tiền món + phí ship` (`total_mismatch`), phí sai mức ⇒ `bad_ship_fee`.
+  - Điện thoại: bấm Ship không bật bàn phím; một hàng "Địa chỉ, khách" mở bảng nhập riêng. Tablet: ô khách + địa chỉ nằm ngay trong giỏ.
 - Đơn đang mở (`open`/`served`): nhân viên sửa món & xóa đơn được. Mọi thay đổi ghi `audit_log` (trước/sau).
   - **Xóa đơn** → chọn nhanh lý do (1 chạm: bấm nhầm / khách bỏ về / khách đổi ý / khác) → Telegram ngay, kèm nội dung đơn và trạng thái lúc xóa (đã ra món hay chưa).
 
@@ -131,7 +134,7 @@ Chủ có thể **bổ sung giữa ca** (vd. "+50 hộp", "+200k tiền lẻ") t
 - Mã đơn: 1 chữ + 2 số, ví dụ `A30` (chữ đầu bỏ `I L O`), ngẫu nhiên, không trùng trong ngày của tablet. Không phản ánh số lượng đơn.
 
 ### 4.4 Thanh toán
-Chọn một hình thức (không chia, không nợ một phần):
+Chọn một hình thức (không chia, không nợ một phần). Số cần thu là tổng đơn, **đã gồm phí ship** (màn thanh toán hiện dòng "Phí ship" riêng):
 - **Tiền mặt**: nút mệnh giá nhanh "Khách đưa" (đủ tiền, 50k, 100k, 200k, 500k, nhập tay) → hiện tiền thối.
 - **Chuyển khoản**: nhân viên xác nhận đã nhận.
 - **Ghi nợ**: ô tên (bắt buộc) với **gợi ý khách có sẵn**; ô mô tả ("giáo viên", "20 Lê Lợi") và SĐT tùy chọn; tên mới → tự tạo khách. Telegram ngay.
@@ -148,7 +151,7 @@ Chọn khách → thấy dư nợ của khách đó → nhập số tiền + hì
 4. Server tính đối soát (mục 5) → Telegram báo cáo ca.
 
 ### 4.7 Chủ sửa đơn đã thanh toán
-Chỉ trên chế độ chủ. Sửa món / hình thức thanh toán / khách nợ, có log trước/sau, `owner_edited = true`. Nếu ca đã đóng → **tính lại** đối soát, đánh dấu "đã điều chỉnh".
+Chỉ trên chế độ chủ. Sửa món / hình thức thanh toán / khách nợ, có log trước/sau, `owner_edited = true`. Phí ship giữ nguyên (tổng mới = tiền món mới + phí ship cũ). Nếu ca đã đóng → **tính lại** đối soát, đánh dấu "đã điều chỉnh".
 
 ### 4.8 Hết món
 - Màn đơn có nút **"Báo hết món"** → chế độ đánh dấu: bấm món hoặc topping để báo **hết** / **bán lại**. Bấm **Xong** để về bán tiếp.
@@ -169,6 +172,7 @@ kỳ vọng = open_float + Σ adjustments(cash)
         + Σ debt_payments.amount (cash, shift = ca này)
 chênh lệch = close_cash_counted − kỳ vọng
 ```
+Phí ship nằm trong `orders.total` nên đã có trong doanh thu và tiền mặt kỳ vọng; báo cáo ca / ngày hiện thêm dòng **"trong đó phí ship"** (Σ `ship_fee` của đơn thu trong ca) khi > 0.
 
 **Hộp** (dùng để tham khảo, không cảnh báo tự động)
 ```
@@ -202,6 +206,7 @@ Gửi vào **một nhóm Telegram**, đồng thời lưu `audit_log` và xem đ�
 | Tablet đăng nhập; vào chế độ chủ trên tablet | ✅ |
 | Mở ca; đóng ca (kèm báo cáo) | ✅ |
 | Xóa đơn | ✅ |
+| Đơn ship mới; đổi địa chỉ / khách đơn ship (kèm phí ship) | ✅ |
 | Ghi nợ; thu nợ | ✅ |
 | Chủ sửa đơn đã thanh toán | ✅ |
 | Phát hiện lỗ hổng `device_seq` | ✅ |
@@ -479,7 +484,7 @@ Có 3 công tắc. Công tắc **chỉ bật hoặc tắt việc in tự động
 
 ### 12.4 Bill thanh toán
 - Tự in **sau khi thanh toán thành công**, kể cả đơn ghi nợ (nếu bật công tắc).
-- Nội dung: tên quán, tên điểm bán, SĐT, địa chỉ, **mã đơn chữ to**, giờ thanh toán, Tại chỗ/Mang về, nhãn hoặc bàn, các dòng món (số lượng, đơn giá, thành tiền), **Tổng**, "Cảm ơn quý khách", dòng chân trang tự nhập, "Không có bill = miễn phí".
+- Nội dung: tên quán, tên điểm bán, SĐT, địa chỉ, **mã đơn chữ to**, giờ thanh toán, Tại chỗ/Mang về, nhãn hoặc bàn, các dòng món (số lượng, đơn giá, thành tiền), dòng **Phí ship** (khi > 0), **Tổng**, "Cảm ơn quý khách", dòng chân trang tự nhập, "Không có bill = miễn phí".
 - **Không in**: hình thức thanh toán, tiền khách đưa và tiền thối, thông tin nợ, tên nhân viên.
 - **Tablet không có nút in hay in lại bill.** Bill in lỗi thì chỉ ghi lại (12.7). Server cũng chặn: tablet chỉ tạo được **một** lệnh bill cho mỗi đơn, trong 10 phút sau khi thanh toán (gọi API trực tiếp cũng không in lại được bill cũ). Chỉ **chủ in lại từ xa**. Bản in lại **giống hệt bản gốc** (không đóng dấu "bản in lại"), theo nội dung hiện tại của đơn (kể cả khi chủ đã sửa đơn sau thanh toán) và mẫu hiện tại.
 

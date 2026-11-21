@@ -85,6 +85,8 @@ export interface PrintDoc {
   created_at: string;
   paid_at: string | null;
   edited_at: string | null;
+  /** Phí ship (đã nằm trong `total`); server cũ không gửi ⇒ không in dòng phí. */
+  ship_fee?: Money;
   total: Money;
   items: PrintDocItem[];
 }

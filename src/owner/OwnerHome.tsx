@@ -118,6 +118,11 @@ function DashboardBody({ data }: { data: Dashboard }) {
           <span className="sr-only"> · </span>
           <Split icon={HandCoins} label="Ghi nợ" value={formatVnd(r.debt)} />
         </p>
+        {(r.ship_fee ?? 0) > 0 && (
+          <p className="num -mt-1.5 text-xs font-medium text-white/85" data-testid="dash-ship-fee">
+            trong đó phí ship {formatVnd(r.ship_fee ?? 0)}
+          </p>
+        )}
       </section>
 
       {/* Điện thoại: một cột theo thứ tự điểm bán → số ca/đơn → đơn chờ → ca. Tablet: hai cột. */}

@@ -43,6 +43,12 @@ describe('chủ sửa đơn đã thanh toán (bản nháp)', () => {
     expect(editSummary(d, paid).after).toBe(90_000);
   });
 
+  it('đơn ship có phí: sửa món giữ nguyên phí, tổng mới = tiền món mới + phí', () => {
+    const ship = { ...paid, total: 72_000, ship_fee: 10_000 };
+    const d = { ...editDraftFrom(ship), items: stepLineQty(ship.items, 'line-1', -1) };
+    expect(editSummary(d, ship)).toEqual({ before: 72_000, after: 41_000, diff: -31_000 });
+  });
+
   it('bỏ hết món ⇒ không lưu được', () => {
     const d = { ...editDraftFrom(paid), items: [] };
     expect(editProblem(d, paid)).toBe('Đơn phải còn ít nhất một món');

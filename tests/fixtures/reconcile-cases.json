@@ -50,7 +50,7 @@
         ]
       },
       "expected": {
-        "revenue": { "total": 155000, "cash": 110000, "transfer": 25000, "debt": 20000 },
+        "revenue": { "total": 155000, "cash": 110000, "transfer": 25000, "debt": 20000, "ship_fee": 0 },
         "paid_orders": 5,
         "debt_collected": { "cash": 50000, "transfer": 30000 },
         "cash": { "expected": 860000, "counted": 840000, "diff": -20000 },
@@ -75,7 +75,7 @@
         "debt_payments": []
       },
       "expected": {
-        "revenue": { "total": 30000, "cash": 30000, "transfer": 0, "debt": 0 },
+        "revenue": { "total": 30000, "cash": 30000, "transfer": 0, "debt": 0, "ship_fee": 0 },
         "paid_orders": 2,
         "debt_collected": { "cash": 0, "transfer": 0 },
         "cash": { "expected": 330000, "counted": 330000, "diff": 0 },
@@ -100,7 +100,7 @@
         "debt_payments": []
       },
       "expected": {
-        "revenue": { "total": 30000, "cash": 15000, "transfer": 15000, "debt": 0 },
+        "revenue": { "total": 30000, "cash": 15000, "transfer": 15000, "debt": 0, "ship_fee": 0 },
         "paid_orders": 2,
         "debt_collected": { "cash": 0, "transfer": 0 },
         "cash": { "expected": 315000, "counted": 330000, "diff": 15000 },
@@ -123,7 +123,7 @@
         "debt_payments": []
       },
       "expected": {
-        "revenue": { "total": 20000, "cash": 20000, "transfer": 0, "debt": 0 },
+        "revenue": { "total": 20000, "cash": 20000, "transfer": 0, "debt": 0, "ship_fee": 0 },
         "paid_orders": 1,
         "debt_collected": { "cash": 0, "transfer": 0 },
         "cash": { "expected": 220000, "counted": null, "diff": null },
@@ -152,7 +152,7 @@
         "debt_payments": []
       },
       "expected": {
-        "revenue": { "total": 141000, "cash": 0, "transfer": 141000, "debt": 0 },
+        "revenue": { "total": 141000, "cash": 0, "transfer": 141000, "debt": 0, "ship_fee": 0 },
         "paid_orders": 3,
         "debt_collected": { "cash": 0, "transfer": 0 },
         "cash": { "expected": 0, "counted": 0, "diff": 0 },
@@ -184,7 +184,7 @@
         ]
       },
       "expected": {
-        "revenue": { "total": 99000, "cash": 59000, "transfer": 40000, "debt": 0 },
+        "revenue": { "total": 99000, "cash": 59000, "transfer": 40000, "debt": 0, "ship_fee": 0 },
         "paid_orders": 3,
         "debt_collected": { "cash": 50000, "transfer": 0 },
         "cash": { "expected": 709000, "counted": 689000, "diff": -20000 },
@@ -219,7 +219,7 @@
         ]
       },
       "expected": {
-        "revenue": { "total": 123000, "cash": 123000, "transfer": 0, "debt": 0 },
+        "revenue": { "total": 123000, "cash": 123000, "transfer": 0, "debt": 0, "ship_fee": 0 },
         "paid_orders": 3,
         "debt_collected": { "cash": 0, "transfer": 0 },
         "cash": { "expected": 123000, "counted": 123000, "diff": 0 },
@@ -228,6 +228,33 @@
         "deleted_count": 1,
         "deleted_after_served": [{ "order_id": "00000000-0000-4000-8000-000000000504", "code": "F24", "boxes": 3, "plates": 0 }],
         "open_orders": 1
+      }
+    },
+    {
+      "name": "ship-co-phi",
+      "input": {
+        "shift": { "id": "00000000-0000-4000-8000-0000000000b1", "open_boxes": 10, "open_plates": 0, "open_float": 100000, "close_boxes_left": 7, "close_plates_left": 0, "close_cash_counted": 160000 },
+        "adjustments": [],
+        "orders": [
+          { "id": "00000000-0000-4000-8000-000000000601", "code": "G21", "status": "paid", "dine_type": "delivery", "opened_shift_id": "00000000-0000-4000-8000-0000000000b1", "paid_shift_id": "00000000-0000-4000-8000-0000000000b1", "payment_method": "cash", "ship_fee": 10000, "total": 35000, "served_at": null, "deleted_at": null,
+            "items": [{ "product_id": "00000000-0000-4000-8000-0000000000a1", "qty": 1, "toppings_snap": [] }] },
+          { "id": "00000000-0000-4000-8000-000000000602", "code": "G22", "status": "paid", "dine_type": "delivery", "opened_shift_id": "00000000-0000-4000-8000-0000000000b1", "paid_shift_id": "00000000-0000-4000-8000-0000000000b1", "payment_method": "transfer", "ship_fee": 15000, "total": 40000, "served_at": null, "deleted_at": null,
+            "items": [{ "product_id": "00000000-0000-4000-8000-0000000000a1", "qty": 1, "toppings_snap": [] }] },
+          { "id": "00000000-0000-4000-8000-000000000603", "code": "G23", "status": "paid", "dine_type": "takeaway", "opened_shift_id": "00000000-0000-4000-8000-0000000000b1", "paid_shift_id": "00000000-0000-4000-8000-0000000000b1", "payment_method": "cash", "ship_fee": 0, "total": 20000, "served_at": null, "deleted_at": null,
+            "items": [{ "product_id": "00000000-0000-4000-8000-0000000000a1", "qty": 1, "toppings_snap": [] }] }
+        ],
+        "debt_payments": []
+      },
+      "expected": {
+        "revenue": { "total": 95000, "cash": 55000, "transfer": 40000, "debt": 0, "ship_fee": 25000 },
+        "paid_orders": 3,
+        "debt_collected": { "cash": 0, "transfer": 0 },
+        "cash": { "expected": 155000, "counted": 160000, "diff": 5000 },
+        "boxes": { "used": 3, "by_orders": 3, "diff": 0 },
+        "plates": { "used": 0, "by_orders": 0, "diff": 0 },
+        "deleted_count": 0,
+        "deleted_after_served": [],
+        "open_orders": 0
       }
     }
   ]

@@ -206,7 +206,7 @@ export default defineConfig({
         'db:orders': (tablet: keyof typeof SEED.tablets) =>
           sql(
             `select o.id, o.device_seq, o.code, o.point_id, o.dine_type, o.status, o.total, o.label,
-                    o.payment_method, o.cash_given, o.opened_shift_id, o.paid_shift_id,
+                    o.payment_method, o.cash_given, o.opened_shift_id, o.paid_shift_id, o.address, o.ship_fee,
                     o.served_at is not null as served, o.delete_reason,
                     coalesce((select json_agg(json_build_object('product_id', i.product_id, 'qty', i.qty,
                                 'unit_price_snap', i.unit_price_snap, 'toppings', i.toppings_snap) order by i.sort)

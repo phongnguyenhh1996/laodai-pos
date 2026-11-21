@@ -51,7 +51,7 @@ describe('owner_dashboard (Tổng quan hôm nay)', () => {
     const { data, error } = await owner.rpc('owner_dashboard');
     expect(error).toBeNull();
     expect(data.date).toBe(today);
-    expect(data.revenue).toEqual({ total: 125_000, cash: 25_000, transfer: 80_000, debt: 20_000, orders: 5 });
+    expect(data.revenue).toEqual({ total: 125_000, cash: 25_000, transfer: 80_000, debt: 20_000, orders: 5, ship_fee: 0 });
     const byPoint = Object.fromEntries(
       (data.by_point as Array<{ point_id: string; total: number; transfer: number }>).map((p) => [p.point_id, [p.total, p.transfer]]),
     );

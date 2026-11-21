@@ -312,6 +312,7 @@ function ShiftBody({ detail, onChanged }: { detail: ShiftDetail; onChanged: () =
           <span className="sr-only"> · </span>
           <span className="ml-3.5">Nợ {formatVnd(r.revenue.debt)}</span>
         </span>
+        {r.revenue.ship_fee > 0 && <span data-testid="rep-ship-fee">trong đó phí ship {formatVnd(r.revenue.ship_fee)}</span>}
         {debtIn > 0 && (
           <span data-testid="rep-debt-collected">
             Thu nợ TM {formatVnd(r.debt_collected.cash)} · CK {formatVnd(r.debt_collected.transfer)}

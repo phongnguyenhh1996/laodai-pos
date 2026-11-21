@@ -148,6 +148,12 @@ function InfoCard({ o, meta }: { o: OrderDetail; meta: string }) {
             </span>
           </li>
         ))}
+        {o.ship_fee > 0 && (
+          <li className="flex items-center justify-between gap-2.5 py-2.5 text-sm text-[#6d6d6d]" data-testid="order-detail-ship-fee">
+            <span className="font-medium">Phí ship</span>
+            <span className="num shrink-0 font-semibold">{formatVnd(o.ship_fee)}</span>
+          </li>
+        )}
       </ul>
       <p className="flex items-center justify-between rounded-xl bg-[#f8f8f8] px-3.5 py-3">
         <span className="text-sm font-semibold leading-[18px]">Tổng</span>

@@ -75,7 +75,8 @@ export interface EditSummary {
   diff: Money;
 }
 
-export function editSummary(d: Pick<OwnerEditDraft, 'items'>, original: Pick<PaidOrderSnapshot, 'total'>): EditSummary {
-  const after = orderTotal(d.items);
+/** Chủ sửa món: phí ship giữ nguyên, cộng vào tổng mới. */
+export function editSummary(d: Pick<OwnerEditDraft, 'items'>, original: Pick<PaidOrderSnapshot, 'total'> & { ship_fee?: Money }): EditSummary {
+  const after = orderTotal(d.items) + (original.ship_fee ?? 0);
   return { before: original.total, after, diff: after - original.total };
 }

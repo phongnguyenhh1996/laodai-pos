@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Ban, Check, Package, Soup, Store } from 'lucide-react';
+import { useIsTablet } from '@/app/useMediaQuery';
 import { menuBoard, tabletPoints, type SoldOutSet } from '@/domain/catalog';
 import { formatVnd } from '@/domain/money';
 import type { Combo, Point, Product, Topping } from '@/domain/types';
@@ -33,6 +34,7 @@ export function MenuBoard({
   onProduct,
   soldOut = NOTHING_SOLD_OUT,
   marking,
+  cartQty = () => 0,
 }: {
   catalog: Catalog;
   pointId: string;
@@ -42,7 +44,10 @@ export function MenuBoard({
   onProduct: (p: Product) => void;
   soldOut?: SoldOutSet;
   marking?: SoldOutMarking;
+  /** Số phần của món đang có trong giỏ (chấm cam trên thẻ món). */
+  cartQty?: (productId: string) => number;
 }) {
+  const isPhone = !useIsTablet();
   const points = tabletPoints(catalog.profile, catalog.points);
   const point = points.find((p) => p.id === pointId);
 
@@ -61,9 +66,23 @@ export function MenuBoard({
     return b.products.length + b.combos.length;
   };
 
+  const markingToggle = (compact: boolean) =>
+    marking && (
+      <button
+        type="button"
+        onClick={marking.onToggleActive}
+        aria-pressed={marking.active}
+        data-testid="soldout-toggle"
+        className={`btn shrink-0 ${compact ? 'min-h-[36px] gap-1.5 px-3 text-sm' : 'min-h-[48px]'} ${marking.active ? 'btn-primary' : 'btn-secondary'}`}
+      >
+        {marking.active ? <Check aria-hidden className="h-5 w-5" /> : <Ban aria-hidden className={compact ? 'h-4 w-4' : 'h-5 w-5'} />}
+        {marking.active ? 'Xong' : 'Báo hết món'}
+      </button>
+    );
+
   return (
-    <section data-testid="menu-board" className="flex flex-col gap-4">
-      <div role="tablist" className="flex gap-2.5 md:gap-3">
+    <section data-testid="menu-board" className="flex flex-col gap-3 md:gap-4">
+      <div role="tablist" className="flex gap-2 md:gap-3">
         {points.map((p) => {
           const on = p.id === pointId;
           return (
@@ -75,7 +94,7 @@ export function MenuBoard({
               disabled={!on && !canSelectPoint(p)}
               onClick={() => onSelectPoint(p)}
               data-testid={`point-tab-${p.id}`}
-              className="flex min-h-[56px] min-w-0 flex-1 items-center gap-2.5 rounded-2xl border border-line bg-surface py-2 pl-2 pr-3 text-left transition-colors duration-fast hover:border-line-strong disabled:cursor-not-allowed disabled:opacity-40 aria-selected:border-brand aria-selected:bg-brand-soft md:min-h-[64px] md:max-w-[200px] md:gap-3 md:pl-2.5 md:pr-4"
+              className="flex min-h-[52px] min-w-0 flex-1 items-center gap-2.5 rounded-2xl border border-line bg-surface py-2 pl-2 pr-3 text-left transition-colors duration-fast hover:border-line-strong disabled:cursor-not-allowed disabled:opacity-40 aria-selected:border-brand aria-selected:bg-brand-soft md:min-h-[64px] md:max-w-[200px] md:gap-3 md:pl-2.5 md:pr-4"
             >
               <span aria-hidden className={`icon-tile h-9 w-9 rounded-full md:h-10 md:w-10 ${on ? 'bg-brand text-white' : 'bg-surface-muted text-ink-muted'}`}>
                 <Store className="h-[18px] w-[18px] md:h-5 md:w-5" />
@@ -89,8 +108,9 @@ export function MenuBoard({
         })}
       </div>
 
+      {/* Điện thoại: chưa đánh dấu thì nút "Báo hết món" nằm nhỏ cạnh tiêu đề "Món" (không đẩy lưới món xuống). */}
       {board && point && marking && (
-        <div className="flex flex-wrap items-center gap-3">
+        <div className={`${isPhone && !marking.active ? 'hidden' : 'flex'} flex-wrap items-center gap-3`}>
           {marking.active ? (
             <p data-testid="soldout-banner" role="status" className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-warning-line bg-warning-soft px-3 py-2.5 text-base font-medium text-warning-strong">
               <Ban aria-hidden className="h-5 w-5 shrink-0" />
@@ -101,16 +121,7 @@ export function MenuBoard({
           ) : (
             <span className="flex-1" />
           )}
-          <button
-            type="button"
-            onClick={marking.onToggleActive}
-            aria-pressed={marking.active}
-            data-testid="soldout-toggle"
-            className={`btn min-h-[48px] shrink-0 ${marking.active ? 'btn-primary' : 'btn-secondary'}`}
-          >
-            {marking.active ? <Check aria-hidden className="h-5 w-5" /> : <Ban aria-hidden className="h-5 w-5" />}
-            {marking.active ? 'Xong' : 'Báo hết món'}
-          </button>
+          {(!isPhone || marking.active) && markingToggle(false)}
         </div>
       )}
 
@@ -132,7 +143,12 @@ export function MenuBoard({
               ))}
             </Grid>
           )}
-          <Grid title="Món" count={board.products.length} cols="grid-cols-2 lg:grid-cols-4">
+          <Grid
+            title="Món"
+            count={board.products.length}
+            cols="grid-cols-2 lg:grid-cols-4"
+            action={isPhone && marking && !marking.active ? markingToggle(true) : null}
+          >
             {board.products.map((p) => (
               <Tile
                 key={p.id}
@@ -140,6 +156,7 @@ export function MenuBoard({
                 name={p.name}
                 tag={point.name}
                 price={p.price}
+                qty={marking?.active ? 0 : cartQty(p.id)}
                 soldOut={soldOut.product(p.id)}
                 marking={marking?.active}
                 pending={marking?.pending === `product:${p.id}`}
@@ -170,20 +187,24 @@ export function MenuBoard({
   );
 }
 
-function Grid({ title, count, cols, children }: { title: string; count: number; cols: string; children: ReactNode }) {
+function Grid({ title, count, cols, action, children }: { title: string; count: number; cols: string; action?: ReactNode; children: ReactNode }) {
   return (
-    <div className="flex flex-col gap-3">
-      <h3 className="flex items-baseline gap-2 text-[17px] font-bold md:text-xl">
-        {title}
-        <span className="num text-base font-normal text-ink-subtle">({count})</span>
-      </h3>
-      <div className={`grid gap-3 ${cols}`}>{children}</div>
+    <div className="flex flex-col gap-2 md:gap-3">
+      <div className="flex items-center gap-2">
+        <h3 className="flex flex-1 items-baseline gap-2 text-[17px] font-bold md:text-xl">
+          {title}
+          <span className="num text-base font-normal text-ink-subtle">({count})</span>
+        </h3>
+        {action}
+      </div>
+      <div className={`grid gap-2 md:gap-3 ${cols}`}>{children}</div>
     </div>
   );
 }
 
 /**
  * Thẻ món kiểu Makaryo: ô minh họa ở trên, tên, nhãn + giá ở dưới. Combo nền cam nhạt.
+ * Điện thoại (Figma MS1): thẻ cao 140px không có ô minh họa, tên to, nhãn + giá ở đáy thẻ.
  * Đang hết ⇒ mờ + nhãn "Hết"; ngoài chế độ đánh dấu thì không bấm được.
  */
 function Tile({
@@ -193,6 +214,7 @@ function Tile({
   price,
   onClick,
   combo,
+  qty = 0,
   soldOut = false,
   marking = false,
   pending = false,
@@ -203,6 +225,8 @@ function Tile({
   price: number;
   onClick: () => void;
   combo?: boolean;
+  /** Số phần đang có trong giỏ (0 ⇒ không hiện). */
+  qty?: number;
   soldOut?: boolean;
   marking?: boolean;
   pending?: boolean;
@@ -216,8 +240,8 @@ function Tile({
       disabled={disabled}
       data-testid={testId}
       data-sold-out={soldOut || undefined}
-      aria-label={soldOut ? `${name} (hết)` : undefined}
-      className={`relative flex min-w-0 flex-col gap-2 rounded-2xl border p-2 text-left transition-colors duration-fast disabled:cursor-not-allowed ${
+      aria-label={soldOut ? `${name} (hết)` : qty > 0 ? `${name} (${qty} trong giỏ)` : undefined}
+      className={`relative flex h-[140px] min-w-0 flex-col gap-2 rounded-2xl border p-3.5 text-left transition-colors duration-fast disabled:cursor-not-allowed md:h-auto md:p-2 ${
         soldOut
           ? `border-dashed border-line-strong bg-surface-sunken ${marking ? 'hover:border-brand' : ''}`
           : combo
@@ -230,14 +254,23 @@ function Tile({
           Hết
         </span>
       )}
+      {qty > 0 && !soldOut && (
+        <span
+          aria-hidden
+          className="num absolute right-2.5 top-2.5 z-[1] flex h-7 min-w-7 items-center justify-center rounded-full bg-brand-strong px-1.5 text-sm font-bold text-white"
+          data-testid={`${testId}-qty`}
+        >
+          {qty}
+        </span>
+      )}
       <span
         aria-hidden
-        className={`flex w-full items-center justify-center rounded-[10px] ${soldOut ? 'opacity-40 grayscale' : ''} ${combo ? 'h-[64px] bg-brand-tint text-brand md:h-[72px]' : 'h-[72px] bg-surface-muted text-brand-light md:h-[92px]'}`}
+        className={`hidden w-full items-center justify-center rounded-[10px] md:flex ${soldOut ? 'opacity-40 grayscale' : ''} ${combo ? 'h-[72px] bg-brand-tint text-brand' : 'h-[92px] bg-surface-muted text-brand-light'}`}
       >
-        <Icon className="h-8 w-8 md:h-[34px] md:w-[34px]" />
+        <Icon className="h-[34px] w-[34px]" />
       </span>
-      <span className={`flex w-full flex-col gap-1.5 px-1 pb-1 ${soldOut ? 'opacity-55' : ''}`}>
-        <span className={`line-clamp-2 text-base font-semibold leading-snug ${soldOut ? 'line-through' : ''}`}>{name}</span>
+      <span className={`flex w-full flex-1 flex-col justify-end gap-2 md:flex-none md:gap-1.5 md:px-1 md:pb-1 ${soldOut ? 'opacity-55' : ''}`}>
+        <span className={`line-clamp-2 text-lg font-bold leading-snug md:text-base md:font-semibold ${soldOut ? 'line-through' : ''}`}>{name}</span>
         <span className="flex items-center gap-1.5">
           <span className={`badge min-w-0 truncate rounded-md px-2 text-xs ${combo ? 'bg-brand-tint text-brand-deep' : 'bg-warning-soft text-warning-strong'}`}>{tag}</span>
           <span className="flex-1" />

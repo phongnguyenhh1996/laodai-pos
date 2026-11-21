@@ -13,7 +13,8 @@ describe('parsePushResult', () => {
   it('ok / duplicate kèm đơn (chỉ giữ trường của Order) hoặc ca; rejected kèm lý do', () => {
     const item = { id: 'i', product_id: 'p', name_snap: 'n', unit_price_snap: 1, qty: 1, toppings_snap: [], sort: 1 };
     const r = parsePushResult({ status: 'ok', order: { ...ORDER, items: [item] } });
-    expect(r).toEqual({ status: 'ok', order: { ...ORDER, recalculated_at: undefined, address: null, items: [{ ...item, sort: undefined }] } });
+    // Server cũ chưa có cột phí ship ⇒ 0.
+    expect(r).toEqual({ status: 'ok', order: { ...ORDER, recalculated_at: undefined, address: null, ship_fee: 0, items: [{ ...item, sort: undefined }] } });
     expect(Object.keys((r as { order: object }).order)).not.toContain('recalculated_at');
     expect(parsePushResult({ status: 'duplicate', order: ORDER })).toMatchObject({ status: 'duplicate', order: { items: [] } });
     expect(parsePushResult({ status: 'ok', shift: { id: 's' } })).toEqual({ status: 'ok', shift: { id: 's' } });

@@ -195,6 +195,14 @@ export class FakeServer {
       return o;
     };
     const total = (items: OrderItem[]) => items.reduce((s, it) => s + (it.unit_price_snap + it.toppings_snap.reduce((t, x) => t + x.price, 0)) * it.qty, 0);
+    /** Như `private.order_ship_fee`. */
+    const shipFee = (x: Record<string, unknown>) => {
+      const v = (x.ship_fee as number | undefined) ?? 0;
+      if (!Number.isInteger(v) || v < 0) throw new Reject('bad_ship_fee');
+      if (x.dine_type !== 'delivery') return 0;
+      if (v > 50_000 || v % 1000 !== 0) throw new Reject('bad_ship_fee');
+      return v;
+    };
 
     switch (op.kind) {
       case 'open_shift': {
@@ -229,7 +237,8 @@ export class FakeServer {
         const items = p.items as OrderItem[];
         if (s.id !== o.opened_shift_id) throw new Reject('bad_shift');
         if (!items?.length) throw new Reject('empty_items');
-        if (total(items) !== o.total) throw new Reject('total_mismatch');
+        const ship_fee = shipFee(o);
+        if (total(items) + ship_fee !== o.total) throw new Reject('total_mismatch');
         if (o.dine_type === 'delivery' && !o.address) throw new Reject('address_required');
         if (this.order(o.id as string)) throw new Reject('order_exists');
         const customer_id = this.shipCustomer(o.dine_type as string, (o.address as string | null) ?? null, p.customer);
@@ -252,6 +261,7 @@ export class FakeServer {
           paid_at: null,
           deleted_at: null,
           delete_reason: null,
+          ship_fee,
           total: o.total as number,
           payment_method: null,
           cash_given: null,
@@ -265,7 +275,8 @@ export class FakeServer {
       case 'update_order': {
         const o = open(p.order_id);
         const items = p.items as OrderItem[];
-        if (total(items) !== p.total) throw new Reject('total_mismatch');
+        const ship_fee = shipFee(p);
+        if (total(items) + ship_fee !== p.total) throw new Reject('total_mismatch');
         if (p.dine_type === 'delivery' && !p.address) throw new Reject('address_required');
         const customer_id = this.shipCustomer(p.dine_type as string, p.address as string | null, p.customer);
         Object.assign(o, {
@@ -276,6 +287,7 @@ export class FakeServer {
           label: p.label ?? null,
           table_no: p.table_no ?? null,
           items: clone(items),
+          ship_fee,
           total: p.total,
         });
         return { data: { order: clone(o) }, catalog: !!customer_id };

@@ -7,6 +7,7 @@ import {
   canSwitchPoint,
   draftAddress,
   draftChanged,
+  draftShipFee,
   draftTotal,
   itemsSummary,
   lineSummary,
@@ -20,6 +21,7 @@ import {
   type DraftCustomer,
   stepLineQty,
   switchPoint,
+  toggleShipFee,
 } from './cart';
 import { CANH, CHA, COMBOS, COMBO_XOI_FULL, COM_GA, COM_MENU, DUA, PRODUCTS, TOPPINGS, TRUNG, XOI_CU, XOI_GA, XOI_MENU, XOI_XEO } from './fixtures';
 import { PricingError } from './pricing';
@@ -183,6 +185,27 @@ describe('cart', () => {
     expect(draftChanged({ ...ship, address: '12 Lê Lợi ' }, saved)).toBe(false);
     expect(draftChanged({ ...ship, address: '14 Lê Lợi' }, saved)).toBe(true);
     expect(draftChanged({ ...d, address: '12 Lê Lợi' }, saved)).toBe(true);
+  });
+
+  it('phí ship: bấm mức ⇒ cộng vào tổng, bấm lại ⇒ bỏ; chỉ đơn ship có phí; đổi khỏi Ship ⇒ phí 0; đổi phí ⇒ có thay đổi', () => {
+    const items = addProduct([], 'l1', XOI_XEO, [], XOI_MENU); // 15.000
+    const ship = setDineType({ ...newDraft(XOI_A), items }, 'delivery');
+    expect(newDraft(XOI_A).ship_fee).toBe(0);
+    const a = toggleShipFee(ship, 10_000);
+    expect(draftTotal(a)).toBe(25_000);
+    expect(draftTotal(toggleShipFee(a, 15_000))).toBe(30_000);
+    expect(toggleShipFee(a, 10_000).ship_fee).toBe(0);
+    // Phí còn trong nháp nhưng không phải đơn ship ⇒ không tính, không gửi.
+    expect(draftShipFee({ ...a, dine_type: 'takeaway' })).toBe(0);
+    expect(draftTotal({ ...a, dine_type: 'takeaway' })).toBe(15_000);
+    expect(setDineType(a, 'takeaway').ship_fee).toBe(0);
+    expect(setDineType(a, 'delivery').ship_fee).toBe(10_000);
+
+    const saved = { point_id: 'xoi-a', dine_type: 'delivery' as DineType, label: null, address: null, items, ship_fee: 10_000 };
+    expect(draftChanged(a, saved)).toBe(false);
+    expect(draftChanged(toggleShipFee(a, 20_000), saved)).toBe(true);
+    // Đơn ship cũ (chưa có cột phí) mở lại, không chọn phí ⇒ không bị coi là đã sửa.
+    expect(draftChanged(ship, { ...saved, ship_fee: undefined })).toBe(false);
   });
 
   it('khách đơn ship: chọn khách điền sẵn địa chỉ (không đè địa chỉ tự gõ); đổi khách ⇒ có thay đổi; không phải ship ⇒ bỏ khách', () => {

@@ -121,6 +121,9 @@ export interface Order {
   paid_at: string | null;
   deleted_at: string | null;
   delete_reason: DeleteReason | null;
+  /** Phí ship (chỉ đơn ship, 0 nếu không có), đã nằm trong `total`. */
+  ship_fee: Money;
+  /** Tiền món + phí ship. */
   total: Money;
   payment_method: PaymentMethod | null;
   cash_given: Money | null;

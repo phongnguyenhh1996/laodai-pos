@@ -106,6 +106,16 @@ describe('bill', () => {
     );
   });
 
+  it('đơn ship có phí: dòng "Phí ship" trước Tổng; phí 0 thì không in; phiếu bếp không có phí', () => {
+    const t = off('bill', ['shop_name', 'point', 'phone', 'address', 'time', 'dine', 'label', 'unit_price', 'thanks', 'no_bill_free']);
+    const ship = doc({ dine_type: 'delivery', ship_fee: 10000, total: 87000 });
+    expect(linesToText(layoutBill({ doc: ship, template: t, tz: TZ }))).toBe(
+      'F15\n- - -\n2 x Xôi gà | 62.000\n   + Trứng\n1 x Xôi xéo | 15.000\nPhí ship | 10.000\n---\nTỔNG | 87.000\n---',
+    );
+    expect(linesToText(layoutBill({ doc: doc({ ship_fee: 0 }), template: t, tz: TZ }))).not.toContain('Phí ship');
+    expect(linesToText(layoutKitchen({ doc: ship, template: tpl(), tz: TZ }))).not.toContain('10.000');
+  });
+
   it('không bao giờ in hình thức thanh toán / tiền đưa / nợ / nhân viên, kể cả khi dữ liệu lọt vào', () => {
     const leaky = { ...doc(), payment_method: 'debt', cash_given: 500000, customer: 'Dũng', staff_name: 'Lan' } as unknown as PrintDoc;
     const text = linesToText(layoutBill({ doc: leaky, template: tpl(), tz: TZ }));

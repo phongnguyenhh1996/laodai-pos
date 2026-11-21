@@ -122,6 +122,12 @@ export function PayScreen() {
                 <span className="num shrink-0 font-medium">{formatVnd(lineTotal(it))}</span>
               </li>
             ))}
+            {o.ship_fee > 0 && (
+              <li className="flex items-baseline justify-between gap-3 text-ink-muted" data-testid="pay-ship-fee">
+                <span className="min-w-0">Phí ship</span>
+                <span className="num shrink-0 font-medium">{formatVnd(o.ship_fee)}</span>
+              </li>
+            )}
           </ul>
           <div className="flex flex-col gap-1 rounded-xl border border-brand-line bg-brand-soft px-[18px] py-4">
             <span className="text-[15px] font-medium text-brand-deep">Cần thu</span>

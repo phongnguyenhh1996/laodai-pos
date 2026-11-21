@@ -484,6 +484,14 @@ function EditForm({ order, cat }: { order: EditableOrder; cat: EditCatalog }) {
       </div>
       {draft.payment_method === 'debt' && <CustomerPicker customers={cat.customers} chosenId={draft.customer_id} onPick={(id) => update((d) => setEditCustomer(d, id))} />}
       <div className={`${card} divide-y divide-line px-4 py-2`}>
+        {order.ship_fee > 0 && (
+          <p className="flex items-center justify-between py-[9px] text-sm leading-[18px]">
+            <span className="text-[#6d6d6d]">Phí ship (giữ nguyên)</span>
+            <b className="num font-semibold" data-testid="edit-ship-fee">
+              {formatVnd(order.ship_fee)}
+            </b>
+          </p>
+        )}
         <p className="flex items-center justify-between py-[9px] text-sm leading-[18px]">
           <span className="text-[#6d6d6d]">Tổng trước</span>
           <b className="num font-semibold" data-testid="edit-total-before">

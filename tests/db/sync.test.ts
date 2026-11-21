@@ -82,6 +82,42 @@ describe('sync_push', () => {
     expect((await sql('select private.customer_balance($1) b', [gv]))[0].b).toBe(0);
   });
 
+  it('phí ship: tổng = món + phí; phí sai bị từ chối; mang về bỏ phí; chủ sửa món giữ phí; doanh thu tách phí ship', async () => {
+    const ship = { dine_type: 'delivery', address: '12 Lê Lợi' };
+    const noFee = await sim.createOrder([item('xoiGa')], { ...ship, ship_fee: 10000 });
+    expect(noFee.result).toEqual({ status: 'rejected', reason: 'total_mismatch' });
+    for (const bad of [7500, 60000, -5000]) {
+      const r = await sim.createOrder([item('xoiGa')], { ...ship, ship_fee: bad, total: 25000 + bad });
+      expect(r.result).toEqual({ status: 'rejected', reason: 'bad_ship_fee' });
+    }
+
+    const o = await sim.createOrder([item('xoiGa')], { ...ship, ship_fee: 10000, total: 35000 });
+    expect(o.result).toMatchObject({ status: 'ok' });
+    expect(await sql('select ship_fee, total from orders where id = $1', [o.id])).toEqual([{ ship_fee: 10000, total: 35000 }]);
+    const [n] = await sql(`select payload from notifications where kind = 'delivery_order'`);
+    expect(n.payload.order).toMatchObject({ ship_fee: 10000, total: 35000 });
+
+    const kept = { ...item('xoiGa'), id: (await sql('select id from order_items where order_id = $1', [o.id]))[0].id };
+    // Đổi phí thôi ⇒ không báo lại Telegram; tổng thiếu phí ⇒ từ chối.
+    expect(await sim.update(o.id, [kept], { ...ship, ship_fee: 15000, total: 40000 })).toMatchObject({ status: 'ok' });
+    expect(await sql(`select 1 from notifications where kind = 'delivery_order'`)).toHaveLength(1);
+    expect(await sim.update(o.id, [kept], { ...ship, ship_fee: 15000 })).toEqual({ status: 'rejected', reason: 'total_mismatch' });
+    // Mang về: phí gửi kèm bị bỏ (như địa chỉ) ⇒ tổng chỉ còn tiền món.
+    expect(await sim.update(o.id, [kept], { dine_type: 'takeaway', ship_fee: 15000 })).toMatchObject({ status: 'ok' });
+    expect(await sql('select ship_fee, total from orders where id = $1', [o.id])).toEqual([{ ship_fee: 0, total: 25000 }]);
+
+    expect(await sim.update(o.id, [kept], { ...ship, ship_fee: 20000, total: 45000 })).toMatchObject({ status: 'ok' });
+    expect(await sim.pay(o.id, 45000, 'cash')).toMatchObject({ status: 'ok' });
+    const owner = await ownerClient();
+    const { error } = await owner.rpc('owner_edit_order', { p_order: o.id, p_items: [{ ...kept, qty: 2 }] });
+    expect(error).toBeNull();
+    expect(await sql('select ship_fee, total from orders where id = $1', [o.id])).toEqual([{ ship_fee: 20000, total: 70000 }]);
+
+    const rec = (await sql('select private.reconcile_shift($1) r', [sim.shiftId]))[0].r;
+    expect(rec.revenue).toMatchObject({ total: 70000, cash: 70000, ship_fee: 20000 });
+    expect(rec.cash.expected - (await sql('select open_float from shifts where id = $1', [sim.shiftId]))[0].open_float).toBe(70000);
+  });
+
   it('gửi lại cùng một op hai lần thì chỉ có một bản ghi', async () => {
     const o = sim.createOrderOp([item('xoiGa')]);
     expect(await push(tab, o.op)).toMatchObject({ status: 'ok' });

@@ -9,6 +9,8 @@ export class DashboardError extends Error {}
 export interface Revenue extends MethodSplit {
   total: Money;
   orders: number;
+  /** Phần phí ship nằm trong `total` (chỉ có ở tổng, không có ở từng ngày / điểm của báo cáo). */
+  ship_fee?: Money;
 }
 
 export interface Dashboard {
