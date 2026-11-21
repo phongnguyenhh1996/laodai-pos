@@ -7,7 +7,7 @@ import { DELETE_REASON_LABELS, actionLabel, describeAudit, type AuditEntry } fro
 import { formatVnd } from '@/domain/money';
 import { businessDate, hhmm } from '@/domain/time';
 import { DINE_LABELS, type DeleteReason, type OrderStatus, type PaymentMethod } from '@/domain/types';
-import { actor, day, useLog, useNames, when } from '../log/LogPages';
+import { AuditFlags, actor, day, useLog, useNames, when } from '../log/LogPages';
 import { loadLog, loadOrderDetail, loadOrderPrints, type LogNames, type OrderDetail, type OrderPrintRow } from '../log/api';
 import { actionVisual } from '../log/visual';
 import { useOwner } from '../OwnerContext';
@@ -286,6 +286,7 @@ function TimelineRow({ e, names, last }: { e: AuditEntry; names: LogNames; last:
             {l}
           </span>
         ))}
+        <AuditFlags e={e} />
       </span>
     </li>
   );

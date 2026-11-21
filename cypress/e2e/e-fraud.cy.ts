@@ -90,7 +90,7 @@ describe('E. Kịch bản gian lận', () => {
         cy.ownerVisit(path);
         cy.get(tid('order-detail-status')).should('have.text', 'Đã xóa');
         cy.get(tid('order-detail-times')).should('contain.text', 'Khách bỏ về').and('contain.text', 'Ra món');
-        cy.get('[data-testid=log-row][data-action=order_delete]').should('contain.text', 'Lý do: Khách bỏ về · lúc xóa ⚠️ ĐÃ RA MÓN');
+        cy.get('[data-testid=log-row][data-action=order_delete]').should('contain.text', 'Lý do: Khách bỏ về · đã ra món → đã xóa');
         cy.get('[data-testid=log-row]').then(($r) => expect([...$r].map((r) => r.dataset.action)).to.deep.eq(['order_delete', 'order_serve', 'order_create']));
 
         // Báo cáo ca: mục bao bì của đơn bị xóa sau khi ra món

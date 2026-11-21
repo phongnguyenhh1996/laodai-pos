@@ -109,6 +109,26 @@ type OrderSnap = {
   items?: Array<Pick<OrderItem, 'qty' | 'name_snap' | 'toppings_snap'>>;
 };
 
+/** Tên bảng cài đặt (trigger audit_settings) → danh từ hiện trong nhật ký. */
+const SETTINGS_NOUNS: Record<string, string> = {
+  settings: 'Cài đặt chung',
+  staff: 'Nhân viên',
+  staff_details: 'Hồ sơ nhân viên',
+  menus: 'Menu',
+  points: 'Điểm bán',
+  tablet_profiles: 'Quầy',
+  products: 'Món',
+  toppings: 'Topping',
+  combos: 'Combo',
+};
+
+/** Nhãn cảnh báo đỏ dưới dòng nhật ký (Figma R28: "Xóa khi ĐÃ RA MÓN", "Hết giấy"). */
+export function auditFlags(e: Pick<AuditEntry, 'action' | 'before' | 'reason'>): string[] {
+  if (e.action === 'order_delete' && (e.before as OrderSnap | null)?.status === 'served') return ['Xóa khi ĐÃ RA MÓN'];
+  if (e.action === 'print_failed' && e.reason) return [e.reason];
+  return [];
+}
+
 const isOrderAction = (a: string) => a.startsWith('order_') || a === 'owner_edit_order' || a === 'debt_transfer';
 
 /** Các dòng mô tả thay đổi trước → sau (chỉ những gì đổi), để chủ chất vấn. */
@@ -127,9 +147,14 @@ export function describeAudit(e: Pick<AuditEntry, 'action' | 'before' | 'after' 
     const itemsA = itemsSummary(a?.items ?? []);
     if (b && a && itemsB !== itemsA) lines.push(`Món: ${itemsB} → ${itemsA}`);
     if (b && a && b.total !== a.total) lines.push(`Tổng: ${formatVnd(b.total ?? 0)} → ${formatVnd(a.total ?? 0)}`);
-    if (b && a && b.status !== a.status && a.status) lines.push(`Trạng thái: ${STATUS[b.status!] ?? b.status} → ${STATUS[a.status]}`);
-    if (b && a && (b.payment_method ?? null) !== (a.payment_method ?? null) && a.payment_method) {
-      lines.push(`Hình thức: ${b.payment_method ? METHOD[b.payment_method] : '—'} → ${METHOD[a.payment_method]}`);
+    // "Chờ ra món → đã thanh toán · tiền mặt" (Figma R28); xóa đơn thì trạng thái nằm ở dòng lý do.
+    const firstPay = !!b && !!a && !b.payment_method && !!a.payment_method;
+    if (b && a && b.status !== a.status && a.status && e.action !== 'order_delete') {
+      const from = STATUS[b.status!] ?? b.status ?? '—';
+      lines.push(`${from.charAt(0).toUpperCase()}${from.slice(1)} → ${STATUS[a.status]}${firstPay ? ` · ${METHOD[a.payment_method!]}` : ''}`);
+    } else if (firstPay) lines.push(`Hình thức: — → ${METHOD[a!.payment_method!]}`);
+    if (b && a && b.payment_method && a.payment_method && b.payment_method !== a.payment_method) {
+      lines.push(`Hình thức: ${METHOD[b.payment_method]} → ${METHOD[a.payment_method]}`);
     }
     if (b && a && b.dine_type !== a.dine_type) lines.push(`${dineLabel(b.dine_type)} → ${dineLabel(a.dine_type)}`);
     if (b && a && (b.address ?? null) !== (a.address ?? null)) lines.push(`Địa chỉ: ${b.address ?? '—'} → ${a.address ?? '—'}`);
@@ -139,7 +164,7 @@ export function describeAudit(e: Pick<AuditEntry, 'action' | 'before' | 'after' 
     const ca = (e.after as { customer_id?: string } | null)?.customer_id;
     if (b && a && cb !== ca && ca) lines.push(`Khách nợ: ${cb ? (names.customer?.(cb) ?? cb) : '—'} → ${names.customer?.(ca) ?? ca}`);
     if (e.action === 'order_delete') {
-      lines.unshift(`Lý do: ${DELETE_REASON_LABELS[e.reason as DeleteReason] ?? e.reason ?? '—'} · lúc xóa ${b?.status === 'served' ? '⚠️ ĐÃ RA MÓN' : 'chưa ra món'}`);
+      lines.unshift(`Lý do: ${DELETE_REASON_LABELS[e.reason as DeleteReason] ?? e.reason ?? '—'} · ${b?.status === 'served' ? 'đã ra món' : 'chưa ra món'} → đã xóa`);
       if (b) lines.push(`${itemsSummary(b.items ?? [])} · ${formatVnd(b.total ?? 0)}`);
     }
     if (lines.length === 0 && ref) lines.push(`${itemsSummary(ref.items ?? [])} · ${formatVnd(ref.total ?? 0)}`);
@@ -152,8 +177,7 @@ export function describeAudit(e: Pick<AuditEntry, 'action' | 'before' | 'after' 
     const code = after.order_code ? ` đơn ${String(after.order_code)}` : '';
     const where = after.tablet_name ? ` · ${String(after.tablet_name)}` : '';
     lines.push(`${kind}${code} · ${PRINT_SOURCE[String(after.source)] ?? String(after.source ?? '')}${where}`);
-    if (e.action === 'print_failed' && e.reason) lines.push(`Lỗi: ${e.reason}`);
-    return lines;
+    return lines; // lỗi in hiện thành nhãn đỏ (auditFlags)
   }
   switch (e.action) {
     case 'shift_close':
@@ -211,7 +235,7 @@ export function describeAudit(e: Pick<AuditEntry, 'action' | 'before' | 'after' 
     case 'settings_update': {
       const before = (e.before ?? {}) as Record<string, unknown>;
       const changed = Object.keys(after).filter((k) => JSON.stringify(after[k]) !== JSON.stringify(before[k]) && k !== 'updated_at');
-      lines.push(`${e.entity}${after.name ? ` "${after.name}"` : ''}${e.action === 'settings_update' ? `: ${changed.map((k) => `${k} ${JSON.stringify(before[k])} → ${JSON.stringify(after[k])}`).join(', ')}` : ''}`);
+      lines.push(`${SETTINGS_NOUNS[e.entity] ?? e.entity}${after.name ? ` “${after.name}”` : ''}${e.action === 'settings_update' ? `: ${changed.map((k) => `${k} ${JSON.stringify(before[k])} → ${JSON.stringify(after[k])}`).join(', ')}` : ''}`);
       break;
     }
   }

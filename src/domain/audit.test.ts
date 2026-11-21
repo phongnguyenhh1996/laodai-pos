@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ACTION_GROUPS, actionLabel, actionsForFilter, describeAudit } from './audit';
+import { ACTION_GROUPS, actionLabel, actionsForFilter, auditFlags, describeAudit } from './audit';
 
 const item = (qty: number, name = 'Xôi gà', tops: string[] = []) => ({
   id: `${name}${qty}`, product_id: 'p', name_snap: name, unit_price_snap: 25_000, qty,
@@ -39,22 +39,21 @@ describe('nhật ký', () => {
       action: 'order_delete', entity: 'order', reason: 'customer_left',
       before: order(), after: order({ status: 'deleted' }),
     });
-    expect(lines[0]).toBe('Lý do: Khách bỏ về · lúc xóa ⚠️ ĐÃ RA MÓN');
-    expect(lines).toContain('Trạng thái: đã ra món → đã xóa');
+    expect(lines[0]).toBe('Lý do: Khách bỏ về · đã ra món → đã xóa');
+    expect(lines.some((l) => l.includes('→ đã xóa') && !l.startsWith('Lý do'))).toBe(false); // không lặp trạng thái
     expect(lines.at(-1)).toBe('2× Xôi gà (Trứng) · 62.000');
     expect(describeAudit({ action: 'order_delete', entity: 'order', reason: 'mistake', before: order({ status: 'open' }), after: null })[0]).toBe(
-      'Lý do: Bấm nhầm · lúc xóa chưa ra món',
+      'Lý do: Bấm nhầm · chưa ra món → đã xóa',
     );
   });
 
   it('tạo / ra món / thanh toán / chủ sửa: chỉ dòng thay đổi; không đổi gì thì tóm tắt đơn', () => {
     expect(describeAudit({ action: 'order_create', entity: 'order', reason: null, before: null, after: order() })).toEqual(['2× Xôi gà (Trứng) · 62.000']);
     expect(describeAudit({ action: 'order_serve', entity: 'order', reason: null, before: order({ status: 'open' }), after: order() })).toEqual([
-      'Trạng thái: chờ ra món → đã ra món',
+      'Chờ ra món → đã ra món',
     ]);
     expect(describeAudit({ action: 'order_pay', entity: 'order', reason: null, before: order(), after: order({ status: 'paid', payment_method: 'cash' }) })).toEqual([
-      'Trạng thái: đã ra món → đã thanh toán',
-      'Hình thức: — → tiền mặt',
+      'Đã ra món → đã thanh toán · tiền mặt',
     ]);
     expect(
       describeAudit({
@@ -100,8 +99,8 @@ describe('nhật ký', () => {
     ]);
     expect(
       describeAudit({ action: 'settings_update', entity: 'products', reason: null, before: { name: 'Xôi gà', price: 25_000 }, after: { name: 'Xôi gà', price: 28_000 } }),
-    ).toEqual(['products "Xôi gà": price 25000 → 28000']);
-    expect(describeAudit({ action: 'settings_create', entity: 'staff', reason: null, before: null, after: { name: 'Hà' } })).toEqual(['staff "Hà"']);
+    ).toEqual(['Món “Xôi gà”: price 25000 → 28000']);
+    expect(describeAudit({ action: 'settings_create', entity: 'staff', reason: null, before: null, after: { name: 'Hà' } })).toEqual(['Nhân viên “Hà”']);
     expect(d('tablet_login', {})).toEqual([]);
     expect(describeAudit({ action: 'owner_mode', entity: 'tablet_profile', reason: null, before: null, after: null })).toEqual([]);
   });
@@ -111,12 +110,11 @@ describe('nhật ký', () => {
     expect(describeAudit({ ...empty, before: {}, after: {} })).toEqual([' · 0']);
     expect(describeAudit({ ...empty, before: null, after: null })).toEqual([]);
     expect(describeAudit({ ...empty, action: 'order_create', before: null, after: {} })).toEqual([' · 0']);
-    expect(describeAudit({ ...empty, action: 'order_delete', reason: null, before: null, after: null })).toEqual(['Lý do: — · lúc xóa chưa ra món']);
-    expect(describeAudit({ ...empty, action: 'order_delete', reason: 'la', before: {}, after: {} })[0]).toBe('Lý do: la · lúc xóa chưa ra món');
+    expect(describeAudit({ ...empty, action: 'order_delete', reason: null, before: null, after: null })).toEqual(['Lý do: — · chưa ra món → đã xóa']);
+    expect(describeAudit({ ...empty, action: 'order_delete', reason: 'la', before: {}, after: {} })[0]).toBe('Lý do: la · chưa ra món → đã xóa');
     expect(describeAudit({ ...empty, before: { status: 'weird' }, after: { status: 'open', payment_method: 'cash', total: 1 } })).toEqual([
       'Tổng: 0 → 1',
-      'Trạng thái: weird → chờ ra món',
-      'Hình thức: — → tiền mặt',
+      'Weird → chờ ra món · tiền mặt',
     ]);
     expect(describeAudit({ ...empty, action: 'debt_transfer', before: { customer_id: 'a' }, after: { customer_id: 'b' } })).toEqual([
       'Khách nợ: a → b',
@@ -129,7 +127,7 @@ describe('nhật ký', () => {
     expect(d('debt_payment', {})).toEqual(['0 · chuyển khoản']);
     expect(d('seq_gap', {})).toEqual(['Thiếu số undefined (nhận được số undefined)']);
     expect(describeAudit({ action: 'settings_update', entity: 'settings', reason: null, before: null, after: { wait_red_min: 12, updated_at: 'x' } })).toEqual([
-      'settings: wait_red_min undefined → 12',
+      'Cài đặt chung: wait_red_min undefined → 12',
     ]);
   });
 });
@@ -179,7 +177,10 @@ describe('nhật ký in (SPEC 12.7)', () => {
       after: { kind: 'bill', order_code: 'A30', source: 'auto', tablet_name: 'Tablet A' },
       reason: 'Hết giấy',
     };
-    expect(describeAudit(e)).toEqual(['Bill đơn A30 · tự in · Tablet A', 'Lỗi: Hết giấy']);
+    expect(describeAudit(e)).toEqual(['Bill đơn A30 · tự in · Tablet A']);
+    expect(auditFlags(e)).toEqual(['Hết giấy']);
+    expect(auditFlags({ action: 'order_delete', reason: 'mistake', before: { status: 'served' } })).toEqual(['Xóa khi ĐÃ RA MÓN']);
+    expect(auditFlags({ action: 'order_delete', reason: 'mistake', before: { status: 'open' } })).toEqual([]);
     expect(describeAudit({ ...e, action: 'print_printed', after: { kind: 'test', source: 'owner' }, reason: null })).toEqual(['In thử · chủ gửi']);
     expect(actionLabel('print_expired')).toMatch(/hết hạn/);
     expect(actionsForFilter('print_issues')).toEqual(['print_failed', 'print_expired']);
