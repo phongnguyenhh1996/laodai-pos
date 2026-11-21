@@ -307,7 +307,7 @@ function ReportBody({ r, rangeLabel, isToday }: { r: Report; rangeLabel: string;
             </span>
             <span className="num flex flex-wrap items-center gap-x-1.5 text-xs leading-[15px] text-[#888]">
               {shortDate(businessDate(s.opened_at))} {hhmm(s.opened_at)}–{s.closed_at ? hhmm(s.closed_at) : 'đang mở'}
-              {s.status === 'closed' && (
+              {s.status === 'closed' && s.reconcile.cash.counted !== null && (
                 <span className={s.reconcile.cash.diff ? 'font-semibold text-[#b91c1c]' : ''} data-testid={`report-shift-${s.shift_id}-cash-diff`}>
                   Tiền mặt {formatSigned(s.reconcile.cash.diff ?? 0)}
                 </span>

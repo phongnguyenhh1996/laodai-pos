@@ -82,15 +82,21 @@ interface Revenue {
   ship_fee?: number;
 }
 
+export type CountItem = 'cash' | 'boxes' | 'plates' | 'cans';
+
 export interface Reconcile {
+  /** Các thứ ca này đếm (bản ghi cũ không có ⇒ tiền mặt, hộp, dĩa). Thứ không đếm thì không nhắc tới. */
+  count_items?: CountItem[];
   revenue: Revenue;
   paid_orders: number;
   debt_collected: { cash: number; transfer: number };
   cash: { expected: number; counted: number | null; diff: number | null };
   boxes: CountLine;
   plates: CountLine;
+  /** Bản ghi cũ không có. */
+  cans?: CountLine;
   deleted_count: number;
-  deleted_after_served: Array<{ order_id: string; code: string; boxes: number; plates: number }>;
+  deleted_after_served: Array<{ order_id: string; code: string; boxes: number; plates: number; cans?: number }>;
   open_orders: number;
 }
 
@@ -203,6 +209,16 @@ function revenueLines(r: Revenue): string[] {
   ];
 }
 
+const PACKS = [
+  ['boxes', 'Hộp', 'hộp'],
+  ['plates', 'Dĩa', 'dĩa'],
+  ['cans', 'Lon', 'lon'],
+] as const;
+
+const counts = (r: Reconcile): CountItem[] => r.count_items ?? ['cash', 'boxes', 'plates'];
+/** Bao bì ca này đếm, theo thứ tự Hộp · Dĩa · Lon. */
+const countedPacks = (r: Reconcile) => PACKS.filter(([k]) => counts(r).includes(k) && r[k]);
+
 export function shiftReport(r: Reconcile): string[] {
   const served = r.deleted_after_served.length;
   const lines = [
@@ -211,21 +227,29 @@ export function shiftReport(r: Reconcile): string[] {
   if (r.debt_collected.cash || r.debt_collected.transfer) {
     lines.push(`Thu nợ: TM ${vnd(r.debt_collected.cash)} · CK ${vnd(r.debt_collected.transfer)}`);
   }
-  lines.push(
-    r.cash.counted === null
-      ? `Tiền mặt: kỳ vọng ${vnd(r.cash.expected)} (chưa đếm)`
-      : `Tiền mặt: đếm ${vnd(r.cash.counted)} / kỳ vọng ${vnd(r.cash.expected)} → ${signed(r.cash.diff)}`,
-  );
-  lines.push(countLine('Hộp', r.boxes), countLine('Dĩa', r.plates));
+  if (counts(r).includes('cash')) {
+    lines.push(
+      r.cash.counted === null
+        ? `Tiền mặt: kỳ vọng ${vnd(r.cash.expected)} (chưa đếm)`
+        : `Tiền mặt: đếm ${vnd(r.cash.counted)} / kỳ vọng ${vnd(r.cash.expected)} → ${signed(r.cash.diff)}`,
+    );
+  }
+  lines.push(...countedPacks(r).map(([k, label]) => countLine(label, r[k]!)));
   lines.push(`Xóa: ${r.deleted_count} đơn (${served} đã ra món) · Đơn còn mở: ${r.open_orders}`);
   if (served) {
     lines.push(
       `Bao bì của đơn bị xóa sau khi ra món: ${r.deleted_after_served
-        .map((d) => `${d.code} (${d.boxes} hộp${d.plates ? `, ${d.plates} dĩa` : ''})`)
+        .map((d) => `${d.code} (${packList(d)})`)
         .join(', ')}`,
     );
   }
   return lines;
+}
+
+/** "3 hộp, 1 lon": chỉ ghi thứ có; không có gì ⇒ "0 hộp". */
+export function packList(d: { boxes: number; plates: number; cans?: number }): string {
+  const parts = PACKS.filter(([k]) => (d[k] ?? 0) > 0).map(([k, , unit]) => `${d[k]} ${unit}`);
+  return parts.join(', ') || '0 hộp';
 }
 
 function shiftIcon(r: Reconcile): string {
@@ -362,8 +386,11 @@ export function formatNotification(n: Notification, opts: FormatOptions): string
         lines.push('Ca:');
         for (const s of q.shifts) {
           const r = s.reconcile;
-          const cash = s.status === 'open' ? 'đang mở' : `TM ${signed(r.cash.diff)}`;
-          lines.push(`• ${who(s)}: ${cash} · Hộp ${signed(r.boxes.diff, false)} · Dĩa ${signed(r.plates.diff, false)}`);
+          const parts = [
+            s.status === 'open' ? 'đang mở' : counts(r).includes('cash') ? `TM ${signed(r.cash.diff)}` : '',
+            ...countedPacks(r).map(([k, label]) => `${label} ${signed(r[k]!.diff, false)}`),
+          ].filter(Boolean);
+          lines.push(`• ${who(s)}: ${parts.join(' · ')}`);
         }
       }
       if (q.open_orders) lines.push(`Đơn còn mở: ${q.open_orders}`);

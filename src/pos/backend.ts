@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { DebtHistory } from '@/domain/debt';
-import type { Order, OrderItem } from '@/domain/types';
+import { DEFAULT_COUNT_ITEMS, type Order, type OrderItem } from '@/domain/types';
 import { createSupabaseCatalogSource, type CatalogData } from './catalog';
 import type { OpenState, PushResult, TabletShift, WireOp } from './types';
 
@@ -93,7 +93,7 @@ export async function loadOpenStateFrom(client: SupabaseClient, profileId: strin
   const [sRes, oRes] = await Promise.all([
     client
       .from('shifts')
-      .select('id,tablet_profile_id,staff_id,opened_at,open_boxes,open_plates,open_float,staff(name)')
+      .select('id,tablet_profile_id,staff_id,opened_at,open_boxes,open_plates,open_cans,open_float,count_items,staff(name)')
       .eq('tablet_profile_id', profileId)
       .eq('status', 'open'),
     client.from('orders').select(ORDER_COLUMNS).eq('tablet_profile_id', profileId).in('status', ['open', 'served']),
@@ -110,7 +110,9 @@ export async function loadOpenStateFrom(client: SupabaseClient, profileId: strin
         opened_at: raw.opened_at,
         open_boxes: raw.open_boxes,
         open_plates: raw.open_plates,
+        open_cans: raw.open_cans ?? 0,
         open_float: raw.open_float,
+        count_items: raw.count_items ?? [...DEFAULT_COUNT_ITEMS],
       }
     : null;
   const orders = ((oRes.data ?? []) as unknown as RawOrder[]).map(({ order_items, ...o }) => ({

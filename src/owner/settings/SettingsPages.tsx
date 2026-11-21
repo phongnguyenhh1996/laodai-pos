@@ -427,7 +427,9 @@ function CardFields({
   onChange: (key: string, v: FormValue) => void;
 }) {
   const parts: FieldDef[][] = [];
-  for (const f of c.fields) {
+  const shown = c.fields.filter((f) => !f.when || f.when(form));
+  if (shown.length === 0) return <p className="text-[13px] leading-[18px] text-[#6d6d6d]">Không có gì cần nhập.</p>;
+  for (const f of shown) {
     const last = parts[parts.length - 1];
     const prev = last?.[last.length - 1];
     const join = prev && ((f.kind === 'bool' && prev.kind === 'bool') || (f.half && prev.half && last.length < 2));

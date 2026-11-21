@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { ReconcileResult } from '@/domain/reconcile';
-import type { AdjustmentKind, DeleteReason, DineType, Money, OrderStatus, PaymentMethod, ToppingSnap } from '@/domain/types';
+import type { AdjustmentKind, CountItem, DeleteReason, DineType, Money, OrderStatus, PaymentMethod, ToppingSnap } from '@/domain/types';
 
 /** Ca (mục 7, màn chủ số 2): danh sách ca → đối soát, đơn của ca, bổ sung hộp / dĩa / tiền giữa ca. */
 
@@ -17,9 +17,13 @@ export interface ShiftRow {
   status: 'open' | 'closed';
   open_boxes: number;
   open_plates: number;
+  open_cans: number;
   open_float: Money;
+  /** Các thứ ca này đếm khi đóng ca (chụp từ quầy lúc mở ca). */
+  count_items: CountItem[];
   close_boxes_left: number | null;
   close_plates_left: number | null;
+  close_cans_left: number | null;
   close_cash_counted: Money | null;
   recalculated_at: string | null;
 }
@@ -67,8 +71,8 @@ export interface ShiftDetail {
 }
 
 const SHIFT_COLUMNS =
-  'id,tablet_profile_id,staff_id,opened_at,closed_at,status,open_boxes,open_plates,open_float,' +
-  'close_boxes_left,close_plates_left,close_cash_counted,recalculated_at,staff(name),tablet_profiles(name)';
+  'id,tablet_profile_id,staff_id,opened_at,closed_at,status,open_boxes,open_plates,open_cans,open_float,count_items,' +
+  'close_boxes_left,close_plates_left,close_cans_left,close_cash_counted,recalculated_at,staff(name),tablet_profiles(name)';
 
 type RawShift = Omit<ShiftRow, 'staff_name' | 'tablet_name'> & { staff: { name: string } | null; tablet_profiles: { name: string } | null };
 

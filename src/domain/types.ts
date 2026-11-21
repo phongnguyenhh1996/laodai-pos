@@ -9,7 +9,12 @@ export type PointDineType = Exclude<DineType, 'delivery'>;
 export const DINE_LABELS: Record<DineType, string> = { dinein: 'Tại chỗ', takeaway: 'Mang về', delivery: 'Ship' };
 export type OrderStatus = 'open' | 'served' | 'paid' | 'deleted';
 export type PaymentMethod = 'cash' | 'transfer' | 'debt';
-export type AdjustmentKind = 'boxes' | 'plates' | 'cash';
+export type AdjustmentKind = 'boxes' | 'plates' | 'cans' | 'cash';
+/** Những thứ nhân viên đếm khi đóng ca (bật/tắt theo quầy). */
+export type CountItem = 'cash' | 'boxes' | 'plates' | 'cans';
+export const COUNT_ITEMS: readonly CountItem[] = ['cash', 'boxes', 'plates', 'cans'];
+/** Quầy cũ / chưa đặt: đếm tiền mặt, hộp, dĩa (chưa đếm lon). */
+export const DEFAULT_COUNT_ITEMS: readonly CountItem[] = ['cash', 'boxes', 'plates'];
 export type DeleteReason = 'mistake' | 'customer_left' | 'customer_changed' | 'other';
 
 export interface Settings {
@@ -40,7 +45,10 @@ export interface TabletProfile {
   point_ids: string[];
   default_boxes: number;
   default_plates: number;
+  default_cans: number;
   default_float: Money;
+  /** Các thứ phải đếm khi đóng ca; ca chụp lại lúc mở ⇒ đổi công tắc áp dụng từ ca sau. */
+  count_items: CountItem[];
   /** Công tắc in tự động (SPEC 12.2). Thiếu (dữ liệu cũ) ⇒ coi như bật. In tay lúc nào cũng in được. */
   auto_print_kitchen?: boolean;
   auto_reprint_kitchen_on_edit?: boolean;
@@ -64,6 +72,8 @@ export interface Product {
   boxes_takeaway: number;
   boxes_dinein: number;
   plates_dinein: number;
+  /** Lon mỗi phần (nước uống), tính như nhau cho mọi loại đơn. */
+  cans: number;
 }
 
 export interface Topping {
@@ -141,9 +151,12 @@ export interface Shift {
   closed_at: string | null;
   open_boxes: number;
   open_plates: number;
+  open_cans: number;
   open_float: Money;
+  count_items: CountItem[];
   close_boxes_left: number | null;
   close_plates_left: number | null;
+  close_cans_left: number | null;
   close_cash_counted: Money | null;
   status: 'open' | 'closed';
   recalculated_at: string | null;

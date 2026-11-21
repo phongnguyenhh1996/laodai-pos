@@ -17,7 +17,7 @@ const XOI_B = point({ id: 'xoi-b', name: 'Xôi B', sort: 2 });
 const COM = point({ id: 'com', name: 'Cơm gà', menu_id: COM_MENU, default_dine_type: 'dinein', sort: 3 });
 const POINTS = [COM, XOI_B, XOI_A];
 const PROFILE: TabletProfile = {
-  id: 'tab-a', name: 'Tablet A', point_ids: ['xoi-a', 'com'], default_boxes: 200, default_plates: 60, default_float: 500_000,
+  id: 'tab-a', name: 'Tablet A', point_ids: ['xoi-a', 'com'], default_boxes: 200, default_plates: 60, default_cans: 0, default_float: 500_000, count_items: ['cash', 'boxes', 'plates'],
 };
 
 const err = (fn: () => void) => {

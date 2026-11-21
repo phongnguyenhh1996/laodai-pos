@@ -7,7 +7,7 @@ import { TabletStore, browserNetwork, browserVisibility, type NetworkEnv, type V
 import type { OpenState, TabletShift } from './types';
 
 const SHIFT: TabletShift = {
-  id: 'sh1', tablet_profile_id: 'tab-a', staff_id: 's1', staff_name: 'Lan', opened_at: '', open_boxes: 1, open_plates: 1, open_float: 0,
+  id: 'sh1', tablet_profile_id: 'tab-a', staff_id: 's1', staff_name: 'Lan', opened_at: '', open_boxes: 1, open_plates: 1, open_cans: 0, open_float: 0, count_items: ['cash', 'boxes', 'plates'],
 };
 const order = (id: string, status: Order['status'] = 'open'): Order =>
   ({ id, status, tablet_profile_id: 'tab-a', items: [], total: 0 }) as unknown as Order;

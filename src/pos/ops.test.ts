@@ -47,7 +47,7 @@ describe('ca', () => {
 
   it('máy khác đã mở ca (máy này chưa thấy) ⇒ server từ chối, báo rõ, tải lại thấy ca đó', async () => {
     await boot(false);
-    server.shifts.push({ id: 'x', tablet_profile_id: 'tab-a', staff_id: 's2', staff_name: 'Mai', opened_at: '', open_boxes: 0, open_plates: 0, open_float: 0, status: 'open' });
+    server.shifts.push({ id: 'x', tablet_profile_id: 'tab-a', staff_id: 's2', staff_name: 'Mai', opened_at: '', open_boxes: 0, open_plates: 0, open_cans: 0, open_float: 0, count_items: ['cash', 'boxes', 'plates'], status: 'open' });
     await expect(pos.openShift({ staff_id: 's1' })).rejects.toThrow('có thể vừa mở ở máy khác');
     await vi.waitFor(() => expect(store.getSnapshot().open?.shift?.staff_name).toBe('Mai'));
   });
@@ -57,7 +57,7 @@ describe('ca', () => {
     const push = vi.spyOn(backend, 'push').mockResolvedValueOnce({ status: 'ok' });
     await expect(pos.openShift({ staff_id: 's1' })).rejects.toThrow('Không mở được ca');
     push.mockRestore();
-    server.shifts.push({ id: 'y', tablet_profile_id: 'tab-a', staff_id: 's1', staff_name: 'Lan', opened_at: '', open_boxes: 0, open_plates: 0, open_float: 0, status: 'open' });
+    server.shifts.push({ id: 'y', tablet_profile_id: 'tab-a', staff_id: 's1', staff_name: 'Lan', opened_at: '', open_boxes: 0, open_plates: 0, open_cans: 0, open_float: 0, count_items: ['cash', 'boxes', 'plates'], status: 'open' });
     vi.spyOn(backend, 'push').mockResolvedValueOnce({ status: 'duplicate' });
     store.setShift(null);
     expect(await pos.openShift({ staff_id: 's1' })).toMatchObject({ id: 'y' });
@@ -71,6 +71,15 @@ describe('ca', () => {
     expect(store.getSnapshot().open?.shift).toBeNull();
     expect(server.ops.at(-1)?.payload).toMatchObject({ boxes_left: 1, plates_left: 2, cash_counted: 3 });
     await expect(pos.closeShift({ boxes_left: 0, plates_left: 0, cash_counted: 0 })).rejects.toThrow('Chưa mở ca');
+  });
+
+  it('đóng ca: chỉ gửi và đòi số của các thứ quầy bật đếm (ca chụp lại lúc mở ca)', async () => {
+    server.catalog.profile = { ...server.catalog.profile, default_cans: 48, count_items: ['cash', 'cans'] };
+    await boot();
+    expect(store.getSnapshot().open?.shift).toMatchObject({ open_cans: 48, count_items: ['cash', 'cans'] });
+    await expect(pos.closeShift({ cash_counted: 0 })).rejects.toThrow('Số không hợp lệ: cans_left');
+    await pos.closeShift({ cans_left: 40, cash_counted: 100, boxes_left: 9 });
+    expect(server.ops.at(-1)?.payload).toEqual({ shift_id: expect.any(String), cans_left: 40, cash_counted: 100 });
   });
 });
 

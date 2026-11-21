@@ -129,7 +129,7 @@ export async function loadEditableOrder(client: SupabaseClient, orderId: string)
 
 export async function loadEditCatalog(client: SupabaseClient, menuId: string): Promise<EditCatalog> {
   const [p, t, c, cu] = await Promise.all([
-    client.from('products').select('id,menu_id,name,price,sort,active,boxes_takeaway,boxes_dinein,plates_dinein').eq('menu_id', menuId),
+    client.from('products').select('id,menu_id,name,price,sort,active,boxes_takeaway,boxes_dinein,plates_dinein,cans').eq('menu_id', menuId),
     client.from('toppings').select('id,menu_id,name,price,extra_box_takeaway,sort,active').eq('menu_id', menuId),
     client.from('combos').select('id,menu_id,name,product_id,topping_ids,sort,active').eq('menu_id', menuId),
     client.from('customers').select('id,name,description,phone,address,merged_into_id'),

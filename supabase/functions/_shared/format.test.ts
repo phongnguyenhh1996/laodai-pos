@@ -153,4 +153,22 @@ describe('định dạng Telegram', () => {
     expect(msg).toContain('Hộp: dùng ? / theo đơn 3');
     expect(msg).toContain('Thu nợ: TM 50.000 · CK 0');
   });
+
+  it('quầy chỉ đếm lon: không nhắc tiền mặt / hộp / dĩa; bao bì đơn xóa ghi lon', () => {
+    const r: Reconcile = {
+      ...rec, count_items: ['cans'], cash: { expected: 275_000, counted: null, diff: null },
+      boxes: { used: null, by_orders: 1, diff: null }, plates: { used: null, by_orders: 0, diff: null },
+      cans: { used: 6, by_orders: 5, diff: 1 },
+      deleted_after_served: [{ order_id: 'o9', code: 'H23', boxes: 0, plates: 0, cans: 1 }],
+    };
+    const msg = formatNotification({ kind: 'shift_close', payload: { ...base, ...ctx, reconcile: r, adjusted: false } }, opts);
+    expect(msg).toContain('Lon: dùng 6 / theo đơn 5 → +1');
+    expect(msg).toContain('H23 (1 lon)');
+    expect(msg).not.toMatch(/Tiền mặt|Hộp:|Dĩa:/);
+    const day = formatNotification(
+      { kind: 'daily_summary', payload: { ...(samples.find((s) => s.kind === 'daily_summary')!.payload as object), shifts: [{ ...ctx, status: 'closed', reconcile: r }] } } as Notification,
+      opts,
+    );
+    expect(day).toContain('• Lan – Tablet A: Lon +1');
+  });
 });

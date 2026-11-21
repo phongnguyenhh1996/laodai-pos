@@ -129,6 +129,22 @@ export function auditFlags(e: Pick<AuditEntry, 'action' | 'before' | 'reason'>):
   return [];
 }
 
+const ADJUST_UNIT: Record<string, string> = { boxes: 'hộp', plates: 'dĩa', cans: 'lon', cash: 'tiền lẻ' };
+
+/** "hộp 12 · lon 40 · tiền 500.000": số đầu ca / số đếm của các thứ ca này đếm (bản ghi cũ: hộp, dĩa, tiền). */
+function shiftCounts(s: Record<string, unknown>, at: 'open' | 'close'): string[] {
+  const items = Array.isArray(s.count_items) ? (s.count_items as string[]) : ['cash', 'boxes', 'plates'];
+  const out: string[] = [];
+  for (const [k, unit] of [['boxes', 'hộp'], ['plates', 'dĩa'], ['cans', 'lon']] as const) {
+    if (items.includes(k)) out.push(`${unit} ${String(s[at === 'open' ? `open_${k}` : `close_${k}_left`] ?? '?')}`);
+  }
+  if (items.includes('cash')) {
+    const v = Number((at === 'open' ? s.open_float : s.close_cash_counted) ?? 0);
+    out.push(`${at === 'open' ? 'tiền lẻ' : 'tiền'} ${formatVnd(v)}`);
+  }
+  return out;
+}
+
 const isOrderAction = (a: string) => a.startsWith('order_') || a === 'owner_edit_order' || a === 'debt_transfer';
 
 /** Các dòng mô tả thay đổi trước → sau (chỉ những gì đổi), để chủ chất vấn. */
@@ -182,13 +198,14 @@ export function describeAudit(e: Pick<AuditEntry, 'action' | 'before' | 'after' 
   switch (e.action) {
     case 'shift_close':
       // Nhật ký chỉ ghi số nhân viên đếm; đối soát xem ở báo cáo ca.
-      lines.push(`Đếm: hộp ${after.close_boxes_left} · dĩa ${after.close_plates_left} · tiền ${formatVnd(Number(after.close_cash_counted ?? 0))}`);
+      // Chỉ những thứ ca này đếm (bản ghi cũ: tiền, hộp, dĩa).
+      lines.push(`Đếm: ${shiftCounts(after, 'close').join(' · ') || 'không đếm gì'}`);
       break;
     case 'shift_open':
-      lines.push(`Đầu ca: hộp ${after.open_boxes} · dĩa ${after.open_plates} · tiền lẻ ${formatVnd(Number(after.open_float ?? 0))}`);
+      lines.push(`Đầu ca: ${shiftCounts(after, 'open').join(' · ') || 'không đếm gì'}`);
       break;
     case 'shift_adjust':
-      lines.push(`+${after.kind === 'cash' ? formatVnd(Number(after.qty)) : after.qty} ${after.kind === 'boxes' ? 'hộp' : after.kind === 'plates' ? 'dĩa' : 'tiền lẻ'}${after.note ? ` · ${after.note}` : ''}`);
+      lines.push(`+${after.kind === 'cash' ? formatVnd(Number(after.qty)) : after.qty} ${ADJUST_UNIT[String(after.kind)] ?? String(after.kind)}${after.note ? ` · ${after.note}` : ''}`);
       break;
     case 'debt_payment':
       lines.push(`${formatVnd(Number(after.amount ?? 0))} · ${after.method === 'cash' ? 'tiền mặt' : 'chuyển khoản'}`);

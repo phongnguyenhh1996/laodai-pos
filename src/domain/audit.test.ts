@@ -90,6 +90,11 @@ describe('nhật ký', () => {
     expect(d('shift_adjust', { kind: 'boxes', qty: 50, note: 'mang thêm' })).toEqual(['+50 hộp · mang thêm']);
     expect(d('shift_adjust', { kind: 'cash', qty: 200_000 })).toEqual(['+200.000 tiền lẻ']);
     expect(d('shift_adjust', { kind: 'plates', qty: 5 })).toEqual(['+5 dĩa']);
+    expect(d('shift_adjust', { kind: 'cans', qty: 24 })).toEqual(['+24 lon']);
+    // Quầy chỉ đếm lon + tiền: không nhắc hộp / dĩa
+    const cans = { count_items: ['cash', 'cans'], open_cans: 48, open_float: 200_000, close_cans_left: 40, close_cash_counted: 260_000, open_boxes: 0 };
+    expect(d('shift_open', cans)).toEqual(['Đầu ca: lon 48 · tiền lẻ 200.000']);
+    expect(d('shift_close', cans)).toEqual(['Đếm: lon 40 · tiền 260.000']);
     expect(d('debt_payment', { amount: 50_000, method: 'cash' })).toEqual(['50.000 · tiền mặt']);
     expect(d('debt_payment', { amount: 1, method: 'transfer' })).toEqual(['1 · chuyển khoản']);
     expect(d('customer_create', { name: 'Tú', description: 'bán vé số', phone: null })).toEqual(['Tú · bán vé số']);
@@ -122,8 +127,8 @@ describe('nhật ký', () => {
     expect(describeAudit({ ...empty, action: 'debt_transfer', before: {}, after: { customer_id: 'b' } })).toEqual(['Khách nợ: — → b']);
     expect(describeAudit({ ...empty, before: { label: 'A' }, after: {} })).toEqual(['Nhãn: A → —']);
     const d = (action: string, after: Record<string, unknown> | null) => describeAudit({ action, entity: 'x', reason: null, before: null, after });
-    expect(d('shift_close', null)).toEqual(['Đếm: hộp undefined · dĩa undefined · tiền 0']);
-    expect(d('shift_open', {})).toEqual(['Đầu ca: hộp undefined · dĩa undefined · tiền lẻ 0']);
+    expect(d('shift_close', null)).toEqual(['Đếm: hộp ? · dĩa ? · tiền 0']);
+    expect(d('shift_open', {})).toEqual(['Đầu ca: hộp ? · dĩa ? · tiền lẻ 0']);
     expect(d('debt_payment', {})).toEqual(['0 · chuyển khoản']);
     expect(d('seq_gap', {})).toEqual(['Thiếu số undefined (nhận được số undefined)']);
     expect(describeAudit({ action: 'settings_update', entity: 'settings', reason: null, before: null, after: { wait_red_min: 12, updated_at: 'x' } })).toEqual([

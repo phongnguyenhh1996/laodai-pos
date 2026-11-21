@@ -59,7 +59,7 @@ describe('reconcile: quy tắc', () => {
     // 200 + 50 − 230 = 20 hộp; theo đơn: xôi 2 + cơm mang về (1 + 2 topping thêm hộp) + cơm tại chỗ 0 + đơn mở 1 = 6
     expect(d.boxes).toEqual({ used: 20, by_orders: 6, diff: 14 });
     expect(d.plates).toEqual({ used: 1, by_orders: 1, diff: 0 });
-    expect(d.deleted_after_served).toEqual([{ order_id: expect.any(String), code: 'F24', boxes: 3, plates: 0 }]);
+    expect(d.deleted_after_served).toEqual([{ order_id: expect.any(String), code: 'F24', boxes: 3, plates: 0, cans: 0 }]);
   });
 
   it('đơn xóa có served_at sau deleted_at (dữ liệu lạ) không tính là "xóa sau khi ra món"', () => {

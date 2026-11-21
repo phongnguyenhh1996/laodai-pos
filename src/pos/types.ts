@@ -12,7 +12,7 @@ export interface Activation {
 /** Ca đang mở của hồ sơ tablet (trên server: chung cho mọi máy dùng hồ sơ này). */
 export type TabletShift = Pick<
   Shift,
-  'id' | 'tablet_profile_id' | 'staff_id' | 'opened_at' | 'open_boxes' | 'open_plates' | 'open_float'
+  'id' | 'tablet_profile_id' | 'staff_id' | 'opened_at' | 'open_boxes' | 'open_plates' | 'open_cans' | 'open_float' | 'count_items'
 > & { staff_name: string };
 
 export type OpKind =

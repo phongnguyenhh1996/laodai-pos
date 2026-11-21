@@ -711,6 +711,24 @@ describe('đóng ca', () => {
     const shifts = server.ops.filter((x) => x.kind === 'open_shift').map((x) => x.entity_id);
     expect(paid).toMatchObject({ opened_shift_id: shifts[0], paid_shift_id: shifts[1] });
   });
+
+  it('quầy tắt đếm dĩa, bật đếm lon: chỉ hiện ô hộp, lon, tiền; xác nhận ghi đúng các số đó', async () => {
+    server.catalog.profile = { ...server.catalog.profile, default_cans: 48, count_items: ['cash', 'boxes', 'cans'] };
+    await startShift('s1');
+    click('open-close-shift');
+    await screen.findByTestId('close-shift-screen');
+    expect(screen.queryByTestId('close-plates')).not.toBeInTheDocument();
+    fireEvent.change(tid('close-boxes'), { target: { value: '186' } });
+    fireEvent.change(tid('close-cans'), { target: { value: '40' } });
+    click('close-review');
+    expect(tid('close-error')).toHaveTextContent('Nhập đủ 3 ô');
+    fireEvent.change(tid('close-cash'), { target: { value: '545000' } });
+    click('close-review');
+    expect(tid('close-confirm-box')).toHaveTextContent('Hộp: 186 · Lon: 40 · Tiền mặt: 545.000');
+    click('close-confirm');
+    await screen.findByTestId('shift-closed');
+    expect(server.ops.at(-1)!.payload).toEqual({ shift_id: expect.any(String), boxes_left: 186, cans_left: 40, cash_counted: 545_000 });
+  });
 });
 
 describe('ghi nợ & thu nợ', () => {

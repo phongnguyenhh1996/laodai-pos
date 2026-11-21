@@ -14,21 +14,22 @@ async function loadCase(c: Case) {
   await withPg(async (db) => {
     for (const p of fixture.products) {
       await db.query(
-        `insert into products (id, menu_id, name, price, boxes_takeaway, boxes_dinein, plates_dinein) values ($1,$2,$3,0,$4,$5,$6)`,
-        [p.id, SEED.menus.xoi, p.name, p.boxes_takeaway, p.boxes_dinein, p.plates_dinein],
+        `insert into products (id, menu_id, name, price, boxes_takeaway, boxes_dinein, plates_dinein, cans) values ($1,$2,$3,0,$4,$5,$6,$7)`,
+        [p.id, SEED.menus.xoi, p.name, p.boxes_takeaway, p.boxes_dinein, p.plates_dinein, p.cans],
       );
     }
-    const s = c.input.shift;
+    const s: Case['input']['shift'] & { open_cans?: number; close_cans_left?: number | null; count_items?: string[]; closed?: boolean } = c.input.shift;
+    const open = s.closed === undefined ? s.close_cash_counted === null : !s.closed;
     for (const id of SHIFT_IDS) {
       const main = id === s.id;
       await db.query(
-        `insert into shifts (id, tablet_profile_id, staff_id, opened_at, open_boxes, open_plates, open_float,
-                             close_boxes_left, close_plates_left, close_cash_counted, status, closed_at)
-         values ($1,$2,$3,now(),$4,$5,$6,$7,$8,$9,$10,$11)`,
+        `insert into shifts (id, tablet_profile_id, staff_id, opened_at, open_boxes, open_plates, open_cans, open_float,
+                             close_boxes_left, close_plates_left, close_cans_left, close_cash_counted, status, closed_at, count_items)
+         values ($1,$2,$3,now(),$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
         [id, main ? SEED.tablets.A : SEED.tablets.B, SEED.staff.Lan,
-         main ? s.open_boxes : 0, main ? s.open_plates : 0, main ? s.open_float : 0,
-         main ? s.close_boxes_left : 0, main ? s.close_plates_left : 0, main ? s.close_cash_counted : 0,
-         main && s.close_cash_counted === null ? 'open' : 'closed', main && s.close_cash_counted === null ? null : new Date()],
+         main ? s.open_boxes : 0, main ? s.open_plates : 0, main ? (s.open_cans ?? 0) : 0, main ? s.open_float : 0,
+         main ? s.close_boxes_left : 0, main ? s.close_plates_left : 0, main ? (s.close_cans_left ?? null) : null, main ? s.close_cash_counted : 0,
+         main && open ? 'open' : 'closed', main && open ? null : new Date(), main ? (s.count_items ?? ['cash', 'boxes', 'plates']) : ['cash', 'boxes', 'plates']],
       );
     }
     for (const a of c.input.adjustments) {

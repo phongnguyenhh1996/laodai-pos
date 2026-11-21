@@ -278,6 +278,33 @@ describe('sync_push', () => {
     expect(n.payload.reconcile.boxes).toEqual({ used: 1, by_orders: 1, diff: 0 });
   });
 
+  it('quầy chỉ đếm lon + tiền: ca chụp công tắc lúc mở; đóng ca đòi đúng các số đó, bỏ hộp/dĩa; lon theo đơn', async () => {
+    await sim.closeShift(199, 60, 500000);
+    await sql(`update tablet_profiles set count_items = '{cash,cans}', default_cans = 48 where id = $1`, [SEED.tablets.A]);
+    await sql(`update products set cans = 1 where id = $1`, [SEED.products.xoiGa]);
+    const opened = (await sim.openShift('Mai')) as { shift?: Record<string, unknown> };
+    expect(opened.shift).toMatchObject({ open_cans: 48, count_items: ['cash', 'cans'] });
+    // Chủ đổi công tắc giữa ca ⇒ ca này không đổi.
+    await sql(`update tablet_profiles set count_items = '{cash,boxes,plates}' where id = $1`, [SEED.tablets.A]);
+
+    const o = await sim.createOrder([item('xoiGa', [], 3)]);
+    await sim.pay(o.id, o.total);
+    const id = sim.shiftId!;
+    const close = (p: Record<string, unknown>) => push(tab, op('close_shift', id, { shift_id: id, ...p }));
+    expect(await close({ cash_counted: 500000 })).toMatchObject({ status: 'rejected' });
+    expect(await close({ cans_left: 45, cash_counted: 500000 + o.total, boxes_left: 7 })).toMatchObject({ status: 'ok' });
+    expect(await sql('select close_boxes_left, close_plates_left, close_cans_left from shifts where id = $1', [id])).toEqual([
+      { close_boxes_left: null, close_plates_left: null, close_cans_left: 45 },
+    ]);
+    const [n] = await sql(`select payload from notifications where kind = 'shift_close' order by performed_at desc limit 1`);
+    expect(n.payload.reconcile).toMatchObject({
+      count_items: ['cash', 'cans'],
+      cans: { used: 3, by_orders: 3, diff: 0 },
+      boxes: { used: null, diff: null },
+      cash: { diff: 0 },
+    });
+  });
+
   it('thu nợ: lưu vào ca hiện tại, báo Telegram kèm dư nợ còn lại', async () => {
     const o = await sim.createOrder([item('xoiGa')]);
     await sim.pay(o.id, o.total, 'debt', { customer: { id: SEED.customers.dungGv, name: 'Dũng' } });

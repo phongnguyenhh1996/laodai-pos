@@ -1,5 +1,5 @@
 import { orderPackaging, type Packaging, type PackagingNorms } from './packaging';
-import type { AdjustmentKind, DineType, Money, OrderItem, OrderStatus, PaymentMethod } from './types';
+import { DEFAULT_COUNT_ITEMS, type AdjustmentKind, type CountItem, type DineType, type Money, type OrderItem, type OrderStatus, type PaymentMethod } from './types';
 
 /**
  * Đối soát cuối ca. Công thức này phải cho cùng kết quả với hàm SQL `reconcile_shift`
@@ -10,9 +10,13 @@ export interface ReconcileShift {
   id: string;
   open_boxes: number;
   open_plates: number;
+  /** Thiếu (dữ liệu cũ) ⇒ 0 / null / mặc định. */
+  open_cans?: number;
   open_float: Money;
+  count_items?: CountItem[];
   close_boxes_left: number | null;
   close_plates_left: number | null;
+  close_cans_left?: number | null;
   close_cash_counted: Money | null;
 }
 
@@ -47,6 +51,8 @@ export interface CountLine {
 }
 
 export interface ReconcileResult {
+  /** Các thứ ca này đếm; thứ không đếm ⇒ `used`/`diff` (hoặc `cash.counted`/`diff`) = null, giao diện ẩn hẳn. */
+  count_items: CountItem[];
   /** `ship_fee`: phần phí ship nằm trong `total` (không cộng thêm). */
   revenue: { total: Money; cash: Money; transfer: Money; debt: Money; ship_fee: Money };
   paid_orders: number;
@@ -54,8 +60,9 @@ export interface ReconcileResult {
   cash: { expected: Money; counted: Money | null; diff: Money | null };
   boxes: CountLine;
   plates: CountLine;
+  cans: CountLine;
   deleted_count: number;
-  deleted_after_served: Array<{ order_id: string; code: string; boxes: number; plates: number }>;
+  deleted_after_served: Array<{ order_id: string; code: string; boxes: number; plates: number; cans: number }>;
   open_orders: number;
 }
 
@@ -93,14 +100,16 @@ export function reconcileShift(input: ReconcileInput): ReconcileResult {
     .reduce<Packaging>(
       (acc, o) => {
         const p = orderPackaging(o, norms);
-        return { boxes: acc.boxes + p.boxes, plates: acc.plates + p.plates };
+        return { boxes: acc.boxes + p.boxes, plates: acc.plates + p.plates, cans: acc.cans + p.cans };
       },
-      { boxes: 0, plates: 0 },
+      { boxes: 0, plates: 0, cans: 0 },
     );
 
   const usedBoxes = shift.close_boxes_left === null ? null : shift.open_boxes + adj('boxes') - shift.close_boxes_left;
   const usedPlates =
     shift.close_plates_left === null ? null : shift.open_plates + adj('plates') - shift.close_plates_left;
+  const cansLeft = shift.close_cans_left ?? null;
+  const usedCans = cansLeft === null ? null : (shift.open_cans ?? 0) + adj('cans') - cansLeft;
 
   const deleted = openedHere.filter((o) => o.status === 'deleted');
   const deleted_after_served = deleted
@@ -109,12 +118,14 @@ export function reconcileShift(input: ReconcileInput): ReconcileResult {
     .map((o) => ({ order_id: o.id, code: o.code, ...orderPackaging(o, norms) }));
 
   return {
+    count_items: [...(shift.count_items ?? DEFAULT_COUNT_ITEMS)],
     revenue,
     paid_orders: paidHere.length,
     debt_collected,
     cash: { expected, counted, diff: counted === null ? null : counted - expected },
     boxes: { used: usedBoxes, by_orders: pack.boxes, diff: usedBoxes === null ? null : usedBoxes - pack.boxes },
     plates: { used: usedPlates, by_orders: pack.plates, diff: usedPlates === null ? null : usedPlates - pack.plates },
+    cans: { used: usedCans, by_orders: pack.cans, diff: usedCans === null ? null : usedCans - pack.cans },
     deleted_count: deleted.length,
     deleted_after_served,
     open_orders: openedHere.filter((o) => o.status === 'open' || o.status === 'served').length,

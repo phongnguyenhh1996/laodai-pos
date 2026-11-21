@@ -3,10 +3,13 @@ import type { SoldOut } from '@/domain/catalog';
 import { canConfirmCash } from '@/domain/cash';
 import { assertQty, orderTotal } from '@/domain/pricing';
 import { businessDate } from '@/domain/time';
-import type { DeleteReason, DineType, Money, Order, OrderItem } from '@/domain/types';
+import type { CountItem, DeleteReason, DineType, Money, Order, OrderItem } from '@/domain/types';
 import { PosNetworkError } from './backend';
 import type { TabletStore } from './store';
 import type { OpKind, PushResult, TabletShift, WireOp } from './types';
+
+/** Thứ cần đếm ⇒ khóa số gửi lên khi đóng ca. */
+export const CLOSE_KEY = { cash: 'cash_counted', boxes: 'boxes_left', plates: 'plates_left', cans: 'cans_left' } as const satisfies Record<CountItem, string>;
 
 /**
  * Thao tác của tablet: kiểm tra tại máy (để báo lỗi ngay), rồi ghi thẳng lên server qua `sync_push`.
@@ -258,12 +261,19 @@ export class Pos {
     return res.shift;
   }
 
-  /** Đếm mù: chỉ ghi số nhân viên đếm. Không trả về số kỳ vọng / chênh lệch. */
-  async closeShift(input: { boxes_left: number; plates_left: number; cash_counted: Money }): Promise<void> {
-    for (const [k, v] of Object.entries(input)) {
-      if (!Number.isInteger(v) || v < 0) throw new PosError(`Số không hợp lệ: ${k}`);
-    }
+  /**
+   * Đếm mù: chỉ ghi số nhân viên đếm. Không trả về số kỳ vọng / chênh lệch.
+   * Chỉ gửi (và bắt buộc) các thứ ca này đếm (`shift.count_items`).
+   */
+  async closeShift(counts: { boxes_left?: number; plates_left?: number; cans_left?: number; cash_counted?: Money }): Promise<void> {
     const shift = this.shift();
+    const input: Record<string, number> = {};
+    for (const item of shift.count_items) {
+      const k = CLOSE_KEY[item];
+      const v = counts[k];
+      if (v === undefined || !Number.isInteger(v) || v < 0) throw new PosError(`Số không hợp lệ: ${k}`);
+      input[k] = v;
+    }
     await this.send('close_shift', shift.id, () => ({ entity_id: shift.id, payload: { shift_id: shift.id, ...input } }));
     this.store.setShift(null);
   }

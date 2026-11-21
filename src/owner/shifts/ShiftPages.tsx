@@ -7,7 +7,7 @@ import { parseCountInput, parseMoneyInput } from '@/domain/catalog';
 import { formatSigned, formatVnd } from '@/domain/money';
 import { shiftDate, shortDate } from '@/domain/report';
 import { businessDate, hhmm } from '@/domain/time';
-import type { AdjustmentKind } from '@/domain/types';
+import { DEFAULT_COUNT_ITEMS, type AdjustmentKind } from '@/domain/types';
 import { useOwner } from '../OwnerContext';
 import { Chip, OwnerLayout } from '../OwnerLayout';
 import { KV, PageHead, Section, TONE, card } from '../ui';
@@ -167,6 +167,13 @@ function StatusChip({ s, diff }: { s: Pick<ShiftRow, 'status'>; diff: number | n
         Đang mở
       </Chip>
     );
+  if (diff === null)
+    return (
+      <Chip className={TONE.gray}>
+        <CircleCheck aria-hidden className="h-3.5 w-3.5" />
+        Đã đóng
+      </Chip>
+    );
   return diff ? (
     <Chip className={`num ${TONE.red}`}>
       <CircleAlert aria-hidden className="h-3.5 w-3.5" />
@@ -261,6 +268,10 @@ function ShiftBody({ detail, onChanged }: { detail: ShiftDetail; onChanged: () =
   const adj = (k: AdjustmentKind) => adjustments.filter((a) => a.kind === k).reduce((n, a) => n + a.qty, 0);
   const closed = s.status === 'closed';
   const diff = r.cash.diff ?? 0;
+  // Thứ ca này không đếm ⇒ ẩn hẳn (thẻ tiền mặt, cột bao bì, nút bổ sung).
+  const counts = s.count_items ?? DEFAULT_COUNT_ITEMS;
+  const countsCash = counts.includes('cash');
+  const packKinds = PACKS.filter((p) => counts.includes(p.kind));
   const debtIn = r.debt_collected.cash + r.debt_collected.transfer;
 
   const summary = (
@@ -298,7 +309,7 @@ function ShiftBody({ detail, onChanged }: { detail: ShiftDetail; onChanged: () =
       <div className="grid grid-cols-3 items-center gap-2">
         <Tile tone="bg-[#ffeee7]" value={<span data-testid="rep-revenue">{formatVnd(r.revenue.total)}</span>} label="Doanh thu" />
         <Tile tone="bg-[#f8f8f8]" value={<span data-testid="rep-paid-orders">{r.paid_orders}</span>} label="Đơn đã thu" />
-        {closed ? (
+        {closed && countsCash ? (
           <Tile tone={diff ? 'bg-[#fdecec]' : 'bg-[#e8f7ee]'} value={formatSigned(diff)} label="Chênh lệch tiền" />
         ) : (
           <Tile tone="bg-[#f8f8f8]" value={formatVnd(r.cash.expected)} label="Tiền mặt kỳ vọng" />
@@ -363,10 +374,10 @@ function ShiftBody({ detail, onChanged }: { detail: ShiftDetail; onChanged: () =
     </Section>
   );
 
-  const cells = (k: 'boxes' | 'plates') => {
+  const cells = (k: PackKind) => {
     const line = r[k];
-    const open = k === 'boxes' ? s.open_boxes : s.open_plates;
-    const left = k === 'boxes' ? s.close_boxes_left : s.close_plates_left;
+    const open = { boxes: s.open_boxes, plates: s.open_plates, cans: s.open_cans }[k];
+    const left = { boxes: s.close_boxes_left, plates: s.close_plates_left, cans: s.close_cans_left }[k];
     return {
       supply: (
         <span data-testid={`rep-${k}-supply`}>
@@ -386,20 +397,33 @@ function ShiftBody({ detail, onChanged }: { detail: ShiftDetail; onChanged: () =
       ),
     };
   };
-  const b = cells('boxes');
-  const p = cells('plates');
-  const packs = (
-    <section className={`${card} overflow-hidden`}>
-      <h2 className="p-3.5 text-base font-bold leading-5 tracking-normal">Hộp & dĩa</h2>
-      <div className={`${tableRow} bg-[#f8f8f8] py-2.5 text-xs font-medium leading-[15px] text-[#6d6d6d]`}>
+  const cols = packKinds.map((p) => ({ ...p, c: cells(p.kind) }));
+  const grid = { gridTemplateColumns: `minmax(0,1fr) ${cols.map(() => '64px').join(' ')}` };
+  const packRow = (label: string, key: 'supply' | 'left' | 'used' | 'diff') => (
+    <div style={grid} className={`${tableRow} num border-b border-line py-[11px] text-sm leading-[18px] last:border-b-0`}>
+      <span>{label}</span>
+      {cols.map((p) => (
+        <b key={p.kind} className="text-right font-semibold">
+          {p.c[key]}
+        </b>
+      ))}
+    </div>
+  );
+  const packs = cols.length > 0 && (
+    <section className={`${card} overflow-hidden`} data-testid="rep-packs">
+      <h2 className="p-3.5 text-base font-bold leading-5 tracking-normal">{joinVi(cols.map((p) => p.label))}</h2>
+      <div style={grid} className={`${tableRow} bg-[#f8f8f8] py-2.5 text-xs font-medium leading-[15px] text-[#6d6d6d]`}>
         <span />
-        <span className="text-right">Hộp</span>
-        <span className="text-right">Dĩa</span>
+        {cols.map((p) => (
+          <span key={p.kind} className="text-right">
+            {p.label}
+          </span>
+        ))}
       </div>
-      <PackRow label="Đầu ca + bổ sung" a={b.supply} b={p.supply} />
-      {closed && <PackRow label="Còn lại" a={b.left} b={p.left} />}
-      <PackRow label="Thực dùng / theo đơn" a={b.used} b={p.used} />
-      {closed && <PackRow label="Chênh lệch" a={b.diff} b={p.diff} />}
+      {packRow('Đầu ca + bổ sung', 'supply')}
+      {closed && packRow('Còn lại', 'left')}
+      {packRow('Thực dùng / theo đơn', 'used')}
+      {closed && packRow('Chênh lệch', 'diff')}
     </section>
   );
 
@@ -428,13 +452,21 @@ function ShiftBody({ detail, onChanged }: { detail: ShiftDetail; onChanged: () =
           <CircleAlert aria-hidden className="mt-px h-4 w-4 shrink-0" />
           <span>
             Bao bì của đơn bị xóa sau khi ra món:{' '}
-            <b data-testid="rep-deleted-after-served">{r.deleted_after_served.map((d) => `${d.code} (${d.boxes} hộp${d.plates ? `, ${d.plates} dĩa` : ''})`).join(', ')}</b>
+            <b data-testid="rep-deleted-after-served">
+              {r.deleted_after_served
+                .map((d) => {
+                  const used = packKinds.filter((p) => (d[p.kind] ?? 0) > 0).map((p) => `${d[p.kind]} ${p.unit}`);
+                  return used.length ? `${d.code} (${used.join(', ')})` : d.code;
+                })
+                .join(', ')}
+            </b>
           </span>
         </p>
       )}
     </Section>
   );
 
+  const adjustKinds: Array<[AdjustmentKind, string]> = [...packKinds.map((p) => [p.kind, p.label] as [AdjustmentKind, string]), ...(countsCash ? [['cash', 'Tiền lẻ'] as [AdjustmentKind, string]] : [])];
   const adjust = (
     <Section title="Bổ sung giữa ca" subtitle={adjustments.length === 0 ? 'Chưa có lần bổ sung nào' : `${adjustments.length} lần bổ sung`}>
       {adjustments.length > 0 && (
@@ -452,7 +484,7 @@ function ShiftBody({ detail, onChanged }: { detail: ShiftDetail; onChanged: () =
           ))}
         </ul>
       )}
-      <AdjustForm shiftId={s.id} onSaved={onChanged} />
+      {adjustKinds.length > 0 && <AdjustForm shiftId={s.id} kinds={adjustKinds} onSaved={onChanged} />}
     </Section>
   );
 
@@ -473,7 +505,7 @@ function ShiftBody({ detail, onChanged }: { detail: ShiftDetail; onChanged: () =
       {summary}
       <div className="flex flex-col gap-3.5 md:grid md:grid-cols-2 md:items-start md:gap-5">
         <div className="flex flex-col gap-3.5 md:gap-4">
-          {cash}
+          {countsCash && cash}
           {packs}
           {deletes}
         </div>
@@ -486,17 +518,19 @@ function ShiftBody({ detail, onChanged }: { detail: ShiftDetail; onChanged: () =
   );
 }
 
-const tableRow = 'grid grid-cols-[minmax(0,1fr)_64px_64px] items-center gap-2 px-3.5';
+const tableRow = 'grid items-center gap-2 px-3.5';
 
-function PackRow({ label, a, b }: { label: string; a: ReactNode; b: ReactNode }) {
-  return (
-    <div className={`${tableRow} num border-b border-line py-[11px] text-sm leading-[18px] last:border-b-0`}>
-      <span>{label}</span>
-      <b className="text-right font-semibold">{a}</b>
-      <b className="text-right font-semibold">{b}</b>
-    </div>
-  );
-}
+type PackKind = 'boxes' | 'plates' | 'cans';
+const PACKS: Array<{ kind: PackKind; label: string; unit: string }> = [
+  { kind: 'boxes', label: 'Hộp', unit: 'hộp' },
+  { kind: 'plates', label: 'Dĩa', unit: 'dĩa' },
+  { kind: 'cans', label: 'Lon', unit: 'lon' },
+];
+/** "Hộp & dĩa", "Hộp, dĩa & lon". */
+const joinVi = ([first = '', ...rest]: string[]) => {
+  const tail = rest.map((x) => x.toLowerCase());
+  return tail.length ? `${[first, ...tail.slice(0, -1)].join(', ')} & ${tail[tail.length - 1]}` : first;
+};
 
 function Tile({ tone, value, label, testId, to }: { tone: string; value: ReactNode; label: string; testId?: string; to?: string }) {
   const body = (
@@ -517,7 +551,7 @@ function Tile({ tone, value, label, testId, to }: { tone: string; value: ReactNo
   );
 }
 
-const KIND_LABEL: Record<AdjustmentKind, string> = { boxes: 'hộp', plates: 'dĩa', cash: 'tiền lẻ' };
+const KIND_LABEL: Record<AdjustmentKind, string> = { boxes: 'hộp', plates: 'dĩa', cans: 'lon', cash: 'tiền lẻ' };
 
 const STATUS: Record<ShiftOrderRow['status'], [string, keyof typeof TONE]> = {
   open: ['Chờ ra món', 'amber'],
@@ -553,9 +587,9 @@ function OrderLine({ o }: { o: ShiftOrderRow }) {
   );
 }
 
-function AdjustForm({ shiftId, onSaved }: { shiftId: string; onSaved: () => Promise<void> }) {
+function AdjustForm({ shiftId, kinds, onSaved }: { shiftId: string; kinds: Array<[AdjustmentKind, string]>; onSaved: () => Promise<void> }) {
   const { client } = useOwner();
-  const [kind, setKind] = useState<AdjustmentKind>('boxes');
+  const [kind, setKind] = useState<AdjustmentKind>(kinds[0][0]);
   const [qty, setQty] = useState('');
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
@@ -586,11 +620,7 @@ function AdjustForm({ shiftId, onSaved }: { shiftId: string; onSaved: () => Prom
   return (
     <form className="flex flex-col gap-3.5" onSubmit={submit} data-testid="adjust-form">
       <Segmented
-        items={[
-          ['boxes', 'Hộp'],
-          ['plates', 'Dĩa'],
-          ['cash', 'Tiền lẻ'],
-        ]}
+        items={kinds}
         value={kind}
         onChange={setKind}
         testIdPrefix="adjust-kind"

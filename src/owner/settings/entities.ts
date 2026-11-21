@@ -1,5 +1,5 @@
 // Mô tả từng loại cài đặt cho màn danh sách + màn sửa dùng chung (SettingsPages.tsx).
-import { Printer, type LucideIcon } from 'lucide-react';
+import { ListChecks, Printer, type LucideIcon } from 'lucide-react';
 import {
   CatalogError, checkCombo, checkMenu, checkPoint, checkProduct, checkStaff, checkTabletProfile, checkTopping,
   parseCountInput, parseMoneyInput,
@@ -7,7 +7,7 @@ import {
 import { formatVnd } from '@/domain/money';
 import { formatDate, formatPhone, parseBirthday, parseIdNumber, parsePhone, type StaffDetails } from '@/domain/payroll';
 import { comboPrice } from '@/domain/pricing';
-import type { Combo, PointDineType, Menu, Point, Product, Staff, TabletProfile, Topping } from '@/domain/types';
+import { COUNT_ITEMS, DEFAULT_COUNT_ITEMS, type Combo, type CountItem, type PointDineType, type Menu, type Point, type Product, type Staff, type TabletProfile, type Topping } from '@/domain/types';
 import type { OwnerCatalog, SettingsTable } from './api';
 
 export type FormValue = string | boolean | string[];
@@ -40,6 +40,8 @@ export interface FieldDef {
   half?: boolean;
   /** Đơn vị bên phải ô số (hộp, dĩa…). Ô tiền luôn có "đ". */
   unit?: string;
+  /** Chỉ hiện khi điều kiện đúng (vd. số đầu ca của thứ đang bật đếm). */
+  when?: (form: Form) => boolean;
 }
 
 type Row = { id: string; name: string; active?: boolean };
@@ -90,6 +92,9 @@ const firstMenu = (cat: OwnerCatalog) => cat.menus[0]?.id ?? '';
 const nextSort = (rows: Array<{ sort: number }>) => String(rows.reduce((m, r) => Math.max(m, r.sort), 0) + 1);
 const inactive = (label: string, active: boolean) => (active ? label : `${label} (ngừng)`);
 
+/** Ô đầu ca chỉ hiện khi quầy bật đếm thứ đó. */
+const counting = (k: CountItem) => (f: Form) => f[`count_${k}`] === true;
+
 const SORT_FIELD: FieldDef = { key: 'sort', label: 'Thứ tự hiển thị', kind: 'count' };
 /** Thẻ "Hiển thị" ở cột phải tablet: thứ tự + đang bán / đang làm. */
 const SHOW_SECTION: Partial<FieldDef> = { section: 'Hiển thị', side: true };
@@ -111,9 +116,10 @@ const products: EntityDef = {
     { key: 'menu_id', label: 'Menu', kind: 'select', options: menuOptions, createOnly: true },
     { key: 'name', label: 'Tên món', kind: 'text' },
     { key: 'price', label: 'Giá', kind: 'money', hint: PRICE_HINT },
-    { key: 'boxes_takeaway', label: 'Hộp khi mang về', kind: 'count', unit: 'hộp', section: 'Hộp & dĩa mỗi phần' },
+    { key: 'boxes_takeaway', label: 'Hộp khi mang về', kind: 'count', unit: 'hộp', section: 'Hộp, dĩa & lon mỗi phần' },
     { key: 'boxes_dinein', label: 'Hộp khi ăn tại chỗ', kind: 'count', unit: 'hộp', half: true },
     { key: 'plates_dinein', label: 'Dĩa khi ăn tại chỗ', kind: 'count', unit: 'dĩa', half: true },
+    { key: 'cans', label: 'Lon mỗi phần', kind: 'count', unit: 'lon', hint: 'Nước uống: tính như nhau cho tại chỗ, mang về, ship.' },
     { ...SORT_FIELD, ...SHOW_SECTION },
     { key: 'active', label: 'Đang bán', kind: 'bool' },
   ],
@@ -126,6 +132,7 @@ const products: EntityDef = {
       boxes_takeaway: String(p?.boxes_takeaway ?? 1),
       boxes_dinein: String(p?.boxes_dinein ?? 0),
       plates_dinein: String(p?.plates_dinein ?? 0),
+      cans: String(p?.cans ?? 0),
       sort: p ? String(p.sort) : nextSort(c.products),
       active: p?.active ?? true,
     };
@@ -138,6 +145,7 @@ const products: EntityDef = {
       boxes_takeaway: count(f, 'boxes_takeaway', 'Số hộp khi mang về'),
       boxes_dinein: count(f, 'boxes_dinein', 'Số hộp khi ăn tại chỗ'),
       plates_dinein: count(f, 'plates_dinein', 'Số dĩa khi ăn tại chỗ'),
+      cans: count(f, 'cans', 'Số lon mỗi phần'),
       sort: count(f, 'sort', 'Thứ tự'),
       active: bool(f, 'active'),
     };
@@ -378,7 +386,14 @@ const profiles: EntityDef = {
   summary: (r, c) => {
     const p = r as TabletProfile;
     const names = c.points.filter((x) => p.point_ids.includes(x.id)).map((x) => x.name);
-    return `${names.join(', ') || 'chưa có điểm bán'} · đầu ca ${p.default_boxes} hộp, ${p.default_plates} dĩa, ${formatVnd(p.default_float)} tiền lẻ`;
+    const counts = p.count_items ?? DEFAULT_COUNT_ITEMS;
+    const start = [
+      counts.includes('boxes') && `${p.default_boxes} hộp`,
+      counts.includes('plates') && `${p.default_plates} dĩa`,
+      counts.includes('cans') && `${p.default_cans ?? 0} lon`,
+      counts.includes('cash') && `${formatVnd(p.default_float)} tiền lẻ`,
+    ].filter(Boolean);
+    return `${names.join(', ') || 'chưa có điểm bán'} · ${start.length ? `đầu ca ${start.join(', ')}` : 'không đếm khi đóng ca'}`;
   },
   fields: [
     { key: 'name', label: 'Tên quầy', kind: 'text' },
@@ -390,9 +405,32 @@ const profiles: EntityDef = {
       sectionHint: 'Mỗi điểm thành một tab khi tạo đơn',
       options: (_f, c) => c.points.map((p) => ({ value: p.id, label: inactive(p.name, p.active) })),
     },
-    { key: 'default_boxes', label: 'Số hộp', kind: 'count', unit: 'hộp', half: true, section: 'Đầu ca mặc định', sectionHint: 'Nhân viên xác nhận lại khi mở ca' },
-    { key: 'default_plates', label: 'Số dĩa', kind: 'count', unit: 'dĩa', half: true },
-    { key: 'default_float', label: 'Tiền lẻ đầu ca', kind: 'money' },
+    {
+      key: 'default_boxes',
+      label: 'Số hộp',
+      kind: 'count',
+      unit: 'hộp',
+      half: true,
+      section: 'Đầu ca mặc định',
+      sectionHint: 'Chỉ hiện thứ đang bật đếm khi đóng ca',
+      when: counting('boxes'),
+    },
+    { key: 'default_plates', label: 'Số dĩa', kind: 'count', unit: 'dĩa', half: true, when: counting('plates') },
+    { key: 'default_cans', label: 'Số lon', kind: 'count', unit: 'lon', half: true, when: counting('cans') },
+    { key: 'default_float', label: 'Tiền lẻ đầu ca', kind: 'money', when: counting('cash') },
+    // Thứ nhân viên phải đếm khi đóng ca; ca chụp lại lúc mở ⇒ đổi áp dụng từ ca sau.
+    {
+      key: 'count_cash',
+      label: 'Tiền mặt đếm được',
+      kind: 'bool',
+      section: 'Đếm khi đóng ca',
+      sectionHint: 'Nhân viên phải nhập khi đóng ca · đổi áp dụng từ ca sau',
+      sectionIcon: ListChecks,
+      side: true,
+    },
+    { key: 'count_boxes', label: 'Số hộp còn lại', kind: 'bool' },
+    { key: 'count_plates', label: 'Số dĩa sạch còn lại', kind: 'bool' },
+    { key: 'count_cans', label: 'Số lon còn lại', kind: 'bool' },
     // SPEC 12.2: chỉ bật / tắt in TỰ ĐỘNG; bấm in tay lúc nào cũng in được.
     {
       key: 'auto_print_kitchen',
@@ -413,7 +451,9 @@ const profiles: EntityDef = {
       point_ids: p?.point_ids ?? [],
       default_boxes: String(p?.default_boxes ?? 0),
       default_plates: String(p?.default_plates ?? 0),
+      default_cans: String(p?.default_cans ?? 0),
       default_float: String(p?.default_float ?? 0),
+      ...Object.fromEntries(COUNT_ITEMS.map((k) => [`count_${k}`, (p?.count_items ?? DEFAULT_COUNT_ITEMS).includes(k)])),
       auto_print_kitchen: p?.auto_print_kitchen !== false,
       auto_reprint_kitchen_on_edit: p?.auto_reprint_kitchen_on_edit !== false,
       auto_print_bill: p?.auto_print_bill !== false,
@@ -426,7 +466,9 @@ const profiles: EntityDef = {
       point_ids: c.points.filter((p) => list(f, 'point_ids').includes(p.id)).map((p) => p.id),
       default_boxes: count(f, 'default_boxes', 'Số hộp đầu ca'),
       default_plates: count(f, 'default_plates', 'Số dĩa đầu ca'),
+      default_cans: count(f, 'default_cans', 'Số lon đầu ca'),
       default_float: money(f, 'default_float', 'Tiền lẻ đầu ca'),
+      count_items: COUNT_ITEMS.filter((k) => f[`count_${k}`] === true),
       auto_print_kitchen: f.auto_print_kitchen === true,
       auto_reprint_kitchen_on_edit: f.auto_reprint_kitchen_on_edit === true,
       auto_print_bill: f.auto_print_bill === true,

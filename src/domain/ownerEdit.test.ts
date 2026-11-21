@@ -4,7 +4,7 @@ import { editDraftFrom, editPayload, editProblem, editSummary, itemsChanged, set
 import type { OrderItem, Product } from './types';
 
 const xoiGa: Product = {
-  id: 'p-ga', menu_id: 'm-xoi', name: 'Xôi gà', price: 28_000, sort: 1, active: true, boxes_takeaway: 1, boxes_dinein: 1, plates_dinein: 0,
+  id: 'p-ga', menu_id: 'm-xoi', name: 'Xôi gà', price: 28_000, sort: 1, active: true, boxes_takeaway: 1, boxes_dinein: 1, plates_dinein: 0, cans: 0,
 };
 
 // Đơn đã thu: 2 × Xôi gà (+Trứng) giá cũ 25.000 ⇒ 62.000, tiền mặt

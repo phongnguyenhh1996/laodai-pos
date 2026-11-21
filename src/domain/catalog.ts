@@ -1,7 +1,7 @@
 // Danh mục (menu, món, topping, combo, điểm bán, nhân viên, hồ sơ tablet):
 // kiểm tra dữ liệu chủ nhập ở Cài đặt và cách tablet dựng bảng chọn từ danh mục đã đồng bộ.
 import { comboPrice, selectableCombos, selectableProducts, selectableToppings } from './pricing';
-import type { Combo, Menu, Money, Point, Product, Staff, TabletProfile, Topping } from './types';
+import { COUNT_ITEMS, type Combo, type Menu, type Money, type Point, type Product, type Staff, type TabletProfile, type Topping } from './types';
 
 export class CatalogError extends Error {}
 
@@ -133,6 +133,7 @@ export function checkProduct(
   checkCount(p.boxes_takeaway, 'Số hộp khi mang về');
   checkCount(p.boxes_dinein, 'Số hộp khi ăn tại chỗ');
   checkCount(p.plates_dinein, 'Số dĩa khi ăn tại chỗ');
+  checkCount(p.cans, 'Số lon mỗi phần');
 }
 
 export function checkTopping(
@@ -203,5 +204,9 @@ export function checkTabletProfile(
   }
   checkCount(p.default_boxes, 'Số hộp đầu ca');
   checkCount(p.default_plates, 'Số dĩa đầu ca');
+  checkCount(p.default_cans, 'Số lon đầu ca');
   checkCount(p.default_float, 'Tiền lẻ đầu ca');
+  if (p.count_items.some((k) => !COUNT_ITEMS.includes(k)) || new Set(p.count_items).size !== p.count_items.length) {
+    throw new CatalogError('Danh sách cần đếm khi đóng ca không hợp lệ');
+  }
 }

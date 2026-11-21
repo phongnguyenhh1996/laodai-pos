@@ -2,6 +2,7 @@
 // cấp mã đơn + số thứ tự, từ chối khi đơn / ca không còn mở, và báo thay đổi (live_pulse) cho mọi máy đang nghe.
 import type { SoldOut } from '@/domain/catalog';
 import { generateOrderCode } from '@/domain/orderCode';
+import { CLOSE_KEY } from '@/pos/ops';
 import { businessDate } from '@/domain/time';
 import type { Customer, Order, OrderItem } from '@/domain/types';
 import {
@@ -92,7 +93,9 @@ export class FakeServer {
           opened_at: s.opened_at,
           open_boxes: s.open_boxes,
           open_plates: s.open_plates,
+          open_cans: s.open_cans,
           open_float: s.open_float,
+          count_items: [...s.count_items],
         }
       : null;
     return clone({ shift, orders: this.openOrders(profileId) });
@@ -218,7 +221,9 @@ export class FakeServer {
           opened_at: now,
           open_boxes: prof.default_boxes,
           open_plates: prof.default_plates,
+          open_cans: prof.default_cans,
           open_float: prof.default_float,
+          count_items: [...prof.count_items],
           status: 'open',
         };
         this.shifts.push(s);
@@ -228,7 +233,14 @@ export class FakeServer {
         const s = shift();
         if (s.id !== p.shift_id) throw new Reject('bad_shift');
         s.status = 'closed';
-        s.close = { boxes_left: p.boxes_left, plates_left: p.plates_left, cash_counted: p.cash_counted, closed_at: now };
+        // Như `private.op_close_shift`: chỉ giữ (và đòi) số của các thứ ca này đếm.
+        s.close = { closed_at: now };
+        for (const item of s.count_items) {
+          const k = CLOSE_KEY[item];
+          const v = p[k];
+          if (typeof v !== 'number' || !Number.isInteger(v) || v < 0) throw new Reject(`bad_${k}`);
+          s.close[k] = v;
+        }
         return {};
       }
       case 'create_order': {

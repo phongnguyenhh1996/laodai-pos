@@ -1,23 +1,32 @@
-import { useState, type FormEvent } from 'react';
+import { Fragment, useState, type FormEvent } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
-import { Banknote, ChevronLeft, ChevronRight, CircleCheckBig, Package, Soup, TriangleAlert } from 'lucide-react';
+import { Banknote, ChevronLeft, ChevronRight, CircleCheckBig, CupSoda, Package, Soup, TriangleAlert, type LucideIcon } from 'lucide-react';
 import { parseCountInput, parseMoneyInput } from '@/domain/catalog';
 import { formatVnd } from '@/domain/money';
+import type { CountItem } from '@/domain/types';
 import { pos } from '@/lib/pos';
+import { CLOSE_KEY } from '@/pos';
 import { Splash, TextField, errorMessage } from '@/app/ui';
 import { Notice, useTablet } from './parts';
 
+/** Ô đếm khi đóng ca, theo thứ tự hiện. Chỉ hiện những thứ ca này đếm (công tắc của quầy, chụp lúc mở ca). */
+const COUNT_FIELDS: Array<{ item: CountItem; label: string; short: string; icon: LucideIcon; unit: string; money?: true }> = [
+  { item: 'boxes', label: 'Số hộp còn lại', short: 'Hộp', icon: Package, unit: 'hộp' },
+  { item: 'plates', label: 'Số dĩa sạch còn lại', short: 'Dĩa', icon: Soup, unit: 'dĩa' },
+  { item: 'cans', label: 'Số lon còn lại', short: 'Lon', icon: CupSoda, unit: 'lon' },
+  { item: 'cash', label: 'Tiền mặt đếm được', short: 'Tiền mặt', icon: Banknote, unit: 'đ', money: true },
+];
+const TEST_ID: Record<CountItem, string> = { boxes: 'close-boxes', plates: 'close-plates', cans: 'close-cans', cash: 'close-cash' };
+
 /**
- * Đóng ca, đếm mù (mục 4.6): nhân viên nhập hộp còn lại, dĩa sạch còn lại, tiền mặt đếm được → Xác nhận.
+ * Đóng ca, đếm mù (mục 4.6): nhân viên nhập số còn lại của những thứ quầy bật đếm (hộp, dĩa sạch, lon, tiền mặt) → Xác nhận.
  * Sau đó chỉ hiện "Đã đóng ca": không có số kỳ vọng hay chênh lệch nào trên tablet (server tính đối soát).
  * Không chặn khi còn đơn mở: đơn đó chuyển tiếp sang ca sau.
  */
 export function CloseShiftScreen() {
   const { shift } = useTablet();
   const navigate = useNavigate();
-  const [boxes, setBoxes] = useState('');
-  const [plates, setPlates] = useState('');
-  const [cash, setCash] = useState('');
+  const [values, setValues] = useState<Partial<Record<CountItem, string>>>({});
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
@@ -39,15 +48,14 @@ export function CloseShiftScreen() {
   // Đang gửi đóng ca: ca vừa đóng trên server (store đã bỏ ca) nhưng chưa chuyển sang "Đã đóng ca".
   if (!shift) return busy ? <Splash /> : <Navigate to="/" replace />;
 
-  const boxesN = parseCountInput(boxes);
-  const platesN = parseCountInput(plates);
-  const cashN = parseMoneyInput(cash);
-  const valid = boxesN !== null && platesN !== null && cashN !== null;
+  const fields = COUNT_FIELDS.filter((f) => shift.count_items.includes(f.item));
+  const parsed = fields.map((f) => ({ ...f, n: (f.money ? parseMoneyInput : parseCountInput)(values[f.item] ?? '') }));
+  const valid = parsed.every((f) => f.n !== null);
 
   function review(e: FormEvent) {
     e.preventDefault();
     if (!valid) {
-      setError('Nhập đủ 3 ô bằng số (0 nếu hết).');
+      setError(fields.length === 1 ? 'Nhập bằng số (0 nếu hết).' : `Nhập đủ ${fields.length} ô bằng số (0 nếu hết).`);
       return;
     }
     setError(null);
@@ -58,7 +66,7 @@ export function CloseShiftScreen() {
     if (!valid || busy) return;
     setBusy(true);
     try {
-      await pos.closeShift({ boxes_left: boxesN, plates_left: platesN, cash_counted: cashN });
+      await pos.closeShift(Object.fromEntries(parsed.map((f) => [CLOSE_KEY[f.item], f.n!])));
       setDone(true);
     } catch (e) {
       setError(errorMessage(e));
@@ -92,11 +100,22 @@ export function CloseShiftScreen() {
           </div>
           <div className="flex flex-col gap-1.5">
             <h3 className="text-2xl font-bold md:text-[26px]">Đóng ca – {shift.staff_name}</h3>
-            <p className="text-[15px] text-ink-subtle">Đếm rồi nhập số thực tế đang có.</p>
+            <p className="text-[15px] text-ink-subtle">{fields.length ? 'Đếm rồi nhập số thực tế đang có.' : 'Quầy này không cần đếm gì khi đóng ca.'}</p>
           </div>
-          <TextField label="Số hộp còn lại" icon={Package} suffix="hộp" inputMode="numeric" placeholder="0" value={boxes} onChange={(e) => setBoxes(e.target.value)} disabled={confirming} data-testid="close-boxes" />
-          <TextField label="Số dĩa sạch còn lại" icon={Soup} suffix="dĩa" inputMode="numeric" placeholder="0" value={plates} onChange={(e) => setPlates(e.target.value)} disabled={confirming} data-testid="close-plates" />
-          <TextField label="Tiền mặt đếm được" icon={Banknote} suffix="đ" inputMode="numeric" placeholder="0" value={cash} onChange={(e) => setCash(e.target.value)} disabled={confirming} data-testid="close-cash" />
+          {fields.map((f) => (
+            <TextField
+              key={f.item}
+              label={f.label}
+              icon={f.icon}
+              suffix={f.unit}
+              inputMode="numeric"
+              placeholder="0"
+              value={values[f.item] ?? ''}
+              onChange={(e) => setValues((v) => ({ ...v, [f.item]: e.target.value }))}
+              disabled={confirming}
+              data-testid={TEST_ID[f.item]}
+            />
+          ))}
           <Notice testId="close-error" tone="error">
             {error}
           </Notice>
@@ -113,9 +132,16 @@ export function CloseShiftScreen() {
             </div>
           ) : (
             <div className="flex flex-col gap-3 rounded-xl border border-warning-line bg-warning-soft p-4" data-testid="close-confirm-box">
-              <p className="text-lg">
-                Hộp: <b>{boxesN}</b> · Dĩa: <b>{platesN}</b> · Tiền mặt: <b>{formatVnd(cashN!)}</b>
-              </p>
+              {parsed.length > 0 && (
+                <p className="text-lg">
+                  {parsed.map((f, i) => (
+                    <Fragment key={f.item}>
+                      {i > 0 && ' · '}
+                      {f.short}: <b>{f.money ? formatVnd(f.n!) : f.n}</b>
+                    </Fragment>
+                  ))}
+                </p>
+              )}
               <p className="flex items-center gap-2 text-base font-medium text-warning-strong">
                 <TriangleAlert aria-hidden className="h-5 w-5 shrink-0" />
                 Đóng ca rồi thì không sửa được nữa.

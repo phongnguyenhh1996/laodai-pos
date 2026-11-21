@@ -5,7 +5,7 @@ import type { TabletProfile } from '@/domain/types';
 import { CatalogFetchError, createSupabaseCatalogSource, type CatalogData } from './catalog';
 
 const PROFILE: TabletProfile = {
-  id: 'tab-a', name: 'Tablet A', point_ids: ['xoi-a', 'com'], default_boxes: 200, default_plates: 60, default_float: 500_000,
+  id: 'tab-a', name: 'Tablet A', point_ids: ['xoi-a', 'com'], default_boxes: 200, default_plates: 60, default_cans: 0, default_float: 500_000, count_items: ['cash', 'boxes', 'plates'],
 };
 const data = (over: Partial<CatalogData> = {}): CatalogData => ({
   profile: PROFILE,

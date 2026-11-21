@@ -43,7 +43,7 @@ export class CatalogFetchError extends Error {}
 const COLUMNS = {
   menus: 'id,name',
   points: 'id,name,menu_id,active,default_dine_type,sort',
-  products: 'id,menu_id,name,price,sort,active,boxes_takeaway,boxes_dinein,plates_dinein',
+  products: 'id,menu_id,name,price,sort,active,boxes_takeaway,boxes_dinein,plates_dinein,cans',
   toppings: 'id,menu_id,name,price,extra_box_takeaway,sort,active',
   combos: 'id,menu_id,name,product_id,topping_ids,sort,active',
   staff: 'id,name,active,sort',
@@ -51,7 +51,7 @@ const COLUMNS = {
 } as const;
 
 const PROFILE_COLUMNS =
-  'id,name,point_ids,default_boxes,default_plates,default_float,auto_print_kitchen,auto_reprint_kitchen_on_edit,auto_print_bill';
+  'id,name,point_ids,default_boxes,default_plates,default_cans,default_float,count_items,auto_print_kitchen,auto_reprint_kitchen_on_edit,auto_print_bill';
 
 export function createSupabaseCatalogSource(client: SupabaseClient): CatalogSource {
   return async (profileId) => {

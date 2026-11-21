@@ -13,6 +13,7 @@ export const product = (p: Partial<Product> & Pick<Product, 'id'>): Product => (
   boxes_takeaway: 1,
   boxes_dinein: 1,
   plates_dinein: 0,
+  cans: 0,
   ...p,
 });
 

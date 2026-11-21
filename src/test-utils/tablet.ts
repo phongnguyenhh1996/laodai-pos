@@ -9,7 +9,7 @@ export const ACT: Activation = { tablet_profile_id: 'tab-a', tablet_name: 'Table
 
 export const CATALOG: Catalog = {
   fetched_at: '2026-11-17T00:00:00.000Z',
-  profile: { id: 'tab-a', name: 'Tablet A', point_ids: ['xoi-a', 'com'], default_boxes: 200, default_plates: 60, default_float: 500_000 },
+  profile: { id: 'tab-a', name: 'Tablet A', point_ids: ['xoi-a', 'com'], default_boxes: 200, default_plates: 60, default_cans: 0, default_float: 500_000, count_items: ['cash', 'boxes', 'plates'] },
   menus: [{ id: XOI_MENU, name: 'Xôi' }, { id: COM_MENU, name: 'Cơm gà' }],
   points: [
     { id: 'xoi-a', name: 'Xôi A', menu_id: XOI_MENU, active: true, default_dine_type: 'takeaway', sort: 1 },
