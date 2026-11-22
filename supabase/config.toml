@@ -438,3 +438,6 @@ verify_jwt = false
 
 [functions.owner-pin-unlock]
 verify_jwt = false
+
+[functions.nightly-backup]
+verify_jwt = false

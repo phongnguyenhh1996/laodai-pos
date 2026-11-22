@@ -4,6 +4,8 @@ export interface MockMessage {
   token: string;
   chat_id: string;
   text: string;
+  /** Chỉ có với sendDocument (file sao lưu). */
+  document?: { filename: string; base64: string };
   at: string;
 }
 

@@ -24,6 +24,23 @@ export function createMockServer() {
       messages.push({ token: m[1], chat_id: body.chat_id, text: body.text, at: new Date().toISOString() });
       return send(200, { ok: true, result: { message_id: messages.length } });
     }
+    // Gửi file (sao lưu hằng đêm): multipart; lưu caption vào `text`, nội dung file dạng base64.
+    const d = url.pathname.match(/^\/bot([^/]*)\/sendDocument$/);
+    if (req.method === 'POST' && d) {
+      const chunks = [];
+      for await (const chunk of req) chunks.push(chunk);
+      const form = await new Request('http://mock/', { method: 'POST', headers: { 'content-type': req.headers['content-type'] ?? '' }, body: Buffer.concat(chunks) }).formData();
+      const file = form.get('document');
+      if (!file || typeof file === 'string') return send(400, { ok: false, description: 'document required' });
+      messages.push({
+        token: d[1],
+        chat_id: String(form.get('chat_id')),
+        text: String(form.get('caption') ?? ''),
+        document: { filename: file.name, base64: Buffer.from(await file.arrayBuffer()).toString('base64') },
+        at: new Date().toISOString(),
+      });
+      return send(200, { ok: true, result: { message_id: messages.length } });
+    }
     send(404, { ok: false });
   });
   return {

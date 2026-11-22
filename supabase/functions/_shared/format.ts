@@ -139,6 +139,7 @@ export type Notification =
     }
   | { kind: 'seq_gap'; payload: Base & { tablet_name: string; missing: number[]; received: number } }
   | { kind: 'sync_rejected'; payload: Base & { tablet_name: string; kind: string; reason: string } }
+  | { kind: 'backup_failed'; payload: Base & { date: string; attempts: number; error: string } }
   | {
       kind: 'daily_summary';
       payload: Base & {
@@ -358,6 +359,16 @@ export function formatNotification(n: Notification, opts: FormatOptions): string
       link = `${app}/owner/orders/${q.order_id}`;
       break;
     }
+    case 'backup_failed': {
+      const q = n.payload;
+      lines = [
+        `⚠️ Sao lưu đêm ${ddmmyyyy(q.date)} không gửi được${q.attempts ? ` (đã thử ${q.attempts} lần)` : ''}`,
+        `Lỗi: ${q.error}`,
+        'Xem log Edge Function nightly-backup trên Supabase.',
+      ];
+      link = `${app}/owner/settings`;
+      break;
+    }
     case 'seq_gap': {
       const q = n.payload;
       lines = [
@@ -400,6 +411,6 @@ export function formatNotification(n: Notification, opts: FormatOptions): string
     }
   }
 
-  const t = n.kind === 'daily_summary' ? '' : timing(p);
+  const t = n.kind === 'daily_summary' || n.kind === 'backup_failed' ? '' : timing(p);
   return [...lines, ...(t ? [t] : []), `🔗 ${link}`].join('\n');
 }

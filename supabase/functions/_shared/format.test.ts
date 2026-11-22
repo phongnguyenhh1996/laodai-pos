@@ -55,6 +55,7 @@ const samples: Notification[] = [
   },
   { kind: 'seq_gap', payload: { ...offline, tablet_name: 'Tablet A', missing: [3], received: 4 } },
   { kind: 'sync_rejected', payload: { ...base, tablet_name: 'Tablet B', kind: 'create_order', reason: 'total_mismatch' } },
+  { kind: 'backup_failed', payload: { ...base, date: '2026-11-23', attempts: 2, error: 'Telegram 400: chat not found' } },
   {
     kind: 'daily_summary',
     payload: {
@@ -81,7 +82,7 @@ describe('định dạng Telegram', () => {
   it('có đủ snapshot cho mọi loại tin của đặc tả', () => {
     expect(new Set(samples.map((s) => s.kind))).toEqual(
       new Set(['tablet_login', 'owner_mode', 'shift_open', 'shift_close', 'order_deleted', 'delivery_order', 'debt_recorded', 'debt_paid',
-        'owner_edit', 'seq_gap', 'sync_rejected', 'daily_summary']),
+        'owner_edit', 'seq_gap', 'sync_rejected', 'daily_summary', 'backup_failed']),
     );
   });
 

@@ -19,6 +19,7 @@
     "db:start": "supabase start",
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset",
+    "db:restore": "node scripts/db-restore.mjs",
     "android:sync": "npm run build && cap sync android",
     "android:apk": "npm run android:sync && cd android && ./gradlew assembleDebug"
   },
@@ -49,6 +50,7 @@
     "cypress": "^13.17.0",
     "dotenv": "^16.6.1",
     "fake-indexeddb": "^6.2.8",
+    "fflate": "^0.8.2",
     "jsdom": "^25.0.1",
     "pg": "^8.23.1",
     "postcss": "^8.4.49",

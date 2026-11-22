@@ -1,5 +1,12 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`định dạng Telegram > backup_failed 1`] = `
+"⚠️ Sao lưu đêm 23/11/2026 không gửi được (đã thử 2 lần)
+Lỗi: Telegram 400: chat not found
+Xem log Edge Function nightly-backup trên Supabase.
+🔗 https://pos.laodai.vn/owner/settings"
+`;
+
 exports[`định dạng Telegram > daily_summary 1`] = `
 "📊 Tổng kết ngày 18/11/2026
 Doanh thu: 3.350.000 (TM 2.100.000 · CK 1.150.000 · Nợ 100.000)
