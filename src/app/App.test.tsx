@@ -325,7 +325,8 @@ describe('đổi quầy cho máy này (chế độ chủ)', () => {
     expect(screen.getByTestId('device-profile-tab-a')).toBeDisabled();
     expect(screen.getByTestId('device-profile-tab-a')).toHaveTextContent('Đang dùng');
     fireEvent.click(screen.getByTestId('device-profile-tab-b'));
-    expect(screen.getByTestId('device-switch')).toHaveTextContent('Chuyển sang Quầy B');
+    expect(screen.getByTestId('device-confirm')).toHaveTextContent('Chuyển sang Quầy B?');
+    expect(screen.getByTestId('device-switch')).toHaveTextContent('Chuyển máy');
     fireEvent.click(screen.getByTestId('device-cancel'));
     expect(screen.queryByTestId('device-confirm')).not.toBeInTheDocument();
     expect(switchTablet).not.toHaveBeenCalled();
