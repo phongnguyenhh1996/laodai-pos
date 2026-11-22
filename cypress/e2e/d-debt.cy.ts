@@ -153,4 +153,41 @@ describe('D. Ghi nợ & thu nợ', () => {
     cy.get(tid('debt-payment-row')).should('have.length', 1).and('contain.text', 'Chủ');
     cy.task('db:balance', GV).should('eq', 0);
   });
+
+  it('chủ thu nợ một phần bằng chuyển khoản; thu quá dư nợ bị chặn; lịch sử ghi hình thức; không tính vào két ca nào', () => {
+    cy.task<string[]>('scenario:debts', [
+      { customer: 'dungGv', product: 'xoiGa' }, // 25.000
+      { customer: 'dungGv', product: 'xoiTc' }, // 30.000
+    ]);
+    cy.loginOwner();
+    cy.ownerNav('debts');
+    cy.get(tid(`debt-row-${GV}`)).should('contain.text', '55.000').click();
+    cy.get(tid('debt-balance')).should('have.text', '55.000');
+
+    // Thu quá dư nợ ⇒ báo lỗi, không ghi
+    cy.get(tid('owner-debt-method-transfer')).click().should('have.attr', 'aria-pressed', 'true');
+    cy.get(tid('owner-debt-amount')).type('60000');
+    cy.get(tid('owner-debt-submit')).click();
+    cy.get(tid('owner-debt-error')).should('contain.text', 'lớn hơn dư nợ');
+    cy.get(tid('debt-payment-row')).should('not.exist');
+    cy.task('db:balance', GV).should('eq', 55_000);
+
+    // Thu 20.000 chuyển khoản
+    cy.get(tid('owner-debt-amount')).clear().type('20k');
+    cy.get(tid('owner-debt-submit')).should('contain.text', '20.000').click();
+    cy.get(tid('debt-balance')).should('have.text', '35.000');
+    cy.get(tid('debt-payment-row')).should('have.length', 1).and('contain.text', 'Chuyển khoản').and('contain.text', '20.000').and('contain.text', 'Chủ');
+    cy.task('db:balance', GV).should('eq', 35_000);
+    cy.telegramWaitFor('Thu nợ 20.000').its('text').should('contain', 'Dư nợ còn: 35.000');
+
+    // Danh sách sổ nợ cập nhật
+    cy.get(tid('owner-back')).click();
+    cy.get(tid(`debt-row-${GV}`)).should('contain.text', '35.000');
+    cy.get(tid('debt-total')).should('have.text', '35.000');
+
+    // Không thuộc ca nào: ca của tablet B (đã đóng) không có khoản thu nợ
+    cy.task<Array<{ id: string }>>('db:shifts', 'B').then(([shift]) => {
+      cy.task<{ debt_collected: { cash: number; transfer: number } }>('db:reconcile', shift.id).its('debt_collected').should('deep.include', { cash: 0, transfer: 0 });
+    });
+  });
 });

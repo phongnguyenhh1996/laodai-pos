@@ -1,7 +1,7 @@
 import { defineConfig } from 'cypress';
 import { resetDb, sql, tabletClient, withPg } from './tests/support/db';
 import { ENV } from './tests/support/env';
-import { TabletSim, item, push, type TestItem } from './tests/support/ops';
+import { TabletSim, item, op, push, type TestItem } from './tests/support/ops';
 import { SEED } from './tests/support/seed-ids';
 import { telegramClear, telegramMessages, waitForMessage } from './tests/support/telegram';
 
@@ -172,7 +172,8 @@ export default defineConfig({
         'db:shifts': (tablet: keyof typeof SEED.tablets) =>
           sql(
             `select s.id, st.name as staff_name, s.status, s.open_boxes, s.open_plates, s.open_float,
-                    s.close_boxes_left, s.close_plates_left, s.close_cash_counted
+                    s.close_boxes_left, s.close_plates_left, s.close_cash_counted,
+                    s.open_cans, s.close_cans_left, s.count_items
                from shifts s join staff st on st.id = s.staff_id
               where s.tablet_profile_id = $1 order by s.opened_at`,
             [SEED.tablets[tablet]],
@@ -271,6 +272,35 @@ export default defineConfig({
           const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date());
           const [r] = await sql<{ id: string | null }>('select private.daily_summary_tick($1::timestamptz) as id', [`${today}T${hhmm}:00+07:00`]);
           return r.id;
+        },
+        /**
+         * "Máy khác" cùng quầy báo hết / bán lại (sync_push `set_sold_out`) trong ca đang mở của quầy
+         * (ca do máy thật trong trình duyệt mở). Trả kết quả của server.
+         */
+        'sim:soldOut': async (a: { tablet: TabletKey; point: keyof typeof SEED.points; kind: 'product' | 'topping'; item: string; soldOut: boolean }) => {
+          const [s] = await sql<{ id: string }>("select id from shifts where tablet_profile_id = $1 and status = 'open'", [SEED.tablets[a.tablet]]);
+          if (!s) throw new Error('không có ca đang mở');
+          const c = await tabletClient(SEED.tablets[a.tablet]);
+          const id = a.kind === 'product' ? SEED.products[a.item as ProductKey] : SEED.toppings[a.item as ToppingKey];
+          const r = await push(c, op('set_sold_out', id, { shift_id: s.id, point_id: SEED.points[a.point], item_kind: a.kind, item_id: id, sold_out: a.soldOut }, new Date().toISOString()));
+          ok('báo hết món', r);
+          return r;
+        },
+        /** Hết món hôm nay mà một quầy đọc được (RPC `sold_out_today`, đúng như tablet đọc): "điểm:loại:id". */
+        'db:soldOutToday': async (tablet: TabletKey) => {
+          const c = await tabletClient(SEED.tablets[tablet]);
+          const { data, error } = await c.rpc('sold_out_today');
+          if (error) throw error;
+          return (data as Array<{ point_id: string; item_kind: string; item_id: string }>).map((r) => `${r.point_id}:${r.item_kind}:${r.item_id}`).sort();
+        },
+        /** Lùi một đơn về `days` ngày trước (giờ tạo + giờ thu), để thử lọc theo ngày. */
+        'db:moveOrderDays': async ({ id, days }: { id: string; days: number }) => {
+          await sql(
+            `update orders set created_at = created_at - make_interval(days => $2),
+                               paid_at = paid_at - make_interval(days => $2) where id = $1`,
+            [id, days],
+          );
+          return null;
         },
         /** Hồ sơ tablet đang lưu trên server. */
         'db:profilePoints': async (tablet: keyof typeof SEED.tablets) => {

@@ -319,4 +319,54 @@ describe('G. Chủ', () => {
       cy.get(tid('log-empty')).should('be.visible');
     });
   });
+
+  it('Đơn: lọc theo ngày, điểm bán, tab Chờ, tìm kiếm; tổng đã thu đổi theo bộ lọc', () => {
+    cy.task('sim:openShift', { tablet: 'A', staff: 'Lan' });
+    cy.task('sim:sell', { tablet: 'A', product: 'xoiGa', method: 'cash' }); // 25.000, Xôi A
+    cy.task('sim:sell', { tablet: 'A', product: 'comGa', point: 'com', method: 'transfer' }); // 35.000, Cơm gà
+    cy.task<Sold>('sim:sell', { tablet: 'A', product: 'xoiXeo' }).as('waiting'); // đang chờ
+    cy.task<Sold>('sim:sell', { tablet: 'A', product: 'xoiPate', method: 'cash' }).then((o) => cy.task('db:moveOrderDays', { id: o.id, days: 2 })); // 20.000, 2 ngày trước
+    const twoDaysAgo = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date(Date.now() - 2 * 86_400_000));
+
+    cy.loginOwner();
+    cy.ownerNav('orders');
+    // Mặc định: hôm nay, mọi điểm
+    cy.get(tid('orders-filter-date')).should('have.value', today());
+    cy.get(tid('orders-row')).should('have.length', 3);
+    cy.get(tid('orders-sum')).should('have.text', '60.000');
+
+    // Tab Chờ: chỉ đơn chưa thu
+    cy.get(tid('orders-tab-waiting')).click();
+    cy.get<Sold>('@waiting').then((w) => cy.get(tid('orders-row')).should('have.length', 1).and('have.attr', 'data-id', w.id));
+    cy.get(tid('orders-tab-all')).click();
+
+    // Điểm Cơm gà
+    cy.get(tid('orders-filter-point')).select(SEED.points.com);
+    cy.location('search').should('contain', `point=${SEED.points.com}`);
+    cy.get(tid('orders-row')).should('have.length', 1).and('have.attr', 'data-method', 'transfer');
+    cy.get(tid('orders-sum')).should('have.text', '35.000');
+    cy.get(tid('orders-filter-point')).select('');
+
+    // Tìm theo tên món / mã đơn
+    cy.get(tid('orders-search')).type('xéo');
+    cy.get(tid('orders-row')).should('have.length', 1).and('have.attr', 'data-status', 'open');
+    cy.get<Sold>('@waiting').then((w) => {
+      cy.get(tid('orders-search')).clear().type(w.code);
+      cy.get(tid('orders-row')).should('have.length', 1).and('have.attr', 'data-id', w.id);
+    });
+    cy.get(tid('orders-search')).clear();
+
+    // Ngày khác: chỉ đơn của ngày đó
+    cy.get(tid('orders-filter-date')).type(twoDaysAgo);
+    cy.location('search').should('contain', `date=${twoDaysAgo}`);
+    cy.get(tid('orders-row')).should('have.length', 1).and('contain.text', 'Xôi pate');
+    cy.get(tid('orders-sum')).should('have.text', '20.000');
+    cy.get(tid('orders-summary')).should('contain.text', `${twoDaysAgo.slice(8)}/${twoDaysAgo.slice(5, 7)}`);
+
+    // Bỏ ngày ⇒ mọi ngày
+    cy.get(tid('orders-filter-date')).clear();
+    cy.get(tid('orders-summary')).should('contain.text', 'Mọi ngày');
+    cy.get(tid('orders-row')).should('have.length', 4);
+    cy.get(tid('orders-sum')).should('have.text', '80.000');
+  });
 });

@@ -14,6 +14,9 @@ interface DbShift {
   close_boxes_left: number | null;
   close_plates_left: number | null;
   close_cash_counted: number | null;
+  open_cans: number;
+  close_cans_left: number | null;
+  count_items: string[];
 }
 
 interface DbOrder {
@@ -230,5 +233,86 @@ describe('B. Ca', () => {
       expect(shifts[0]).to.include({ staff_name: 'Lan', status: 'closed', close_cash_counted: 531_000 });
     });
     cy.telegramWaitFor('Đóng ca – Lan').its('text').should('contain', 'đếm 531.000 / kỳ vọng 531.000');
+  });
+
+  it('B10: chủ tạo món nước "Lon mỗi phần" + quầy tắt đếm dĩa, bật đếm lon ⇒ ca đang mở giữ cách đếm cũ; ca sau chỉ đếm hộp / lon / tiền; báo cáo + Telegram có Lon, không có Dĩa', () => {
+    cy.activateTablet('A');
+    cy.openShift('Lan');
+
+    // Chủ (ngay trên tablet): thêm món "Nước ngọt" 10.000, 1 lon mỗi phần, không tốn hộp
+    cy.ownerVisit('/owner/settings/products/new');
+    cy.get(tid('field-menu_id')).select(SEED.menus.xoi);
+    cy.get(tid('field-name')).type('Nước ngọt');
+    cy.get(tid('field-price')).type('10k');
+    cy.get(tid('field-boxes_takeaway')).clear().type('0');
+    cy.get(tid('field-cans')).clear().type('1');
+    cy.get(tid('settings-save')).click();
+    cy.get(tid('settings-saved')).should('be.visible');
+    cy.location('pathname').should('match', /^\/owner\/settings\/products\/[0-9a-f-]{36}$/);
+    cy.get(tid('owner-back')).click();
+    cy.contains('[data-testid^=settings-row-]', 'Nước ngọt').should('contain.text', '10.000');
+
+    // Quầy A: bỏ đếm dĩa, thêm đếm lon (48 lon đầu ca)
+    cy.ownerVisit(`/owner/settings/profiles/${SEED.tablets.A}`);
+    cy.get(tid('field-default_cans')).should('not.exist');
+    cy.get(tid('field-count_plates')).should('be.checked').uncheck();
+    cy.get(tid('field-default_plates')).should('not.exist');
+    cy.get(tid('field-count_cans')).should('not.be.checked').check();
+    cy.get(tid('field-default_cans')).clear().type('48');
+    cy.get(tid('settings-save')).click();
+    cy.get(tid('settings-saved')).should('be.visible');
+    cy.get(tid('owner-exit')).click();
+    cy.get(tid('tablet-home')).should('be.visible');
+
+    // Ca đang mở (Lan) đã chụp cách đếm lúc mở ⇒ vẫn hộp / dĩa / tiền, chưa có lon
+    cy.get(tid('open-close-shift')).click();
+    cy.get(tid('close-plates')).should('be.visible');
+    cy.get(tid('close-cans')).should('not.exist');
+    cy.get(tid('close-boxes')).type('200');
+    cy.get(tid('close-plates')).type('60');
+    cy.get(tid('close-cash')).type('500000');
+    cy.get(tid('close-review')).click();
+    cy.get(tid('close-confirm')).click();
+    cy.get(tid('shift-closed-done')).click();
+
+    // Ca sau (Mai): bán 2 lon nước ngọt
+    cy.openShift('Mai');
+    cy.get(tid('new-order')).click();
+    for (let i = 0; i < 2; i++) {
+      cy.contains('[data-testid^=menu-product-]', 'Nước ngọt').click();
+      cy.get(tid('topping-add')).click();
+    }
+    cy.get('[data-testid^=cart-line-][data-testid$=-qty]').should('have.length', 1).and('have.text', '2');
+    cy.get(tid('order-pay-exact')).click();
+    cy.get(tid('queue-flash')).should('be.visible');
+
+    // Đóng ca: chỉ hộp, lon, tiền (dùng 3 lon, đơn ghi 2 lon)
+    cy.get(tid('open-close-shift')).click();
+    cy.get(tid('close-plates')).should('not.exist');
+    cy.get(tid('close-boxes')).type('200');
+    cy.get(tid('close-cans')).type('45');
+    cy.get(tid('close-cash')).type('520000');
+    cy.get(tid('close-review')).click();
+    cy.get(tid('close-confirm-box')).should('contain.text', 'Hộp: 200 · Lon: 45 · Tiền mặt: 520.000');
+    cy.get(tid('close-confirm')).click();
+    cy.get(tid('shift-closed')).should('be.visible');
+    cy.waitLive();
+
+    cy.task<DbShift[]>('db:shifts', 'A').then(([lan, mai]) => {
+      expect(lan).to.include({ staff_name: 'Lan', open_cans: 0, close_cans_left: null, close_plates_left: 60 });
+      expect(lan.count_items).to.include('plates').and.not.include('cans');
+      expect(mai).to.include({ staff_name: 'Mai', open_cans: 48, close_cans_left: 45, close_plates_left: null });
+      expect(mai.count_items).to.include('cans').and.not.include('plates');
+
+      cy.telegramWaitFor('Đóng ca – Lan').its('text').should('contain', 'Dĩa:').and('not.contain', 'Lon:');
+      cy.telegramWaitFor('Đóng ca – Mai').its('text').should('contain', 'Lon: dùng 3 / theo đơn 2 → +1').and('not.contain', 'Dĩa:');
+
+      // Báo cáo ca của chủ: cột Lon, không có cột Dĩa
+      cy.ownerVisit(`/owner/shifts/${mai.id}`);
+      cy.get(tid('rep-cans')).should('have.text', '3 / 2');
+      cy.get(tid('rep-cans-diff')).should('have.text', '+1').and('have.attr', 'data-alert', 'true');
+      cy.get(tid('rep-plates')).should('not.exist');
+      cy.get(tid('rep-cash-expected')).should('have.text', '520.000');
+    });
   });
 });
