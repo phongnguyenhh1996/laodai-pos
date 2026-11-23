@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeftRight, Banknote, Bike, ChefHat, ChevronLeft, ChevronRight, ChevronUp, Check, MapPin, Minus, Plus, Receipt, Save, ShoppingBag, Soup, Tag, Trash2, UtensilsCrossed, Wallet, X } from 'lucide-react';
 import { v7 as uuidv7 } from 'uuid';
@@ -164,7 +164,7 @@ export function OrderScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const points = catalog ? tabletPoints(catalog.profile, catalog.points) : [];
+  const points = useMemo(() => (catalog ? tabletPoints(catalog.profile, catalog.points) : []), [catalog]);
   const book = useDebtBook();
 
   /** Bản mới nhất của đơn đang sửa trên server (cập nhật realtime). */
