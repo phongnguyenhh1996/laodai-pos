@@ -401,4 +401,26 @@ describe('C. Bán hàng', () => {
     });
     cy.telegramWaitFor('Đóng ca – Lan').its('text').should('contain', 'đếm 490.000 / kỳ vọng 490.000 → 0').and('contain', 'Ship ngoài: 1 đơn · phụ thu 5.000 · trả 10.000 → −5.000');
   });
+
+  it('C20: điện thoại 360×800, hàng đợi có đơn ship ngoài: badge "Ship ngoài · trả 10k" + tổng không làm scroll ngang', () => {
+    cy.viewport(360, 800);
+    cy.openShift('Lan');
+    cy.get(tid('new-order')).click();
+    cy.get(tid(`menu-combo-${SEED.combos.xoiGaTrung}`)).click();
+    cy.get(tid('order-dine-delivery')).click();
+    cy.get(tid('order-ship-mode-external')).click();
+    cy.get(tid('order-ship-payout-10000')).click();
+    cy.get(tid('order-ship-details')).click();
+    cy.get(tid('order-address')).type('12 Lê Lợi');
+    cy.get(tid('ship-sheet-done')).click();
+    cy.get(tid('order-save')).click();
+    cy.get(tid('queue-screen')).should('be.visible');
+    cards().should('have.length', 1).and('contain.text', 'Ship ngoài · trả 10k');
+    cards().should(($c) => expect($c[0].getBoundingClientRect().right).to.be.at.most(360));
+    // Không vùng cuộn nào của hàng đợi rộng hơn màn.
+    cy.get(tid('queue-screen')).should(($s) => {
+      const scrollers = [...$s[0].querySelectorAll<HTMLElement>('*')].filter((el) => ['auto', 'scroll'].includes(getComputedStyle(el).overflowX));
+      for (const el of scrollers) expect(el.scrollWidth, 'scroll ngang').to.be.at.most(el.clientWidth);
+    });
+  });
 });

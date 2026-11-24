@@ -368,24 +368,26 @@ function Card({
           {itemsSummary(o.items)}
         </span>
       </button>
-      <div className="flex items-center gap-2 border-t border-line pt-3">
+      {/* Điện thoại hẹp: badge ship + tổng không vừa một hàng ⇒ nhóm bên phải xuống dòng, không đẩy thẻ rộng ra (scroll ngang). */}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 border-t border-line pt-3">
         <span className={`badge num rounded-md text-[13px] ${WAIT_STYLE[card.color]}`}>
           <Clock aria-hidden className="h-3.5 w-3.5" />
           Chờ <span data-testid={tid('wait')}>{card.waitMinutes} phút</span>
         </span>
-        <span className="flex-1" />
-        {o.ship_mode === 'external' ? (
-          <span className="badge num rounded-md bg-danger-soft text-[13px] font-semibold text-danger-strong" data-testid={tid('ship-external')}>
-            {externalShipBadge(o.ship_payout)}
-          </span>
-        ) : o.ship_fee > 0 && (
-          <span className="badge num rounded-md bg-warning-soft text-[13px] text-warning-strong" data-testid={tid('ship-fee')}>
-            {shipFeeLabel(o.ship_fee)} ship
-          </span>
-        )}
-        <b className="num text-xl font-bold text-ink" data-testid={tid('total')}>
-          {formatVnd(o.total)}
-        </b>
+        <span className="ml-auto flex items-center gap-2">
+          {o.ship_mode === 'external' ? (
+            <span className="badge num rounded-md bg-danger-soft text-[13px] font-semibold text-danger-strong" data-testid={tid('ship-external')}>
+              {externalShipBadge(o.ship_payout)}
+            </span>
+          ) : o.ship_fee > 0 && (
+            <span className="badge num rounded-md bg-warning-soft text-[13px] text-warning-strong" data-testid={tid('ship-fee')}>
+              {shipFeeLabel(o.ship_fee)} ship
+            </span>
+          )}
+          <b className="num text-xl font-bold text-ink" data-testid={tid('total')}>
+            {formatVnd(o.total)}
+          </b>
+        </span>
       </div>
       <div className="flex gap-2">
         {card.group === 'serve' ? (
