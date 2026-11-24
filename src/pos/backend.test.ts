@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { describe, expect, it, vi } from 'vitest';
-import { PosNetworkError, createSupabaseBackend, loadOpenStateFrom, parsePushResult } from './backend';
+import { PosNetworkError, createSupabaseBackend, loadOpenStateFrom, parsePushResult, parseShipDefaults } from './backend';
 
 const ORDER = {
   id: 'o1', device_seq: 1, tablet_profile_id: 'tab-a', point_id: 'p', code: 'ABC', label: null, table_no: null,
@@ -14,7 +14,7 @@ describe('parsePushResult', () => {
     const item = { id: 'i', product_id: 'p', name_snap: 'n', unit_price_snap: 1, qty: 1, toppings_snap: [], sort: 1 };
     const r = parsePushResult({ status: 'ok', order: { ...ORDER, items: [item] } });
     // Server cũ chưa có cột phí ship ⇒ 0.
-    expect(r).toEqual({ status: 'ok', order: { ...ORDER, recalculated_at: undefined, address: null, ship_fee: 0, items: [{ ...item, sort: undefined }] } });
+    expect(r).toEqual({ status: 'ok', order: { ...ORDER, recalculated_at: undefined, address: null, ship_fee: 0, ship_mode: 'shop', ship_payout: 0, items: [{ ...item, sort: undefined }] } });
     expect(Object.keys((r as { order: object }).order)).not.toContain('recalculated_at');
     expect(parsePushResult({ status: 'duplicate', order: ORDER })).toMatchObject({ status: 'duplicate', order: { items: [] } });
     expect(parsePushResult({ status: 'ok', shift: { id: 's' } })).toEqual({ status: 'ok', shift: { id: 's' } });
@@ -26,6 +26,16 @@ describe('parsePushResult', () => {
   it('phản hồi lạ ⇒ lỗi tạm thời (gửi lại được)', () => {
     expect(() => parsePushResult(null)).toThrow(PosNetworkError);
     expect(() => parsePushResult({ status: 'weird' })).toThrow('không hợp lệ');
+  });
+});
+
+describe('parseShipDefaults', () => {
+  it('ba trường của đơn ship gần nhất; null / dữ liệu lạ ⇒ null; quán ship ⇒ payout 0', () => {
+    expect(parseShipDefaults(null)).toBeNull();
+    expect(parseShipDefaults({ ship_mode: 'grab' })).toBeNull();
+    expect(parseShipDefaults({ ship_mode: 'external', ship_fee: 5000, ship_payout: 10000 })).toEqual({ ship_mode: 'external', ship_fee: 5000, ship_payout: 10000 });
+    expect(parseShipDefaults({ ship_mode: 'shop', ship_fee: 10000, ship_payout: 5000 })).toEqual({ ship_mode: 'shop', ship_fee: 10000, ship_payout: 0 });
+    expect(parseShipDefaults({ ship_mode: 'external' })).toEqual({ ship_mode: 'external', ship_fee: 0, ship_payout: 0 });
   });
 });
 
@@ -76,6 +86,14 @@ describe('createSupabaseBackend', () => {
     await expect(e3.push(op)).rejects.toThrow(PosNetworkError);
     const e4 = createSupabaseBackend(fakeClient({ rpc: () => Promise.reject('down') }).client);
     await expect(e4.push(op)).rejects.toThrow('down');
+  });
+
+  it('shift_ship_defaults: gọi RPC theo ca; lỗi ⇒ PosNetworkError', async () => {
+    const f = fakeClient({ rpc: async () => ({ data: { ship_mode: 'external', ship_fee: 0, ship_payout: 15000 }, error: null }) });
+    expect(await createSupabaseBackend(f.client).loadShipDefaults('sh1')).toEqual({ ship_mode: 'external', ship_fee: 0, ship_payout: 15000 });
+    expect(f.raw.rpc).toHaveBeenCalledWith('shift_ship_defaults', { p_shift: 'sh1' });
+    const bad = createSupabaseBackend(fakeClient({ rpc: async () => ({ data: null, error: { message: 'forbidden', code: '42501' } }) }).client);
+    await expect(bad.loadShipDefaults('sh1')).rejects.toMatchObject({ name: 'PosNetworkError', code: '42501' });
   });
 
   it('nghe live_pulse: đúng khóa hồ sơ ⇒ "open", "catalog" ⇒ danh mục, khóa khác bỏ qua; trạng thái kênh', () => {

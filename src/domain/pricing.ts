@@ -15,9 +15,17 @@ export function orderTotal(items: Array<Pick<OrderItem, 'unit_price_snap' | 'qty
 /** Các mức phí ship nhân viên bấm được (server nhận 0–50.000, bội số 1.000). */
 export const SHIP_FEES: readonly Money[] = [5000, 10000, 15000, 20000];
 
-/** "+10k" trên nút phí ship. */
+/** Các mức trả shipper ngoài (bắt buộc chọn một; server nhận 1.000–50.000, bội số 1.000). Nhãn dùng `shipFeeLabel`. */
+export const SHIP_PAYOUTS: readonly Money[] = [5000, 10000, 15000, 20000];
+
+/** "+10k" trên nút phí ship / trả shipper. */
 export function shipFeeLabel(fee: Money): string {
   return `+${fee / 1000}k`;
+}
+
+/** Badge đơn shipper ngoài (hàng đợi, danh sách đơn của chủ): "Ship ngoài · trả 10k" — nhắc lấy tiền két đưa shipper. */
+export function externalShipBadge(payout: Money): string {
+  return `Ship ngoài · trả ${payout / 1000}k`;
 }
 
 export function assertQty(qty: number): void {

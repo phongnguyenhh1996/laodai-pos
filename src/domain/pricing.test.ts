@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  PricingError, buildComboItem, buildItem, comboPrice, lineTotal, orderTotal,
+  PricingError, SHIP_PAYOUTS, buildComboItem, externalShipBadge, buildItem, comboPrice, lineTotal, orderTotal,
   selectableCombos, selectableProducts, selectableToppings, setItemQty,
 } from './pricing';
 import { CHA, COMBOS, COMBO_PATE, COMBO_XOI_FULL, COM_GA, COM_MENU, CANH, PATE_CU, PRODUCTS, TOPPINGS, TRUNG, XOI_CU, XOI_GA, XOI_MENU, XOI_XEO } from './fixtures';
@@ -77,5 +77,12 @@ describe('pricing', () => {
     const it1 = buildItem('i', XOI_GA, []);
     expect(() => setItemQty(it1, 0)).toThrow(PricingError);
     expect(setItemQty(it1, 4).qty).toBe(4);
+  });
+});
+
+describe('trả shipper', () => {
+  it('bốn mức cố định; badge "Ship ngoài · trả 10k"', () => {
+    expect(SHIP_PAYOUTS).toEqual([5000, 10000, 15000, 20000]);
+    expect(externalShipBadge(10_000)).toBe('Ship ngoài · trả 10k');
   });
 });

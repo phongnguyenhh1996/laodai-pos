@@ -77,6 +77,29 @@ describe('nhật ký', () => {
         after: order({ dine_type: 'delivery', address: '12 Lê Lợi', ship_fee: 15_000 }),
       }),
     ).toEqual(['Phí ship: 10.000 → 15.000']);
+    // Đổi kiểu ship + trả shipper; phí của shipper ngoài gọi là "Phụ thu".
+    expect(
+      describeAudit({
+        action: 'order_update', entity: 'order', reason: null,
+        before: order({ dine_type: 'delivery', address: '12 Lê Lợi', ship_fee: 10_000, ship_mode: 'shop', ship_payout: 0 }),
+        after: order({ dine_type: 'delivery', address: '12 Lê Lợi', ship_fee: 5_000, ship_mode: 'external', ship_payout: 10_000 }),
+      }),
+    ).toEqual(['Kiểu ship: Quán ship → Shipper ngoài', 'Phụ thu: 10.000 → 5.000', 'Trả shipper: 0 → 10.000']);
+    expect(
+      describeAudit({
+        action: 'owner_edit_order', entity: 'order', reason: null,
+        before: order({ dine_type: 'delivery', address: 'x', ship_fee: 5_000, ship_mode: 'external', ship_payout: 10_000 }),
+        after: order({ dine_type: 'delivery', address: 'x', ship_fee: 5_000, ship_mode: 'external', ship_payout: 15_000 }),
+      }),
+    ).toEqual(['Trả shipper: 10.000 → 15.000']);
+    // Bản ghi cũ không có kiểu ship ⇒ coi như quán ship, không sinh dòng.
+    expect(
+      describeAudit({
+        action: 'order_update', entity: 'order', reason: null,
+        before: { ...order({ dine_type: 'delivery', address: 'x' }), ship_mode: undefined, ship_payout: undefined },
+        after: order({ dine_type: 'delivery', address: 'x' }),
+      }),
+    ).toEqual(['2× Xôi gà (Trứng) · 62.000']);
     expect(describeAudit({ action: 'order_update', entity: 'order', reason: null, before: order(), after: order() })).toEqual(['2× Xôi gà (Trứng) · 62.000']);
   });
 

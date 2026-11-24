@@ -78,6 +78,10 @@ export interface OrderDetail extends Omit<ShiftOrderRow, 'items'> {
   address: string | null;
   /** Đã nằm trong `total`. */
   ship_fee: number;
+  /** Thiếu khi server chưa áp migration ship hai kiểu. */
+  ship_mode?: 'shop' | 'external';
+  /** Tiền trả shipper ngoài: không nằm trong `total`. */
+  ship_payout?: number;
   items: Array<Pick<OrderItem, 'name_snap' | 'qty' | 'unit_price_snap' | 'toppings_snap'>>;
 }
 
@@ -85,7 +89,7 @@ export async function loadOrderDetail(client: SupabaseClient, orderId: string): 
   const { data, error } = await client
     .from('orders')
     .select(
-      'id,code,label,dine_type,address,ship_fee,status,total,payment_method,cash_given,created_at,served_at,paid_at,deleted_at,delete_reason,' +
+      'id,code,label,dine_type,address,ship_fee,ship_mode,ship_payout,status,total,payment_method,cash_given,created_at,served_at,paid_at,deleted_at,delete_reason,' +
         'owner_edited,opened_shift_id,paid_shift_id,tablet_profile_id,points(name),tablet_profiles(name),customers(name,description),' +
         'opened:shifts!orders_opened_shift_id_fkey(staff(name)),paid:shifts!orders_paid_shift_id_fkey(staff(name)),' +
         'order_items(name_snap,qty,unit_price_snap,toppings_snap,sort,removed_at)',

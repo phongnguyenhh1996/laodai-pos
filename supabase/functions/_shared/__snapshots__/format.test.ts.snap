@@ -41,7 +41,18 @@ exports[`định dạng Telegram > delivery_order 1`] = `
 "🛵 Đơn ship mới #F35 – Xôi A
 📍 12 Lê Lợi, P.3 – 0909 123 456
 • 2× Xôi gà (+Trứng) — 62.000
+Quán ship · không phí ship
 Tổng: 62.000
+Lan – Tablet A
+🔗 https://pos.laodai.vn/owner/orders/o1"
+`;
+
+exports[`định dạng Telegram > delivery_order 2`] = `
+"🛵 Đơn ship mới #F35 – Xôi A
+📍 12 Lê Lợi
+• 2× Xôi gà (+Trứng) — 62.000
+Shipper ngoài · phụ thu 5.000 · trả shipper 10.000
+Tổng: 67.000
 Lan – Tablet A
 🔗 https://pos.laodai.vn/owner/orders/o1"
 `;
@@ -80,6 +91,19 @@ Có thể dữ liệu trên tablet đã bị xóa trước khi đồng bộ.
 exports[`định dạng Telegram > shift_close 1`] = `
 "🔴 Đóng ca – Lan – Tablet A (05:42–10:15)
 Doanh thu: 2.350.000 (TM 1.600.000 · CK 650.000 · Nợ 100.000)
+Tiền mặt: đếm 2.080.000 / kỳ vọng 2.100.000 → −20.000
+Hộp: dùng 118 / theo đơn 112 → +6
+Dĩa: dùng 0 / theo đơn 0
+Xóa: 2 đơn (1 đã ra món) · Đơn còn mở: 1
+Bao bì của đơn bị xóa sau khi ra món: F35 (2 hộp)
+🔗 https://pos.laodai.vn/owner/shifts/s1"
+`;
+
+exports[`định dạng Telegram > shift_close 2`] = `
+"🔴 Đóng ca – Lan – Tablet A (05:42–10:15)
+Doanh thu: 2.350.000 (TM 1.600.000 · CK 650.000 · Nợ 100.000)
+Trong đó phí ship: 20.000
+Ship ngoài: 3 đơn · phụ thu 15.000 · trả 30.000 → −15.000
 Tiền mặt: đếm 2.080.000 / kỳ vọng 2.100.000 → −20.000
 Hộp: dùng 118 / theo đơn 112 → +6
 Dĩa: dùng 0 / theo đơn 0

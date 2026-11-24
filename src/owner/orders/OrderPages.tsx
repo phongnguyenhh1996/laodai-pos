@@ -5,10 +5,21 @@ import { ErrorText, Splash, errorMessage } from '@/app/ui';
 import { addCombo, addProduct, itemsSummary, stepLineQty } from '@/domain/cart';
 import { customerLabel, suggestCustomers } from '@/domain/debt';
 import { formatSigned, formatVnd } from '@/domain/money';
-import { editDraftFrom, editPayload, editProblem, editSummary, setEditCustomer, setEditMethod, type OwnerEditDraft } from '@/domain/ownerEdit';
-import { lineTotal, selectableCombos, selectableProducts, selectableToppings } from '@/domain/pricing';
+import {
+  editDraftFrom,
+  editPayload,
+  editProblem,
+  editSummary,
+  setEditCustomer,
+  setEditMethod,
+  setEditShipMode,
+  setEditShipPayout,
+  toggleEditShipFee,
+  type OwnerEditDraft,
+} from '@/domain/ownerEdit';
+import { SHIP_FEES, SHIP_PAYOUTS, externalShipBadge, lineTotal, selectableCombos, selectableProducts, selectableToppings, shipFeeLabel } from '@/domain/pricing';
 import { businessDate, hhmm } from '@/domain/time';
-import { DINE_LABELS, type OrderStatus, type PaymentMethod, type Product } from '@/domain/types';
+import { DINE_LABELS, SHIP_MODE_LABELS, type OrderStatus, type PaymentMethod, type Product } from '@/domain/types';
 import { OrderDetailPage } from './OrderDetail';
 import { useOwner } from '../OwnerContext';
 import { Chip, OwnerLayout } from '../OwnerLayout';
@@ -244,6 +255,11 @@ function OrderRow({ o }: { o: OrderListRow }) {
                     chủ đã sửa
                   </Chip>
                 )}
+                {o.ship_mode === 'external' && (
+                  <Chip className={`${TONE.red} num !px-2 !py-0.5 !text-[11px]`} testId="orders-row-ship-external">
+                    {externalShipBadge(o.ship_payout ?? 0)}
+                  </Chip>
+                )}
               </span>
               <span className="num truncate text-xs leading-[15px] text-[#888]">{[hhmm(o.at), o.point_name, o.label].filter(Boolean).join(' · ')}</span>
             </span>
@@ -311,6 +327,12 @@ function OrderEditPage() {
 
 const label = 'text-xs font-semibold uppercase leading-[15px] tracking-normal text-[#888]';
 const METHOD_ICON: Record<PaymentMethod, LucideIcon> = { cash: Banknote, transfer: Landmark, debt: HandCoins };
+
+/** Nút chọn (kiểu ship / mức phí / trả shipper) trên form sửa. */
+const shipChoice = (on: boolean) =>
+  `num flex h-[48px] items-center justify-center rounded-[14px] px-2 text-[14px] leading-4 transition-colors duration-fast ${
+    on ? 'border-[1.5px] border-brand bg-[#ffeee7] font-semibold text-[#c2380a]' : 'border border-line bg-white font-medium text-[#111] hover:bg-[#f8f8f8]'
+  }`;
 
 function EditForm({ order, cat }: { order: EditableOrder; cat: EditCatalog }) {
   const { client } = useOwner();
@@ -483,12 +505,44 @@ function EditForm({ order, cat }: { order: EditableOrder; cat: EditCatalog }) {
         })}
       </div>
       {draft.payment_method === 'debt' && <CustomerPicker customers={cat.customers} chosenId={draft.customer_id} onPick={(id) => update((d) => setEditCustomer(d, id))} />}
+      {order.dine_type === 'delivery' && (
+        <div className="flex flex-col gap-2.5" data-testid="edit-ship">
+          <h2 className={label}>Kiểu ship</h2>
+          <div className="grid grid-cols-2 gap-2.5" role="group" aria-label="Kiểu ship">
+            {(['shop', 'external'] as const).map((m) => (
+              <button key={m} type="button" aria-pressed={draft.ship_mode === m} onClick={() => update((d) => setEditShipMode(d, m))} className={shipChoice(draft.ship_mode === m)} data-testid={`edit-ship-mode-${m}`}>
+                {SHIP_MODE_LABELS[m]}
+              </button>
+            ))}
+          </div>
+          <span className="text-[13px] font-semibold text-[#6d6d6d]">{draft.ship_mode === 'external' ? 'Phụ thu' : 'Phí ship'}</span>
+          <div className="grid grid-cols-4 gap-2" role="group" aria-label={draft.ship_mode === 'external' ? 'Phụ thu' : 'Phí ship'}>
+            {SHIP_FEES.map((v) => (
+              <button key={v} type="button" aria-pressed={draft.ship_fee === v} onClick={() => update((d) => toggleEditShipFee(d, v))} className={shipChoice(draft.ship_fee === v)} data-testid={`edit-ship-fee-${v}`}>
+                {shipFeeLabel(v)}
+              </button>
+            ))}
+          </div>
+          {draft.ship_mode === 'external' && (
+            <>
+              <span className="text-[13px] font-semibold text-[#6d6d6d]">Trả shipper (tiền két, không tính vào tổng)</span>
+              <div className="grid grid-cols-4 gap-2" role="group" aria-label="Trả shipper">
+                {SHIP_PAYOUTS.map((v) => (
+                  <button key={v} type="button" aria-pressed={draft.ship_payout === v} onClick={() => update((d) => setEditShipPayout(d, v))} className={shipChoice(draft.ship_payout === v)} data-testid={`edit-ship-payout-${v}`}>
+                    {shipFeeLabel(v)}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
       <div className={`${card} divide-y divide-line px-4 py-2`}>
-        {order.ship_fee > 0 && (
+        {draft.ship_fee > 0 && (
           <p className="flex items-center justify-between py-[9px] text-sm leading-[18px]">
-            <span className="text-[#6d6d6d]">Phí ship (giữ nguyên)</span>
+            <span className="text-[#6d6d6d]">{draft.ship_mode === 'external' ? 'Phụ thu' : 'Phí ship'}</span>
             <b className="num font-semibold" data-testid="edit-ship-fee">
-              {formatVnd(order.ship_fee)}
+              {formatVnd(draft.ship_fee)}
             </b>
           </p>
         )}

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { longWaiting, methodShares, shiftDate, shortDate } from './report';
+import { EMPTY_SHIP_STATS } from './reconcile';
+import { longWaiting, methodShares, shiftDate, shipStatLines, shortDate } from './report';
 
 describe('methodShares (tỷ lệ TM / CK / Nợ)', () => {
   it('chia phần trăm, cộng lại đúng 100', () => {
@@ -66,5 +67,17 @@ describe('ngày', () => {
 
   it('shortDate', () => {
     expect(shortDate('2026-11-07')).toBe('07/11');
+  });
+});
+
+describe('shipStatLines (thống kê ship, chỉ chủ)', () => {
+  it('chỉ dòng > 0; lãi/lỗ ship ngoài hiện khi có đơn shipper ngoài, kể cả lỗ; không có số liệu ⇒ rỗng', () => {
+    expect(shipStatLines(undefined)).toEqual([]);
+    expect(shipStatLines(EMPTY_SHIP_STATS)).toEqual([]);
+    expect(shipStatLines({ ...EMPTY_SHIP_STATS, shop_orders: 2, shop_fee: 20_000 }).map((l) => `${l.label} ${l.value}`)).toEqual(['Quán ship 2 đơn', 'Phí ship 20.000']);
+    expect(
+      shipStatLines({ shop_orders: 0, external_orders: 3, shop_fee: 0, external_fee: 15_000, payout: 30_000, external_profit: -15_000 }).map((l) => `${l.label} ${l.value}`),
+    ).toEqual(['Shipper ngoài 3 đơn', 'Phụ thu ship ngoài 15.000', 'Trả shipper ngoài 30.000', 'Lãi/lỗ ship ngoài −15.000']);
+    expect(shipStatLines({ ...EMPTY_SHIP_STATS, external_orders: 1, payout: 10_000, external_fee: 10_000 }).at(-1)).toMatchObject({ value: '0' });
   });
 });

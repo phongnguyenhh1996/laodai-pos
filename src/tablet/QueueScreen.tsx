@@ -4,7 +4,7 @@ import { Bike, Check, ChefHat, Clock, Inbox, MapPin, Plus, ShoppingBag, UserRoun
 import { customerLabel } from '@/domain/debt';
 import { itemsSummary } from '@/domain/cart';
 import { formatVnd } from '@/domain/money';
-import { shipFeeLabel } from '@/domain/pricing';
+import { externalShipBadge, shipFeeLabel } from '@/domain/pricing';
 import { buildQueue, type QueueCard, type WaitColor } from '@/domain/queue';
 import { hhmm } from '@/domain/time';
 import { DINE_LABELS, type DineType, type Order } from '@/domain/types';
@@ -374,7 +374,11 @@ function Card({
           Chờ <span data-testid={tid('wait')}>{card.waitMinutes} phút</span>
         </span>
         <span className="flex-1" />
-        {o.ship_fee > 0 && (
+        {o.ship_mode === 'external' ? (
+          <span className="badge num rounded-md bg-danger-soft text-[13px] font-semibold text-danger-strong" data-testid={tid('ship-external')}>
+            {externalShipBadge(o.ship_payout)}
+          </span>
+        ) : o.ship_fee > 0 && (
           <span className="badge num rounded-md bg-warning-soft text-[13px] text-warning-strong" data-testid={tid('ship-fee')}>
             {shipFeeLabel(o.ship_fee)} ship
           </span>

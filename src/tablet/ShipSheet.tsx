@@ -1,7 +1,7 @@
 import { MapPin } from 'lucide-react';
 import type { DraftCustomer } from '@/domain/cart';
 import { formatVnd } from '@/domain/money';
-import type { Money } from '@/domain/types';
+import { SHIP_MODE_LABELS, type Money, type ShipMode } from '@/domain/types';
 import type { DebtBook } from '@/pos';
 import { Sheet } from './parts';
 import { ShipCustomerPicker } from './ShipCustomer';
@@ -15,6 +15,8 @@ export function ShipSheet({
   customer,
   book,
   shipFee,
+  shipMode = 'shop',
+  payout = 0,
   total,
   onAddress,
   onCustomer,
@@ -24,6 +26,9 @@ export function ShipSheet({
   customer: DraftCustomer | null;
   book: DebtBook | null;
   shipFee: Money;
+  shipMode?: ShipMode;
+  /** Tiền trả shipper ngoài (không nằm trong tổng). */
+  payout?: Money;
   total: Money;
   onAddress: (v: string) => void;
   onCustomer: (c: DraftCustomer | null) => void;
@@ -36,7 +41,13 @@ export function ShipSheet({
       title="Giao hàng"
       subtitle={
         <span className="font-semibold text-brand-deep" data-testid="ship-sheet-summary">
-          {shipFee > 0 ? `Phí đang chọn +${formatVnd(shipFee)}` : 'Chưa chọn phí ship'} · tổng {formatVnd(total)}
+          {SHIP_MODE_LABELS[shipMode]} ·{' '}
+          {shipMode === 'external'
+            ? `${shipFee > 0 ? `phụ thu +${formatVnd(shipFee)}` : 'không phụ thu'} · ${payout > 0 ? `trả shipper ${formatVnd(payout)}` : 'chưa chọn trả shipper'}`
+            : shipFee > 0
+              ? `phí đang chọn +${formatVnd(shipFee)}`
+              : 'chưa chọn phí ship'}{' '}
+          · tổng {formatVnd(total)}
         </span>
       }
       onClose={onClose}

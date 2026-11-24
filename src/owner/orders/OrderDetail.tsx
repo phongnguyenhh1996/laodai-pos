@@ -150,8 +150,14 @@ function InfoCard({ o, meta }: { o: OrderDetail; meta: string }) {
         ))}
         {o.ship_fee > 0 && (
           <li className="flex items-center justify-between gap-2.5 py-2.5 text-sm text-[#6d6d6d]" data-testid="order-detail-ship-fee">
-            <span className="font-medium">Phí ship</span>
+            <span className="font-medium">{o.ship_mode === 'external' ? 'Phụ thu' : 'Phí ship'}</span>
             <span className="num shrink-0 font-semibold">{formatVnd(o.ship_fee)}</span>
+          </li>
+        )}
+        {o.ship_mode === 'external' && (
+          <li className="flex items-center justify-between gap-2.5 py-2.5 text-sm text-[#b91c1c]" data-testid="order-detail-ship-payout">
+            <span className="font-medium">Trả shipper (tiền két, không tính vào tổng)</span>
+            <span className="num shrink-0 font-semibold">{formatVnd(o.ship_payout ?? 0)}</span>
           </li>
         )}
       </ul>

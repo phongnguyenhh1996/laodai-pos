@@ -39,11 +39,12 @@ async function loadCase(c: Case) {
     for (const o of c.input.orders) {
       await db.query(
         `insert into orders (id, device_seq, tablet_profile_id, point_id, code, dine_type, address, status, opened_shift_id, paid_shift_id,
-                             created_at, served_at, paid_at, deleted_at, ship_fee, total, payment_method, customer_id)
-         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,now(),$11,$12,$13,$14,$15,$16,$17)`,
+                             created_at, served_at, paid_at, deleted_at, ship_fee, ship_mode, ship_payout, total, payment_method, customer_id)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,now(),$11,$12,$13,$14,$15,$16,$17,$18,$19)`,
         [o.id, ++seq, SEED.tablets.A, SEED.points.xoiA, o.code, o.dine_type, o.dine_type === 'delivery' ? '12 Lê Lợi' : null,
          o.status, o.opened_shift_id, o.paid_shift_id,
-         o.served_at, o.status === 'paid' ? new Date() : null, o.deleted_at, 'ship_fee' in o ? o.ship_fee : 0, o.total, o.payment_method,
+         o.served_at, o.status === 'paid' ? new Date() : null, o.deleted_at, 'ship_fee' in o ? o.ship_fee : 0,
+         'ship_mode' in o ? o.ship_mode : 'shop', 'ship_payout' in o ? o.ship_payout : 0, o.total, o.payment_method,
          o.payment_method === 'debt' ? SEED.customers.dungGv : null],
       );
       for (const [i, it] of o.items.entries()) {

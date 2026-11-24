@@ -1,5 +1,5 @@
 import { orderPackaging, type Packaging, type PackagingNorms } from './packaging';
-import { DEFAULT_COUNT_ITEMS, type AdjustmentKind, type CountItem, type DineType, type Money, type OrderItem, type OrderStatus, type PaymentMethod } from './types';
+import { DEFAULT_COUNT_ITEMS, type AdjustmentKind, type CountItem, type DineType, type Money, type OrderItem, type OrderStatus, type PaymentMethod, type ShipMode } from './types';
 
 /**
  * Đối soát cuối ca. Công thức này phải cho cùng kết quả với hàm SQL `reconcile_shift`
@@ -30,6 +30,10 @@ export interface ReconcileOrder {
   payment_method: PaymentMethod | null;
   /** Phí ship (đã nằm trong `total`); không có ⇒ 0. */
   ship_fee?: Money;
+  /** Kiểu ship; không có ⇒ `shop`. */
+  ship_mode?: ShipMode;
+  /** Tiền trả shipper ngoài (không nằm trong `total`); không có ⇒ 0. */
+  ship_payout?: Money;
   total: Money;
   served_at: string | null;
   deleted_at: string | null;
@@ -50,11 +54,46 @@ export interface CountLine {
   diff: number | null; // used − by_orders
 }
 
+/** Thống kê ship (chỉ chủ): đơn ship đã thu trong ca / kỳ. */
+export interface ShipStats {
+  shop_orders: number;
+  external_orders: number;
+  /** Σ phí ship của đơn quán ship. */
+  shop_fee: Money;
+  /** Σ phụ thu của đơn shipper ngoài. */
+  external_fee: Money;
+  /** Σ tiền trả shipper ngoài (tiền mặt lấy từ két). */
+  payout: Money;
+  /** Lãi/lỗ ship ngoài = phụ thu ship ngoài − trả shipper ngoài. */
+  external_profit: Money;
+}
+
+export const EMPTY_SHIP_STATS: ShipStats = { shop_orders: 0, external_orders: 0, shop_fee: 0, external_fee: 0, payout: 0, external_profit: 0 };
+
+/** Cùng công thức với `private.ship_stats` (SQL). */
+export function shipStats(orders: ReadonlyArray<Pick<ReconcileOrder, 'dine_type' | 'ship_mode' | 'ship_fee' | 'ship_payout'>>): ShipStats {
+  const ship = orders.filter((o) => o.dine_type === 'delivery');
+  const shop = ship.filter((o) => (o.ship_mode ?? 'shop') === 'shop');
+  const ext = ship.filter((o) => o.ship_mode === 'external');
+  const sum = (xs: typeof ship, f: (o: (typeof ship)[number]) => number) => xs.reduce((s, o) => s + f(o), 0);
+  const external_fee = sum(ext, (o) => o.ship_fee ?? 0);
+  const payout = sum(ship, (o) => o.ship_payout ?? 0);
+  return {
+    shop_orders: shop.length,
+    external_orders: ext.length,
+    shop_fee: sum(shop, (o) => o.ship_fee ?? 0),
+    external_fee,
+    payout,
+    external_profit: external_fee - sum(ext, (o) => o.ship_payout ?? 0),
+  };
+}
+
 export interface ReconcileResult {
   /** Các thứ ca này đếm; thứ không đếm ⇒ `used`/`diff` (hoặc `cash.counted`/`diff`) = null, giao diện ẩn hẳn. */
   count_items: CountItem[];
   /** `ship_fee`: phần phí ship nằm trong `total` (không cộng thêm). */
   revenue: { total: Money; cash: Money; transfer: Money; debt: Money; ship_fee: Money };
+  ship: ShipStats;
   paid_orders: number;
   debt_collected: { cash: Money; transfer: Money };
   cash: { expected: Money; counted: Money | null; diff: Money | null };
@@ -90,7 +129,10 @@ export function reconcileShift(input: ReconcileInput): ReconcileResult {
     transfer: debtHere.filter((p) => p.method === 'transfer').reduce((s, p) => s + p.amount, 0),
   };
 
-  const expected = shift.open_float + adj('cash') + revenue.cash + debt_collected.cash;
+  // Trả shipper ngoài luôn là tiền mặt lấy từ két, kể cả khách CK / Nợ (đơn đã thu trong ca này).
+  const ship = shipStats(paidHere);
+  const payout = paidHere.reduce((s, o) => s + (o.ship_payout ?? 0), 0);
+  const expected = shift.open_float + adj('cash') + revenue.cash + debt_collected.cash - payout;
   const counted = shift.close_cash_counted;
 
   // Bao bì: theo ca MỞ đơn, bỏ đơn đã xóa
@@ -120,6 +162,7 @@ export function reconcileShift(input: ReconcileInput): ReconcileResult {
   return {
     count_items: [...(shift.count_items ?? DEFAULT_COUNT_ITEMS)],
     revenue,
+    ship,
     paid_orders: paidHere.length,
     debt_collected,
     cash: { expected, counted, diff: counted === null ? null : counted - expected },

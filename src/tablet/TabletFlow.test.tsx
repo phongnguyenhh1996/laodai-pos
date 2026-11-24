@@ -259,7 +259,7 @@ describe('tạo đơn & thanh toán', () => {
 
     click('order-ship-fee-10000');
     click('order-ship-details');
-    expect(tid('ship-sheet-summary')).toHaveTextContent('Phí đang chọn +10.000 · tổng 25.000');
+    expect(tid('ship-sheet-summary')).toHaveTextContent('Quán ship · phí đang chọn +10.000 · tổng 25.000');
     fireEvent.change(tid('order-address'), { target: { value: '12 Lê Lợi' } });
     click('ship-sheet-done');
     click('order-pay-exact');
@@ -314,6 +314,85 @@ describe('tạo đơn & thanh toán', () => {
     } finally {
       restore();
     }
+  });
+
+  it('shipper ngoài: hàng Trả shipper bắt buộc (khóa lưu / thanh toán), không cộng vào tổng; thanh toán có dòng nhắc; badge hàng đợi', async () => {
+    await startShift();
+    await newOrder();
+    addProduct(XOI_XEO.id); // 15.000
+    click('order-dine-delivery');
+    click('order-ship-details');
+    fireEvent.change(tid('order-address'), { target: { value: '12 Lê Lợi' } });
+    click('ship-sheet-done');
+    // Đầu ca: Quán ship, chưa chọn phí, không có hàng trả shipper.
+    expect(tid('order-ship-mode-shop')).toHaveAttribute('aria-pressed', 'true');
+    expect(tid('order-ship-fee-title')).toHaveTextContent('Phí ship');
+    expect(screen.queryByTestId('order-ship-payout-10000')).toBeNull();
+
+    click('order-ship-mode-external');
+    expect(tid('order-ship-mode-external')).toHaveAttribute('aria-pressed', 'true');
+    expect(tid('order-ship-fee-title')).toHaveTextContent('Phụ thu');
+    expect(screen.getAllByTestId(/^order-ship-payout-\d+$/).map((b) => b.textContent)).toEqual(['+5k', '+10k', '+15k', '+20k']);
+    expect(tid('order-payout-missing')).toHaveTextContent('Chưa chọn tiền trả shipper');
+    for (const b of ['order-pay-exact', 'order-pay', 'order-serve', 'order-save']) expect(tid(b)).toBeDisabled();
+
+    click('order-ship-fee-5000');
+    click('order-ship-payout-10000');
+    click('order-ship-payout-10000'); // bấm lại không bỏ
+    expect(tid('order-ship-payout-10000')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.queryByTestId('order-payout-missing')).toBeNull();
+    expect(tid('cart-total')).toHaveTextContent('20.000'); // 15.000 + phụ thu 5.000, không cộng trả shipper
+    expect(tid('cart-ship-breakdown')).toHaveTextContent('15.000 + phụ thu 5.000 · trả ship 10.000');
+    click('order-ship-details');
+    expect(tid('ship-sheet-summary')).toHaveTextContent('Shipper ngoài · phụ thu +5.000 · trả shipper 10.000 · tổng 20.000');
+    click('ship-sheet-done');
+
+    click('order-pay');
+    await screen.findByTestId('pay-screen');
+    const create = server.ops.find((op) => op.kind === 'create_order')!;
+    expect(create.payload).toMatchObject({ order: { ship_mode: 'external', ship_payout: 10_000, ship_fee: 5_000, total: 20_000 } });
+    expect(tid('pay-total')).toHaveTextContent('20.000');
+    expect(tid('pay-ship-fee')).toHaveTextContent('Phụ thu');
+    expect(tid('pay-ship-payout')).toHaveTextContent('Trả shipper −10.000 (lấy từ két)');
+
+    click('pay-back');
+    await screen.findByTestId('order-screen');
+    click('order-back');
+    await screen.findByTestId('queue-screen');
+    expect(tid(`queue-ship-external-${create.entity_id}`)).toHaveTextContent('Ship ngoài · trả 10k');
+  });
+
+  it('mặc định theo ca: đơn ship thứ hai lấy Shipper ngoài + phụ thu + trả shipper của đơn ship gần nhất (kể cả đã thanh toán); đổi sang Mang về ⇒ shop / 0', async () => {
+    await startShift();
+    await newOrder();
+    addProduct(XOI_XEO.id);
+    click('order-dine-delivery');
+    click('order-ship-details');
+    fireEvent.change(tid('order-address'), { target: { value: '12 Lê Lợi' } });
+    click('ship-sheet-done');
+    click('order-ship-mode-external');
+    click('order-ship-fee-5000');
+    click('order-ship-payout-15000');
+    click('order-pay-exact'); // đã thanh toán ⇒ tablet không còn thấy đơn, mặc định vẫn lấy từ server
+    expect(await screen.findByTestId('queue-flash')).toHaveTextContent('Đã thu 20.000');
+
+    await newOrder();
+    addProduct(XOI_XEO.id);
+    click('order-dine-delivery');
+    await waitFor(() => expect(tid('order-ship-mode-external')).toHaveAttribute('aria-pressed', 'true'));
+    expect(tid('order-ship-fee-5000')).toHaveAttribute('aria-pressed', 'true');
+    expect(tid('order-ship-payout-15000')).toHaveAttribute('aria-pressed', 'true');
+
+    // Về quán ship bỏ trả shipper; sang Mang về ⇒ gửi shop / 0.
+    click('order-ship-mode-shop');
+    expect(screen.queryByTestId('order-ship-payout-15000')).toBeNull();
+    click('order-ship-mode-external');
+    expect(tid('order-payout-missing')).toBeInTheDocument();
+    click('order-dine-takeaway');
+    click('order-save');
+    await screen.findByTestId('queue-screen');
+    const take = server.ops.filter((op) => op.kind === 'create_order').at(-1)!;
+    expect(take.payload).toMatchObject({ order: { dine_type: 'takeaway', ship_mode: 'shop', ship_payout: 0, ship_fee: 0, total: 15_000 } });
   });
 
   it('bảng topping: Hủy thì không thêm gì; bấm món 2 lần cùng topping ⇒ 1 dòng số lượng 2', async () => {

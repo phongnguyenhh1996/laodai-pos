@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { DebtHistory } from '@/domain/debt';
-import { DEFAULT_COUNT_ITEMS, type Order, type OrderItem } from '@/domain/types';
+import { DEFAULT_COUNT_ITEMS, type Order, type OrderItem, type ShipDefaults } from '@/domain/types';
 import { createSupabaseCatalogSource, type CatalogData } from './catalog';
 import type { OpenState, PushResult, TabletShift, WireOp } from './types';
 
@@ -18,6 +18,8 @@ export interface PosBackend {
   loadOpenState(profileId: string): Promise<OpenState>;
   /** Các khoản nợ (ngày + món) và lần trả của một khách — màn Thu nợ. */
   loadDebtHistory(customerId: string): Promise<DebtHistory>;
+  /** Kiểu ship / phí / tiền trả shipper của đơn ship gần nhất của ca (RPC `shift_ship_defaults`); chưa có ⇒ null. */
+  loadShipDefaults(shiftId: string): Promise<ShipDefaults | null>;
   /** Nghe thay đổi của hồ sơ tablet + danh mục. Trả hàm hủy đăng ký. */
   subscribe(profileId: string, onPulse: (scope: PulseScope) => void, onStatus: (s: ChannelStatus) => void): () => void;
 }
@@ -63,6 +65,8 @@ function normalizeOrder(o: Order): Order {
     deleted_at: o.deleted_at,
     delete_reason: o.delete_reason,
     ship_fee: o.ship_fee ?? 0,
+    ship_mode: o.ship_mode ?? 'shop',
+    ship_payout: o.ship_payout ?? 0,
     total: o.total,
     payment_method: o.payment_method,
     cash_given: o.cash_given,
@@ -79,13 +83,24 @@ function normalizeOrder(o: Order): Order {
   };
 }
 
+/** Kết quả `shift_ship_defaults`: null hoặc ba trường; dữ liệu lạ ⇒ null (về Quán ship, chưa chọn phí). */
+export function parseShipDefaults(data: unknown): ShipDefaults | null {
+  const d = data as Partial<ShipDefaults> | null;
+  if (!d || (d.ship_mode !== 'shop' && d.ship_mode !== 'external')) return null;
+  return {
+    ship_mode: d.ship_mode,
+    ship_fee: typeof d.ship_fee === 'number' ? d.ship_fee : 0,
+    ship_payout: d.ship_mode === 'external' && typeof d.ship_payout === 'number' ? d.ship_payout : 0,
+  };
+}
+
 type RawShift = Omit<TabletShift, 'staff_name'> & { staff: { name: string } | null };
 type RawItem = OrderItem & { sort: number; removed_at: string | null };
 type RawOrder = Omit<Order, 'items'> & { order_items: RawItem[] };
 
 const ORDER_COLUMNS =
   'id,device_seq,tablet_profile_id,point_id,code,label,table_no,dine_type,address,status,opened_shift_id,paid_shift_id,' +
-  'created_at,served_at,paid_at,deleted_at,delete_reason,ship_fee,total,payment_method,cash_given,customer_id,owner_edited,' +
+  'created_at,served_at,paid_at,deleted_at,delete_reason,ship_fee,ship_mode,ship_payout,total,payment_method,cash_given,customer_id,owner_edited,' +
   'order_items(id,product_id,name_snap,unit_price_snap,qty,toppings_snap,sort,removed_at)';
 
 /** Ca đang mở + đơn đang mở, đọc bằng phiên `tablet` (RLS chỉ cho thấy đúng những thứ này của chính hồ sơ). */
@@ -117,6 +132,9 @@ export async function loadOpenStateFrom(client: SupabaseClient, profileId: strin
     : null;
   const orders = ((oRes.data ?? []) as unknown as RawOrder[]).map(({ order_items, ...o }) => ({
     ...o,
+    ship_fee: o.ship_fee ?? 0,
+    ship_mode: o.ship_mode ?? 'shop',
+    ship_payout: o.ship_payout ?? 0,
     items: order_items
       .filter((i) => !i.removed_at)
       .sort((a, b) => a.sort - b.sort)
@@ -147,6 +165,11 @@ export function createSupabaseBackend(client: SupabaseClient): PosBackend {
       if (error) throw new PosNetworkError(`Không tải được lịch sử nợ: ${error.message}`, error.code ?? null);
       if (!data) throw new PosNetworkError('Không tải được lịch sử nợ');
       return data as DebtHistory;
+    },
+    async loadShipDefaults(shiftId) {
+      const { data, error } = await client.rpc('shift_ship_defaults', { p_shift: shiftId });
+      if (error) throw new PosNetworkError(`Không tải được mặc định đơn ship: ${error.message}`, error.code ?? null);
+      return parseShipDefaults(data);
     },
     subscribe(profileId, onPulse, onStatus) {
       const openKey = `profile:${profileId}`;

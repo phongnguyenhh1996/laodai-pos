@@ -116,6 +116,14 @@ describe('bill', () => {
     expect(linesToText(layoutKitchen({ doc: ship, template: tpl(), tz: TZ }))).not.toContain('10.000');
   });
 
+  it('shipper ngoài: phụ thu in giống hệt "Phí ship"; không in kiểu ship / tiền trả shipper dù dữ liệu lọt vào', () => {
+    const t = off('bill', ['shop_name', 'point', 'phone', 'address', 'time', 'dine', 'label', 'unit_price', 'thanks', 'no_bill_free']);
+    const ext = { ...doc({ dine_type: 'delivery', ship_fee: 5000, total: 82000 }), ship_mode: 'external', ship_payout: 13000 } as unknown as PrintDoc;
+    const text = linesToText(layoutBill({ doc: ext, template: t, tz: TZ }));
+    expect(text).toBe('F15\n- - -\n2 x Xôi gà | 62.000\n   + Trứng\n1 x Xôi xéo | 15.000\nPhí ship | 5.000\n---\nTỔNG | 82.000\n---');
+    expect(text).not.toMatch(/13\.000|shipper|Shipper|ngoài|Phụ thu/);
+  });
+
   it('không bao giờ in hình thức thanh toán / tiền đưa / nợ / nhân viên, kể cả khi dữ liệu lọt vào', () => {
     const leaky = { ...doc(), payment_method: 'debt', cash_given: 500000, customer: 'Dũng', staff_name: 'Lan' } as unknown as PrintDoc;
     const text = linesToText(layoutBill({ doc: leaky, template: tpl(), tz: TZ }));

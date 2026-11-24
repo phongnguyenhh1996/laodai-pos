@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import fixture from '../../tests/fixtures/reconcile-cases.json';
-import { reconcileShift, type ReconcileInput, type ReconcileResult } from './reconcile';
+import { EMPTY_SHIP_STATS, reconcileShift, shipStats, type ReconcileInput, type ReconcileResult } from './reconcile';
 
 const cases = fixture.cases as unknown as Array<{ name: string; input: Omit<ReconcileInput, 'products'>; expected: ReconcileResult }>;
 const products = fixture.products;
@@ -16,6 +16,19 @@ describe('reconcile (bộ dữ liệu dùng chung với SQL)', () => {
 });
 
 describe('reconcile: quy tắc', () => {
+  it('thống kê ship: chỉ đơn ship; đơn cũ thiếu kiểu ⇒ quán ship; lãi/lỗ ship ngoài = phụ thu − trả shipper', () => {
+    expect(shipStats([])).toEqual(EMPTY_SHIP_STATS);
+    expect(
+      shipStats([
+        { dine_type: 'delivery', ship_fee: 10_000 },
+        { dine_type: 'delivery', ship_mode: 'external', ship_fee: 5_000, ship_payout: 10_000 },
+        { dine_type: 'delivery', ship_mode: 'external', ship_fee: 20_000, ship_payout: 15_000 },
+        { dine_type: 'takeaway' },
+      ]),
+    ).toEqual({ shop_orders: 1, external_orders: 2, shop_fee: 10_000, external_fee: 25_000, payout: 25_000, external_profit: 0 });
+  });
+
+
   const r = run('co-ban');
 
   it('tiền mặt kỳ vọng = tiền lẻ + chủ bổ sung + đơn TM theo ca thu + TM thu nợ', () => {

@@ -17,6 +17,9 @@ interface DbOrder {
   cash_given: number | null;
   address: string | null;
   ship_fee: number;
+  ship_mode: string;
+  ship_payout: number;
+  opened_shift_id: string;
   served: boolean;
   items: Array<{ product_id: string; qty: number; unit_price_snap: number; toppings: Array<{ id: string; price: number }> }>;
 }
@@ -336,6 +339,66 @@ describe('C. Bán hàng', () => {
       expect(os).to.have.length(1);
       expect(os[0]).to.include({ dine_type: 'delivery', address: '12 Lê Lợi', ship_fee: 15_000, total: 46_000, status: 'open' });
     });
-    cy.telegramWaitFor('Phí ship: 15.000');
+    cy.telegramWaitFor('Quán ship · phí ship 15.000');
+  });
+
+  it('C19: shipper ngoài: trả shipper bắt buộc, không vào tổng; thu CK; đóng ca đếm = tiền lẻ − trả shipper ⇒ chênh 0; hai máy cùng quầy cùng mặc định', () => {
+    cy.openShift('Lan');
+    cy.get(tid('new-order')).click();
+    cy.get(tid(`menu-combo-${SEED.combos.xoiGaTrung}`)).click(); // 31.000
+    cy.get(tid('order-dine-delivery')).click();
+    cy.get(tid('order-ship-mode-shop')).should('have.attr', 'aria-pressed', 'true'); // đầu ca
+    cy.get(tid('order-address')).type('12 Lê Lợi');
+    cy.get(tid('order-ship-mode-external')).click();
+    cy.get(tid('order-ship-fee-title')).should('have.text', 'Phụ thu');
+    cy.get(tid('order-payout-missing')).should('be.visible');
+    cy.get(tid('order-pay')).should('be.disabled');
+    cy.get(tid('order-ship-fee-5000')).click();
+    cy.get(tid('order-ship-payout-10000')).click();
+    cy.get(tid('order-total')).should('have.text', '36.000'); // không cộng 10.000 trả shipper
+    cy.get(tid('order-pay')).should('not.be.disabled').click();
+    cy.get(tid('pay-total')).should('have.text', '36.000');
+    cy.get(tid('pay-ship-payout')).should('have.text', 'Trả shipper −10.000 (lấy từ két)');
+    cy.get(tid('pay-method-transfer')).click();
+    cy.get(tid('pay-transfer-confirm')).click();
+    cy.get(tid('queue-flash')).should('contain.text', 'chuyển khoản');
+    cy.telegramWaitFor('Shipper ngoài · phụ thu 5.000 · trả shipper 10.000');
+
+    // Máy thứ hai của cùng quầy hỏi server ⇒ cùng mặc định (đơn đã thanh toán vẫn tính).
+    cy.task('sim:shipDefaults', 'A').should('deep.equal', { ship_mode: 'external', ship_fee: 5000, ship_payout: 10000 });
+    cy.get(tid('new-order')).click();
+    cy.get(tid('order-dine-delivery')).click();
+    cy.get(tid('order-ship-mode-external')).should('have.attr', 'aria-pressed', 'true');
+    cy.get(tid('order-ship-fee-5000')).should('have.attr', 'aria-pressed', 'true');
+    cy.get(tid('order-ship-payout-10000')).should('have.attr', 'aria-pressed', 'true');
+    cy.get(tid('order-back')).click();
+    // Máy kia tạo đơn quán ship +15k (thu CK) ⇒ đơn mới ở máy này theo đơn đó.
+    cy.task('sim:shipOrder', { tablet: 'A', mode: 'shop', fee: 15_000, method: 'transfer' });
+    cy.get(tid('new-order')).click();
+    cy.get(tid('order-dine-delivery')).click();
+    cy.get(tid('order-ship-mode-shop')).should('have.attr', 'aria-pressed', 'true');
+    cy.get(tid('order-ship-fee-15000')).should('have.attr', 'aria-pressed', 'true');
+    cy.get(tid('order-back')).click();
+
+    // Đóng ca: không ai bán tiền mặt ⇒ két = 500.000 tiền lẻ − 10.000 đưa shipper.
+    cy.get(tid('open-close-shift')).click();
+    cy.get(tid('close-boxes')).type('198');
+    cy.get(tid('close-plates')).type('60');
+    cy.get(tid('close-cash')).type('490000');
+    cy.get(tid('close-review')).click();
+    cy.get(tid('close-confirm')).click();
+    cy.get(tid('shift-closed')).should('be.visible');
+    cy.waitLive();
+    serverOrders().then((os) => {
+      expect(os.map((o) => [o.ship_mode, o.ship_fee, o.ship_payout, o.total, o.payment_method])).to.deep.eq([
+        ['external', 5_000, 10_000, 36_000, 'transfer'],
+        ['shop', 15_000, 0, 40_000, 'transfer'],
+      ]);
+      cy.task<{ cash: { expected: number; diff: number }; ship: Record<string, number> }>('db:reconcile', os[0].opened_shift_id).then((r) => {
+        expect(r.cash).to.include({ expected: 490_000, diff: 0 });
+        expect(r.ship).to.deep.eq({ shop_orders: 1, external_orders: 1, shop_fee: 15_000, external_fee: 5_000, payout: 10_000, external_profit: -5_000 });
+      });
+    });
+    cy.telegramWaitFor('Đóng ca – Lan').its('text').should('contain', 'đếm 490.000 / kỳ vọng 490.000 → 0').and('contain', 'Ship ngoài: 1 đơn · phụ thu 5.000 · trả 10.000 → −5.000');
   });
 });

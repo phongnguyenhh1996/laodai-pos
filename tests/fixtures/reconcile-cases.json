@@ -53,6 +53,7 @@
       "expected": {
         "count_items": ["cash", "boxes", "plates"],
         "revenue": { "total": 155000, "cash": 110000, "transfer": 25000, "debt": 20000, "ship_fee": 0 },
+        "ship": { "shop_orders": 0, "external_orders": 0, "shop_fee": 0, "external_fee": 0, "payout": 0, "external_profit": 0 },
         "paid_orders": 5,
         "debt_collected": { "cash": 50000, "transfer": 30000 },
         "cash": { "expected": 860000, "counted": 840000, "diff": -20000 },
@@ -80,6 +81,7 @@
       "expected": {
         "count_items": ["cash", "boxes", "plates"],
         "revenue": { "total": 30000, "cash": 30000, "transfer": 0, "debt": 0, "ship_fee": 0 },
+        "ship": { "shop_orders": 0, "external_orders": 0, "shop_fee": 0, "external_fee": 0, "payout": 0, "external_profit": 0 },
         "paid_orders": 2,
         "debt_collected": { "cash": 0, "transfer": 0 },
         "cash": { "expected": 330000, "counted": 330000, "diff": 0 },
@@ -107,6 +109,7 @@
       "expected": {
         "count_items": ["cash", "boxes", "plates"],
         "revenue": { "total": 30000, "cash": 15000, "transfer": 15000, "debt": 0, "ship_fee": 0 },
+        "ship": { "shop_orders": 0, "external_orders": 0, "shop_fee": 0, "external_fee": 0, "payout": 0, "external_profit": 0 },
         "paid_orders": 2,
         "debt_collected": { "cash": 0, "transfer": 0 },
         "cash": { "expected": 315000, "counted": 330000, "diff": 15000 },
@@ -132,6 +135,7 @@
       "expected": {
         "count_items": ["cash", "boxes", "plates"],
         "revenue": { "total": 20000, "cash": 20000, "transfer": 0, "debt": 0, "ship_fee": 0 },
+        "ship": { "shop_orders": 0, "external_orders": 0, "shop_fee": 0, "external_fee": 0, "payout": 0, "external_profit": 0 },
         "paid_orders": 1,
         "debt_collected": { "cash": 0, "transfer": 0 },
         "cash": { "expected": 220000, "counted": null, "diff": null },
@@ -163,6 +167,7 @@
       "expected": {
         "count_items": ["cash", "boxes", "plates"],
         "revenue": { "total": 141000, "cash": 0, "transfer": 141000, "debt": 0, "ship_fee": 0 },
+        "ship": { "shop_orders": 0, "external_orders": 0, "shop_fee": 0, "external_fee": 0, "payout": 0, "external_profit": 0 },
         "paid_orders": 3,
         "debt_collected": { "cash": 0, "transfer": 0 },
         "cash": { "expected": 0, "counted": 0, "diff": 0 },
@@ -197,6 +202,7 @@
       "expected": {
         "count_items": ["cash", "boxes", "plates"],
         "revenue": { "total": 99000, "cash": 59000, "transfer": 40000, "debt": 0, "ship_fee": 0 },
+        "ship": { "shop_orders": 0, "external_orders": 0, "shop_fee": 0, "external_fee": 0, "payout": 0, "external_profit": 0 },
         "paid_orders": 3,
         "debt_collected": { "cash": 50000, "transfer": 0 },
         "cash": { "expected": 709000, "counted": 689000, "diff": -20000 },
@@ -234,6 +240,7 @@
       "expected": {
         "count_items": ["cash", "boxes", "plates"],
         "revenue": { "total": 123000, "cash": 123000, "transfer": 0, "debt": 0, "ship_fee": 0 },
+        "ship": { "shop_orders": 0, "external_orders": 0, "shop_fee": 0, "external_fee": 0, "payout": 0, "external_profit": 0 },
         "paid_orders": 3,
         "debt_collected": { "cash": 0, "transfer": 0 },
         "cash": { "expected": 123000, "counted": 123000, "diff": 0 },
@@ -263,6 +270,7 @@
       "expected": {
         "count_items": ["cash", "boxes", "plates"],
         "revenue": { "total": 95000, "cash": 55000, "transfer": 40000, "debt": 0, "ship_fee": 25000 },
+        "ship": { "shop_orders": 2, "external_orders": 0, "shop_fee": 25000, "external_fee": 0, "payout": 0, "external_profit": 0 },
         "paid_orders": 3,
         "debt_collected": { "cash": 0, "transfer": 0 },
         "cash": { "expected": 155000, "counted": 160000, "diff": 5000 },
@@ -296,6 +304,7 @@
       "expected": {
         "count_items": ["cans"],
         "revenue": { "total": 75000, "cash": 75000, "transfer": 0, "debt": 0, "ship_fee": 0 },
+        "ship": { "shop_orders": 0, "external_orders": 0, "shop_fee": 0, "external_fee": 0, "payout": 0, "external_profit": 0 },
         "paid_orders": 2,
         "debt_collected": { "cash": 0, "transfer": 0 },
         "cash": { "expected": 275000, "counted": null, "diff": null },
@@ -305,6 +314,47 @@
         "deleted_count": 1,
         "deleted_after_served": [{ "order_id": "00000000-0000-4000-8000-000000000703", "code": "H23", "boxes": 0, "plates": 0, "cans": 1 }],
         "open_orders": 0
+      }
+    },
+    {
+      "name": "ship-ngoai",
+      "$comment": "Shipper ngoài: trả shipper luôn là tiền mặt từ két (kể cả CK / Nợ), chỉ đơn đã thanh toán trong ca này. Đơn xóa / chưa thu / thu ở ca khác ⇒ không trừ.",
+      "input": {
+        "shift": {"id": "00000000-0000-4000-8000-0000000000b1", "open_boxes": 10, "open_plates": 0, "open_float": 100000, "close_boxes_left": 4, "close_plates_left": 0, "close_cash_counted": 145000},
+        "adjustments": [],
+        "orders": [
+          {"id": "00000000-0000-4000-8000-000000000801", "code": "J21", "status": "paid", "dine_type": "delivery", "opened_shift_id": "00000000-0000-4000-8000-0000000000b1", "paid_shift_id": "00000000-0000-4000-8000-0000000000b1", "payment_method": "cash", "ship_mode": "external", "ship_fee": 5000, "ship_payout": 10000, "total": 30000, "served_at": null, "deleted_at": null,
+            "items": [{"product_id": "00000000-0000-4000-8000-0000000000a1", "qty": 1, "toppings_snap": []}] },
+          {"id": "00000000-0000-4000-8000-000000000802", "code": "J22", "status": "paid", "dine_type": "delivery", "opened_shift_id": "00000000-0000-4000-8000-0000000000b1", "paid_shift_id": "00000000-0000-4000-8000-0000000000b1", "payment_method": "transfer", "ship_mode": "external", "ship_fee": 5000, "ship_payout": 10000, "total": 30000, "served_at": null, "deleted_at": null,
+            "items": [{"product_id": "00000000-0000-4000-8000-0000000000a1", "qty": 1, "toppings_snap": []}] },
+          {"id": "00000000-0000-4000-8000-000000000803", "code": "J23", "status": "paid", "dine_type": "delivery", "opened_shift_id": "00000000-0000-4000-8000-0000000000b1", "paid_shift_id": "00000000-0000-4000-8000-0000000000b1", "payment_method": "debt", "ship_mode": "external", "ship_fee": 0, "ship_payout": 15000, "total": 25000, "served_at": null, "deleted_at": null,
+            "items": [{"product_id": "00000000-0000-4000-8000-0000000000a1", "qty": 1, "toppings_snap": []}] },
+          {"id": "00000000-0000-4000-8000-000000000804", "code": "J24", "status": "deleted", "dine_type": "delivery", "opened_shift_id": "00000000-0000-4000-8000-0000000000b1", "paid_shift_id": null, "payment_method": null, "ship_mode": "external", "ship_fee": 5000, "ship_payout": 10000, "total": 30000, "served_at": null, "deleted_at": "2026-11-17T23:30:00Z",
+            "items": [{"product_id": "00000000-0000-4000-8000-0000000000a1", "qty": 1, "toppings_snap": []}] },
+          {"id": "00000000-0000-4000-8000-000000000805", "code": "J25", "status": "served", "dine_type": "delivery", "opened_shift_id": "00000000-0000-4000-8000-0000000000b1", "paid_shift_id": null, "payment_method": null, "ship_mode": "external", "ship_fee": 5000, "ship_payout": 10000, "total": 30000, "served_at": null, "deleted_at": null,
+            "items": [{"product_id": "00000000-0000-4000-8000-0000000000a1", "qty": 1, "toppings_snap": []}] },
+          {"id": "00000000-0000-4000-8000-000000000806", "code": "J26", "status": "paid", "dine_type": "delivery", "opened_shift_id": "00000000-0000-4000-8000-0000000000b1", "paid_shift_id": "00000000-0000-4000-8000-0000000000b1", "payment_method": "cash", "ship_mode": "shop", "ship_fee": 10000, "ship_payout": 0, "total": 35000, "served_at": null, "deleted_at": null,
+            "items": [{"product_id": "00000000-0000-4000-8000-0000000000a1", "qty": 1, "toppings_snap": []}] },
+          {"id": "00000000-0000-4000-8000-000000000807", "code": "J27", "status": "paid", "dine_type": "delivery", "opened_shift_id": "00000000-0000-4000-8000-0000000000b1", "paid_shift_id": "00000000-0000-4000-8000-0000000000b2", "payment_method": "cash", "ship_mode": "external", "ship_fee": 5000, "ship_payout": 20000, "total": 30000, "served_at": null, "deleted_at": null,
+            "items": [{"product_id": "00000000-0000-4000-8000-0000000000a1", "qty": 1, "toppings_snap": []}] },
+          {"id": "00000000-0000-4000-8000-000000000808", "code": "J28", "status": "paid", "dine_type": "delivery", "opened_shift_id": "00000000-0000-4000-8000-0000000000b0", "paid_shift_id": "00000000-0000-4000-8000-0000000000b1", "payment_method": "cash", "ship_mode": "external", "ship_fee": 5000, "ship_payout": 5000, "total": 20000, "served_at": null, "deleted_at": null,
+            "items": [{"product_id": "00000000-0000-4000-8000-0000000000a1", "qty": 1, "toppings_snap": []}] }
+        ],
+        "debt_payments": []
+      },
+      "expected": {
+        "count_items": ["cash", "boxes", "plates"],
+        "revenue": {"total": 140000, "cash": 85000, "transfer": 30000, "debt": 25000, "ship_fee": 25000},
+        "ship": {"shop_orders": 1, "external_orders": 4, "shop_fee": 10000, "external_fee": 15000, "payout": 40000, "external_profit": -25000},
+        "paid_orders": 5,
+        "debt_collected": {"cash": 0, "transfer": 0},
+        "cash": {"expected": 145000, "counted": 145000, "diff": 0},
+        "boxes": {"used": 6, "by_orders": 6, "diff": 0},
+        "plates": {"used": 0, "by_orders": 0, "diff": 0},
+        "cans": {"used": null, "by_orders": 0, "diff": null},
+        "deleted_count": 1,
+        "deleted_after_served": [],
+        "open_orders": 1
       }
     }
   ]

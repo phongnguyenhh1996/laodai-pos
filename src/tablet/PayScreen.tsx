@@ -124,7 +124,7 @@ export function PayScreen() {
             ))}
             {o.ship_fee > 0 && (
               <li className="flex items-baseline justify-between gap-3 text-ink-muted" data-testid="pay-ship-fee">
-                <span className="min-w-0">Phí ship</span>
+                <span className="min-w-0">{o.ship_mode === 'external' ? 'Phụ thu' : 'Phí ship'}</span>
                 <span className="num shrink-0 font-medium">{formatVnd(o.ship_fee)}</span>
               </li>
             )}
@@ -134,6 +134,11 @@ export function PayScreen() {
             <span className="num text-[34px] font-bold leading-tight text-brand-deep md:text-[40px]" data-testid="pay-total">
               {formatVnd(o.total)}
             </span>
+            {o.ship_mode === 'external' && o.ship_payout > 0 && (
+              <span className="num text-[15px] font-semibold text-danger-strong" data-testid="pay-ship-payout">
+                Trả shipper −{formatVnd(o.ship_payout)} (lấy từ két)
+              </span>
+            )}
           </div>
         </section>
 

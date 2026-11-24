@@ -8,7 +8,7 @@ import { methodShares, shiftDate, shortDate } from '@/domain/report';
 import { businessDate, hhmm } from '@/domain/time';
 import { useOwner } from '../OwnerContext';
 import { Chip, OwnerLayout } from '../OwnerLayout';
-import { PageHead, Section, TONE, card } from '../ui';
+import { PageHead, Section, ShipStatsLine, TONE, card } from '../ui';
 import { loadReport, type Report } from './api';
 
 type Preset = 'today' | '7d' | 'month' | 'custom';
@@ -162,11 +162,7 @@ function ReportBody({ r, rangeLabel, isToday }: { r: Report; rangeLabel: string;
             </b>
           </span>
         ))}
-        {(r.revenue.ship_fee ?? 0) > 0 && (
-          <span className="text-[#6d6d6d]" data-testid="report-ship-fee">
-            trong đó phí ship <b className="num font-semibold text-ink">{formatVnd(r.revenue.ship_fee ?? 0)}</b>
-          </span>
-        )}
+        <ShipStatsLine stats={r.revenue.ship} testId="report-ship" className="w-full text-[#6d6d6d] [&_b]:text-ink" />
       </p>
     </Section>
   );

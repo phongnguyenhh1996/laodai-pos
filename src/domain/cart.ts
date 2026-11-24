@@ -1,7 +1,7 @@
 // Giỏ hàng của màn tạo / sửa đơn trên tablet: thêm combo / món + topping, đổi số lượng, đổi điểm bán.
 // Hàm thuần, không đụng IndexedDB: màn đơn giữ bản nháp, chỉ ghi xuống khi bấm Lưu / Đã ra món / Thanh toán.
 import { assertQty, buildComboItem, buildItem, orderTotal } from './pricing';
-import type { Combo, Customer, DineType, Money, OrderItem, Point, Product, Topping } from './types';
+import type { Combo, Customer, DineType, Money, OrderItem, Point, Product, ShipDefaults, ShipMode, Topping } from './types';
 
 /** Khách của đơn ship: có trong danh sách khách, hoặc khách mới (server tạo cùng lúc lưu đơn). */
 export interface DraftCustomer {
@@ -23,24 +23,45 @@ export interface CartDraft {
   address: string;
   /** Khách đơn ship (tùy chọn): chọn khách ⇒ điền sẵn địa chỉ giao gần nhất của khách. */
   customer: DraftCustomer | null;
-  /** Phí ship đang chọn (0 = không phí): chỉ tính khi đơn ship. */
+  /** Phí ship đang chọn (0 = không phí): chỉ tính khi đơn ship. Shipper ngoài: UI gọi là "Phụ thu". */
   ship_fee: Money;
+  /** Kiểu ship: chỉ tính khi đơn ship. */
+  ship_mode: ShipMode;
+  /** Tiền trả shipper ngoài (0 = chưa chọn): chỉ tính khi đơn ship + shipper ngoài; không nằm trong tổng. */
+  ship_payout: Money;
+  /** Nhân viên đã tự bấm kiểu / phí / trả shipper ⇒ mặc định theo ca đến muộn không ghi đè. */
+  ship_touched?: boolean;
   items: OrderItem[];
 }
 
 export class CartError extends Error {}
 
-export function newDraft(point: Pick<Point, 'id' | 'default_dine_type'>): CartDraft {
-  return {
-    point_id: point.id,
-    dine_type: point.default_dine_type,
-    dine_type_touched: false,
-    label: '',
-    address: '',
-    customer: null,
-    ship_fee: 0,
-    items: [],
-  };
+/**
+ * Đơn mới. `ship` = mặc định theo ca (đơn ship gần nhất của ca); chưa có ⇒ Quán ship, chưa chọn phí.
+ */
+export function newDraft(point: Pick<Point, 'id' | 'default_dine_type'>, ship: ShipDefaults | null = null): CartDraft {
+  return withShipDefaults(
+    {
+      point_id: point.id,
+      dine_type: point.default_dine_type,
+      dine_type_touched: false,
+      label: '',
+      address: '',
+      customer: null,
+      ship_fee: 0,
+      ship_mode: 'shop',
+      ship_payout: 0,
+      items: [],
+    },
+    ship,
+  );
+}
+
+/** Áp mặc định theo ca (đến sau khi đã dựng bản nháp) — trừ khi nhân viên đã tự chọn kiểu / phí / trả shipper. */
+export function withShipDefaults(draft: CartDraft, ship: ShipDefaults | null): CartDraft {
+  if (!ship || draft.ship_touched) return draft;
+  const external = ship.ship_mode === 'external';
+  return { ...draft, ship_mode: ship.ship_mode, ship_fee: ship.ship_fee, ship_payout: external ? ship.ship_payout : 0 };
 }
 
 /** Hai dòng giống hệt nhau (cùng món, cùng topping, cùng giá chụp) ⇒ gộp thành một dòng tăng số lượng. */
@@ -152,9 +173,29 @@ export function draftShipFee(draft: Partial<Pick<CartDraft, 'dine_type' | 'ship_
   return draft.dine_type === 'delivery' ? draft.ship_fee ?? 0 : 0;
 }
 
-/** Bấm một mức phí ship; bấm lại mức đang chọn ⇒ bỏ phí. */
+/** Bấm một mức phí ship / phụ thu; bấm lại mức đang chọn ⇒ bỏ phí. */
 export function toggleShipFee(draft: CartDraft, fee: Money): CartDraft {
-  return { ...draft, ship_fee: draft.ship_fee === fee ? 0 : fee };
+  return { ...draft, ship_fee: draft.ship_fee === fee ? 0 : fee, ship_touched: true };
+}
+
+/** Kiểu ship gửi đi: không phải đơn ship ⇒ `shop`. */
+export function draftShipMode(draft: Partial<Pick<CartDraft, 'dine_type' | 'ship_mode'>>): ShipMode {
+  return draft.dine_type === 'delivery' ? draft.ship_mode ?? 'shop' : 'shop';
+}
+
+/** Tiền trả shipper gửi đi: chỉ đơn ship + shipper ngoài (0 = chưa chọn). */
+export function draftShipPayout(draft: Partial<Pick<CartDraft, 'dine_type' | 'ship_mode' | 'ship_payout'>>): Money {
+  return draftShipMode(draft) === 'external' ? draft.ship_payout ?? 0 : 0;
+}
+
+/** Công tắc Quán ship / Shipper ngoài. Về Quán ship ⇒ bỏ tiền trả shipper (phí giữ nguyên). */
+export function setShipMode(draft: CartDraft, ship_mode: ShipMode): CartDraft {
+  return { ...draft, ship_mode, ship_payout: ship_mode === 'external' ? draft.ship_payout : 0, ship_touched: true };
+}
+
+/** Chọn mức trả shipper; bấm lại mức đang chọn KHÔNG bỏ (bắt buộc chọn). */
+export function toggleShipPayout(draft: CartDraft, payout: Money): CartDraft {
+  return { ...draft, ship_payout: payout, ship_touched: true };
 }
 
 /**
@@ -177,9 +218,13 @@ export function switchPoint(draft: CartDraft, points: readonly Point[], to: Poin
   };
 }
 
-/** Rời đơn ship ⇒ bỏ phí ship (địa chỉ / khách vẫn giữ trên màn, chỉ không gửi đi). */
+/**
+ * Rời đơn ship ⇒ bỏ phí ship, kiểu ship về Quán ship, bỏ tiền trả shipper
+ * (địa chỉ / khách vẫn giữ trên màn, chỉ không gửi đi).
+ */
 export function setDineType(draft: CartDraft, dine_type: DineType): CartDraft {
-  return { ...draft, dine_type, dine_type_touched: true, ship_fee: dine_type === 'delivery' ? draft.ship_fee : 0 };
+  if (dine_type === 'delivery') return { ...draft, dine_type, dine_type_touched: true };
+  return { ...draft, dine_type, dine_type_touched: true, ship_fee: 0, ship_mode: 'shop', ship_payout: 0 };
 }
 
 /** Địa chỉ gửi đi: chỉ đơn ship mới có, bỏ khoảng trắng thừa. */
@@ -212,6 +257,18 @@ export function needsAddress(draft: Pick<CartDraft, 'dine_type' | 'address'>): b
   return draft.dine_type === 'delivery' && draftAddress(draft) === null;
 }
 
+/** Đơn shipper ngoài chưa chọn tiền trả shipper ⇒ chưa được lưu. */
+export function needsShipPayout(draft: Partial<Pick<CartDraft, 'dine_type' | 'ship_mode' | 'ship_payout'>>): boolean {
+  return draftShipMode(draft) === 'external' && draftShipPayout(draft) === 0;
+}
+
+/** Lý do đơn ship chưa lưu / ra món / thanh toán được (chữ đỏ trên giỏ), hoặc null. */
+export function draftBlocker(draft: Pick<CartDraft, 'dine_type' | 'address'> & Partial<Pick<CartDraft, 'ship_mode' | 'ship_payout'>>): string | null {
+  if (needsAddress(draft)) return 'Thiếu địa chỉ ship';
+  if (needsShipPayout(draft)) return 'Chưa chọn tiền trả shipper';
+  return null;
+}
+
 /** "2× Xôi gà (Trứng, Chả)" — tóm tắt dòng trên thẻ hàng đợi / giỏ hàng. */
 export function lineSummary(it: Pick<OrderItem, 'qty' | 'name_snap' | 'toppings_snap'>): string {
   const tops = it.toppings_snap.length ? ` (${it.toppings_snap.map((t) => t.name).join(', ')})` : '';
@@ -224,7 +281,8 @@ export function itemsSummary(items: ReadonlyArray<Pick<OrderItem, 'qty' | 'name_
 
 /** Bản nháp khác với đơn đã lưu ⇒ cần ghi `update_order`. */
 export function draftChanged(
-  draft: Pick<CartDraft, 'point_id' | 'dine_type' | 'label' | 'address' | 'items'> & Partial<Pick<CartDraft, 'customer' | 'ship_fee'>>,
+  draft: Pick<CartDraft, 'point_id' | 'dine_type' | 'label' | 'address' | 'items'> &
+    Partial<Pick<CartDraft, 'customer' | 'ship_fee' | 'ship_mode' | 'ship_payout'>>,
   saved: {
     point_id: string;
     dine_type: DineType;
@@ -232,12 +290,16 @@ export function draftChanged(
     address: string | null;
     customer_id?: string | null;
     ship_fee?: Money;
+    ship_mode?: ShipMode;
+    ship_payout?: Money;
     items: readonly OrderItem[];
   },
 ): boolean {
   if (draft.point_id !== saved.point_id || draft.dine_type !== saved.dine_type) return true;
   if (draftAddress(draft) !== (saved.address ?? null)) return true;
   if (draftShipFee(draft) !== (saved.ship_fee ?? 0)) return true;
+  if (draftShipMode(draft) !== (saved.ship_mode ?? 'shop')) return true;
+  if (draftShipPayout(draft) !== (saved.ship_payout ?? 0)) return true;
   if ((draftCustomer({ dine_type: draft.dine_type, customer: draft.customer ?? null })?.id ?? null) !== (saved.customer_id ?? null)) return true;
   if ((draft.label.trim() || null) !== (saved.label ?? null)) return true;
   if (draft.items.length !== saved.items.length) return true;

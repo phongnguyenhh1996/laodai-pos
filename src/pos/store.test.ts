@@ -21,6 +21,7 @@ class ManualBackend implements PosBackend {
   unsubscribed = 0;
   push = vi.fn();
   loadDebtHistory = vi.fn();
+  loadShipDefaults = vi.fn();
   loadOpenState = () => new Promise<OpenState>((resolve, reject) => this.openCalls.push({ resolve, reject }));
   loadCatalog = () => new Promise<typeof CATALOG>((resolve, reject) => this.catalogCalls.push({ resolve, reject }));
   subscribe(_p: string, onPulse: (s: PulseScope) => void, onStatus: (s: ChannelStatus) => void) {

@@ -2,7 +2,7 @@
 import { itemsSummary } from './cart';
 import { formatVnd } from './money';
 import { DAY_MARK_LABELS, PAYROLL_KIND_LABELS, formatDate, monthLabel, type DayMarkKind, type PayrollKind } from './payroll';
-import { DINE_LABELS, type DeleteReason, type DineType, type OrderItem, type OrderStatus, type PaymentMethod } from './types';
+import { DINE_LABELS, SHIP_MODE_LABELS, type DeleteReason, type DineType, type OrderItem, type OrderStatus, type PaymentMethod, type ShipMode } from './types';
 
 const dineLabel = (t: DineType | undefined) => (t ? (DINE_LABELS[t] ?? t) : '—');
 
@@ -102,6 +102,8 @@ type OrderSnap = {
   status?: OrderStatus;
   total?: number;
   ship_fee?: number;
+  ship_mode?: ShipMode;
+  ship_payout?: number;
   dine_type?: DineType;
   address?: string | null;
   label?: string | null;
@@ -174,7 +176,16 @@ export function describeAudit(e: Pick<AuditEntry, 'action' | 'before' | 'after' 
     }
     if (b && a && b.dine_type !== a.dine_type) lines.push(`${dineLabel(b.dine_type)} → ${dineLabel(a.dine_type)}`);
     if (b && a && (b.address ?? null) !== (a.address ?? null)) lines.push(`Địa chỉ: ${b.address ?? '—'} → ${a.address ?? '—'}`);
-    if (b && a && (b.ship_fee ?? 0) !== (a.ship_fee ?? 0)) lines.push(`Phí ship: ${formatVnd(b.ship_fee ?? 0)} → ${formatVnd(a.ship_fee ?? 0)}`);
+    if (b && a && (b.ship_mode ?? 'shop') !== (a.ship_mode ?? 'shop')) {
+      lines.push(`Kiểu ship: ${SHIP_MODE_LABELS[b.ship_mode ?? 'shop']} → ${SHIP_MODE_LABELS[a.ship_mode ?? 'shop']}`);
+    }
+    if (b && a && (b.ship_fee ?? 0) !== (a.ship_fee ?? 0)) {
+      const noun = a.ship_mode === 'external' ? 'Phụ thu' : 'Phí ship';
+      lines.push(`${noun}: ${formatVnd(b.ship_fee ?? 0)} → ${formatVnd(a.ship_fee ?? 0)}`);
+    }
+    if (b && a && (b.ship_payout ?? 0) !== (a.ship_payout ?? 0)) {
+      lines.push(`Trả shipper: ${formatVnd(b.ship_payout ?? 0)} → ${formatVnd(a.ship_payout ?? 0)}`);
+    }
     if (b && a && (b.label ?? null) !== (a.label ?? null)) lines.push(`Nhãn: ${b.label ?? '—'} → ${a.label ?? '—'}`);
     const cb = (e.before as { customer_id?: string } | null)?.customer_id;
     const ca = (e.after as { customer_id?: string } | null)?.customer_id;

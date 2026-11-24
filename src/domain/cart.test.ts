@@ -7,7 +7,14 @@ import {
   canSwitchPoint,
   draftAddress,
   draftChanged,
+  draftBlocker,
   draftShipFee,
+  draftShipMode,
+  draftShipPayout,
+  needsShipPayout,
+  setShipMode,
+  toggleShipPayout,
+  withShipDefaults,
   draftTotal,
   itemsSummary,
   lineSummary,
@@ -206,6 +213,56 @@ describe('cart', () => {
     expect(draftChanged(toggleShipFee(a, 20_000), saved)).toBe(true);
     // Đơn ship cũ (chưa có cột phí) mở lại, không chọn phí ⇒ không bị coi là đã sửa.
     expect(draftChanged(ship, { ...saved, ship_fee: undefined })).toBe(false);
+  });
+
+  it('kiểu ship: shipper ngoài bắt buộc trả shipper, không cộng vào tổng; về quán ship bỏ trả shipper; rời Ship ⇒ shop/0', () => {
+    const items = addProduct([], 'l1', XOI_XEO, [], XOI_MENU); // 15.000
+    const ship = { ...setDineType({ ...newDraft(XOI_A), items }, 'delivery'), address: '12 Lê Lợi' };
+    expect(ship).toMatchObject({ ship_mode: 'shop', ship_payout: 0 });
+    expect(draftBlocker(ship)).toBeNull();
+
+    const ext = setShipMode(toggleShipFee(ship, 5_000), 'external');
+    expect(needsShipPayout(ext)).toBe(true);
+    expect(draftBlocker(ext)).toBe('Chưa chọn tiền trả shipper');
+    expect(draftBlocker({ ...ext, address: '' })).toBe('Thiếu địa chỉ ship');
+    const paid = toggleShipPayout(ext, 10_000);
+    expect(draftBlocker(paid)).toBeNull();
+    // Phụ thu nằm trong tổng, trả shipper thì không.
+    expect(draftTotal(paid)).toBe(20_000);
+    expect([draftShipMode(paid), draftShipFee(paid), draftShipPayout(paid)]).toEqual(['external', 5_000, 10_000]);
+    // Bấm lại mức trả shipper đang chọn không bỏ được.
+    expect(toggleShipPayout(paid, 10_000).ship_payout).toBe(10_000);
+    expect(toggleShipPayout(paid, 15_000).ship_payout).toBe(15_000);
+
+    // Về quán ship: bỏ trả shipper, phí giữ nguyên.
+    expect(setShipMode(paid, 'shop')).toMatchObject({ ship_mode: 'shop', ship_fee: 5_000, ship_payout: 0 });
+    // Rời Ship: về shop / 0, không gửi gì.
+    const take = setDineType(paid, 'takeaway');
+    expect(take).toMatchObject({ ship_mode: 'shop', ship_fee: 0, ship_payout: 0 });
+    expect([draftShipMode({ ...paid, dine_type: 'dinein' }), draftShipPayout({ ...paid, dine_type: 'dinein' })]).toEqual(['shop', 0]);
+    expect(needsShipPayout({ ...ext, dine_type: 'takeaway' })).toBe(false);
+
+    const saved = { point_id: 'xoi-a', dine_type: 'delivery' as DineType, label: null, address: '12 Lê Lợi', items, ship_fee: 5_000, ship_mode: 'external' as const, ship_payout: 10_000 };
+    expect(draftChanged(paid, saved)).toBe(false);
+    expect(draftChanged(toggleShipPayout(paid, 15_000), saved)).toBe(true);
+    expect(draftChanged(setShipMode(paid, 'shop'), saved)).toBe(true);
+    // Đơn cũ (chưa có hai cột) ⇒ shop / 0, không bị coi là đã sửa.
+    expect(draftChanged(toggleShipFee(ship, 5_000), { ...saved, ship_mode: undefined, ship_payout: undefined })).toBe(false);
+  });
+
+  it('mặc định theo ca: đơn mới lấy kiểu / phí / trả shipper của đơn ship gần nhất; đến muộn không đè lựa chọn đã bấm', () => {
+    const def = { ship_mode: 'external' as const, ship_fee: 5_000, ship_payout: 10_000 };
+    expect(newDraft(XOI_A, def)).toMatchObject(def);
+    expect(newDraft(XOI_A, null)).toMatchObject({ ship_mode: 'shop', ship_fee: 0, ship_payout: 0 });
+    // Quán ship gần nhất có payout lạ ⇒ bỏ.
+    expect(newDraft(XOI_A, { ship_mode: 'shop', ship_fee: 15_000, ship_payout: 9_000 })).toMatchObject({ ship_mode: 'shop', ship_fee: 15_000, ship_payout: 0 });
+    const d = newDraft(XOI_A);
+    expect(withShipDefaults(d, def)).toMatchObject(def);
+    expect(withShipDefaults(d, null)).toBe(d);
+    const touched = toggleShipFee(d, 10_000);
+    expect(withShipDefaults(touched, def)).toBe(touched);
+    // Mặc định chỉ tính khi là đơn ship.
+    expect(draftTotal({ ...newDraft(XOI_A, def), dine_type: 'takeaway' })).toBe(0);
   });
 
   it('khách đơn ship: chọn khách điền sẵn địa chỉ (không đè địa chỉ tự gõ); đổi khách ⇒ có thay đổi; không phải ship ⇒ bỏ khách', () => {

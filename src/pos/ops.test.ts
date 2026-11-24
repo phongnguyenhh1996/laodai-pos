@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { COMBO_XOI_FULL, CHA, TRUNG, XOI_GA } from '@/domain/fixtures';
+import { orderTotal } from '@/domain/pricing';
 import type { OrderItem } from '@/domain/types';
 import { CATALOG } from '@/test-utils/tablet';
 import { FakeServer } from '@/test-utils/fakeServer';
@@ -140,6 +141,69 @@ describe('đơn', () => {
     const o = await pos.createOrder(draft());
     vi.spyOn(backend, 'push').mockResolvedValueOnce({ status: 'ok' });
     expect((await pos.updateOrder(o.id, { label: 'z' })).id).toBe(o.id);
+  });
+});
+
+describe('ship hai kiểu', () => {
+  const ship = (over = {}) => draft({ dine_type: 'delivery' as const, address: '12 Lê Lợi', ...over });
+
+  it('shipper ngoài: gửi kiểu + payout, tổng không cộng payout; thiếu payout ⇒ báo ngay; quán ship / mang về ⇒ shop / 0', async () => {
+    await boot();
+    await expect(pos.createOrder(ship({ ship_mode: 'external', ship_fee: 5000 }))).rejects.toThrow('Chưa chọn tiền trả shipper');
+    const o = await pos.createOrder(ship({ ship_mode: 'external', ship_fee: 5000, ship_payout: 10000 }));
+    const sent = server.ops.at(-1)!.payload.order as Record<string, unknown>;
+    expect(sent).toMatchObject({ ship_mode: 'external', ship_payout: 10000, ship_fee: 5000, total: orderTotal([line()]) + 5000 });
+    expect(o).toMatchObject({ ship_mode: 'external', ship_payout: 10000 });
+
+    const shop = await pos.createOrder(ship({ ship_mode: 'shop', ship_payout: 10000 }));
+    expect(shop).toMatchObject({ ship_mode: 'shop', ship_payout: 0 });
+    const take = await pos.createOrder(draft({ ship_mode: 'external', ship_payout: 10000 }));
+    expect(take).toMatchObject({ ship_mode: 'shop', ship_payout: 0 });
+
+    // Sửa: không gửi kiểu ⇒ giữ kiểu cũ; đổi sang mang về ⇒ shop / 0.
+    const u = await pos.updateOrder(o.id, { ship_payout: 15000 });
+    expect(u).toMatchObject({ ship_mode: 'external', ship_payout: 15000 });
+    expect(server.ops.at(-1)!.payload).toMatchObject({ ship_mode: 'external', ship_payout: 15000 });
+    await expect(pos.updateOrder(o.id, { ship_payout: 0 })).rejects.toThrow('Chưa chọn tiền trả shipper');
+    expect(await pos.updateOrder(o.id, { dine_type: 'takeaway' })).toMatchObject({ ship_mode: 'shop', ship_payout: 0, ship_fee: 0 });
+  });
+
+  it('server từ chối payout sai ⇒ thông điệp tiếng Việt', () => {
+    expect(rejectMessage('bad_ship_payout')).toBe('Chưa chọn tiền trả shipper');
+    expect(rejectMessage('bad_ship_mode')).toBe('Kiểu ship không hợp lệ');
+  });
+
+  it('mặc định theo ca: hỏi server (đơn đã thanh toán vẫn tính); lưu đơn ship ⇒ nhớ ngay; mất mạng ⇒ bản đã biết', async () => {
+    await boot();
+    expect(await pos.shipDefaults()).toBeNull();
+    const o = await pos.createOrder(ship({ ship_mode: 'external', ship_fee: 5000, ship_payout: 10000 }));
+    expect(pos.cachedShipDefaults()).toEqual({ ship_mode: 'external', ship_fee: 5000, ship_payout: 10000 });
+    await pos.updateOrder(o.id, { ship_payout: 20000 });
+    expect(pos.cachedShipDefaults()).toMatchObject({ ship_payout: 20000 });
+    await pos.payOrder(o.id, { method: 'transfer' });
+    expect(await pos.shipDefaults()).toEqual({ ship_mode: 'external', ship_fee: 5000, ship_payout: 20000 });
+
+    // Máy khác cùng quầy tạo đơn quán ship ⇒ lần hỏi sau thấy luôn.
+    const other = new Pos(new TabletStore(server.device(), { debounceMs: 0, schedule: () => () => undefined }));
+    const otherStore = (other as unknown as { store: TabletStore }).store;
+    otherStore.start('tab-a');
+    await otherStore.refresh();
+    await other.createOrder(ship({ ship_fee: 15000 }));
+    // Sửa đơn cũ hơn ⇒ mặc định đã biết không đổi.
+    expect(pos.cachedShipDefaults()).toMatchObject({ ship_mode: 'external' });
+    expect(await pos.shipDefaults()).toEqual({ ship_mode: 'shop', ship_fee: 15000, ship_payout: 0 });
+
+    server.offline = true;
+    expect(await pos.shipDefaults()).toEqual({ ship_mode: 'shop', ship_fee: 15000, ship_payout: 0 });
+    server.offline = false;
+    pos.reset();
+    expect(pos.cachedShipDefaults()).toBeNull();
+  });
+
+  it('chưa mở ca ⇒ không có mặc định', async () => {
+    await boot(false);
+    expect(await pos.shipDefaults()).toBeNull();
+    expect(pos.cachedShipDefaults()).toBeNull();
   });
 });
 

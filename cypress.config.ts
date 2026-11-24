@@ -78,6 +78,36 @@ export default defineConfig({
           return sim.shiftId;
         },
         'sim:sell': (a: SellArgs) => simSell(a),
+        /**
+         * Máy thứ hai của cùng quầy (phiên tablet riêng, giả lập phía server) tạo một đơn ship 1 Xôi gà vào ca đang mở
+         * rồi (nếu có `method`) thu tiền. Trả id.
+         */
+        'sim:shipOrder': async (a: { tablet: TabletKey; mode: 'shop' | 'external'; fee: number; payout?: number; method?: 'cash' | 'transfer' }) => {
+          const sim = await simFor(a.tablet);
+          const [s] = await sql<{ id: string }>("select id from shifts where tablet_profile_id = $1 and status = 'open'", [SEED.tablets[a.tablet]]);
+          if (!s) throw new Error('không có ca đang mở');
+          sim.shiftId = s.id;
+          const total = 25_000 + a.fee;
+          // Ca do máy thật mở theo giờ thật ⇒ thao tác của máy giả cũng ghi giờ thật (đồng hồ của TabletSim đi sau).
+          const o = sim.createOrderOp([item('xoiGa')], {
+            dine_type: 'delivery', address: '9 Pasteur', ship_mode: a.mode, ship_fee: a.fee, ship_payout: a.payout ?? 0, total,
+          });
+          o.op.performed_at = new Date().toISOString();
+          ok('tạo đơn ship', await push(sim.c, o.op));
+          if (a.method) {
+            const payOp = op('pay_order', o.id, { order_id: o.id, paid_shift_id: s.id, method: a.method, cash_given: a.method === 'cash' ? total : null, total, customer: null }, new Date().toISOString());
+            ok('thanh toán', await push(sim.c, payOp));
+          }
+          return o.id;
+        },
+        /** Mặc định đơn ship của ca đang mở, hỏi bằng một phiên tablet khác của cùng quầy (RPC `shift_ship_defaults`). */
+        'sim:shipDefaults': async (tablet: TabletKey) => {
+          const [s] = await sql<{ id: string }>("select id from shifts where tablet_profile_id = $1 and status = 'open'", [SEED.tablets[tablet]]);
+          const c = await tabletClient(SEED.tablets[tablet]);
+          const { data, error } = await c.rpc('shift_ship_defaults', { p_shift: s.id });
+          if (error) throw new Error(error.message);
+          return data;
+        },
         /** Đóng ca hiện tại của tablet giả lập. Trả id ca. */
         'sim:close': async ({ tablet, boxes, plates, cash }: { tablet: TabletKey; boxes: number; plates: number; cash: number }) => {
           const sim = await simFor(tablet);
@@ -207,7 +237,7 @@ export default defineConfig({
         'db:orders': (tablet: keyof typeof SEED.tablets) =>
           sql(
             `select o.id, o.device_seq, o.code, o.point_id, o.dine_type, o.status, o.total, o.label,
-                    o.payment_method, o.cash_given, o.opened_shift_id, o.paid_shift_id, o.address, o.ship_fee,
+                    o.payment_method, o.cash_given, o.opened_shift_id, o.paid_shift_id, o.address, o.ship_fee, o.ship_mode, o.ship_payout,
                     o.served_at is not null as served, o.delete_reason,
                     coalesce((select json_agg(json_build_object('product_id', i.product_id, 'qty', i.qty,
                                 'unit_price_snap', i.unit_price_snap, 'toppings', i.toppings_snap) order by i.sort)

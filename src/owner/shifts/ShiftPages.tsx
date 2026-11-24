@@ -10,7 +10,7 @@ import { businessDate, hhmm } from '@/domain/time';
 import { DEFAULT_COUNT_ITEMS, type AdjustmentKind } from '@/domain/types';
 import { useOwner } from '../OwnerContext';
 import { Chip, OwnerLayout } from '../OwnerLayout';
-import { KV, PageHead, Section, TONE, card } from '../ui';
+import { KV, PageHead, Section, ShipStatsLine, TONE, card } from '../ui';
 import { addAdjustment, loadShiftBoard, loadShiftDetail, type ShiftCard, type ShiftDetail, type ShiftOrderRow, type ShiftRow } from './api';
 
 /** `/owner/shifts/*` (mục 7, màn chủ số 2). */
@@ -323,7 +323,7 @@ function ShiftBody({ detail, onChanged }: { detail: ShiftDetail; onChanged: () =
           <span className="sr-only"> · </span>
           <span className="ml-3.5">Nợ {formatVnd(r.revenue.debt)}</span>
         </span>
-        {r.revenue.ship_fee > 0 && <span data-testid="rep-ship-fee">trong đó phí ship {formatVnd(r.revenue.ship_fee)}</span>}
+        <ShipStatsLine stats={r.ship} testId="rep-ship" />
         {debtIn > 0 && (
           <span data-testid="rep-debt-collected">
             Thu nợ TM {formatVnd(r.debt_collected.cash)} · CK {formatVnd(r.debt_collected.transfer)}
@@ -350,6 +350,11 @@ function ShiftBody({ detail, onChanged }: { detail: ShiftDetail; onChanged: () =
         <KV roomy label="Chủ bổ sung">
           <span data-testid="rep-cash-adj">{formatVnd(adj('cash'))}</span>
         </KV>
+        {(r.ship?.payout ?? 0) > 0 && (
+          <KV roomy label="Trả shipper ngoài (từ két)">
+            <span data-testid="rep-cash-payout">{formatSigned(-(r.ship?.payout ?? 0))}</span>
+          </KV>
+        )}
         <KV roomy label="Kỳ vọng">
           <span data-testid="rep-cash-expected">{formatVnd(r.cash.expected)}</span>
         </KV>

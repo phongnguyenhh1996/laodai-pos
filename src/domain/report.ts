@@ -1,6 +1,24 @@
 // Số liệu hiển thị của dashboard / báo cáo chủ (mục 7, màn chủ 1 & 4). Hàm thuần.
 import { waitColor, type WaitColor } from './queue';
+import { formatSigned, formatVnd } from './money';
+import type { ShipStats } from './reconcile';
 import type { Money, OrderStatus } from './types';
+
+/**
+ * Thống kê ship (SPEC 5, chỉ chủ) thành các dòng hiển thị; mỗi dòng chỉ hiện khi > 0
+ * (lãi/lỗ ship ngoài hiện khi có đơn shipper ngoài, kể cả lỗ). Không có số liệu (server cũ) ⇒ rỗng.
+ */
+export function shipStatLines(s: ShipStats | null | undefined): Array<{ key: keyof ShipStats; label: string; value: string }> {
+  if (!s) return [];
+  const out: Array<{ key: keyof ShipStats; label: string; value: string }> = [];
+  if (s.shop_orders > 0) out.push({ key: 'shop_orders', label: 'Quán ship', value: `${s.shop_orders} đơn` });
+  if (s.external_orders > 0) out.push({ key: 'external_orders', label: 'Shipper ngoài', value: `${s.external_orders} đơn` });
+  if (s.shop_fee > 0) out.push({ key: 'shop_fee', label: 'Phí ship', value: formatVnd(s.shop_fee) });
+  if (s.external_fee > 0) out.push({ key: 'external_fee', label: 'Phụ thu ship ngoài', value: formatVnd(s.external_fee) });
+  if (s.payout > 0) out.push({ key: 'payout', label: 'Trả shipper ngoài', value: formatVnd(s.payout) });
+  if (s.external_orders > 0) out.push({ key: 'external_profit', label: 'Lãi/lỗ ship ngoài', value: formatSigned(s.external_profit) });
+  return out;
+}
 
 export interface MethodSplit {
   cash: Money;

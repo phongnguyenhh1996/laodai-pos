@@ -8,21 +8,28 @@ import {
   canSwitchPoint,
   draftAddress,
   draftChanged,
+  draftBlocker,
   draftCustomer,
   draftShipFee,
+  draftShipMode,
+  draftShipPayout,
   draftTotal,
   itemsSummary,
   lineSummary,
   needsAddress,
+  needsShipPayout,
   newDraft,
   replaceWithCombo,
   replaceWithProduct,
   setCustomer,
   setDineType,
+  setShipMode,
   stepLineQty,
   switchPoint,
   toDraftCustomer,
   toggleShipFee,
+  toggleShipPayout,
+  withShipDefaults,
   type CartDraft,
   type DraftCustomer,
 } from '@/domain/cart';
@@ -30,9 +37,9 @@ import { DELETE_REASON_LABELS } from '@/domain/audit';
 import { customerLabel } from '@/domain/debt';
 import { soldOutAt, tabletPoints, type SoldOutSet } from '@/domain/catalog';
 import { formatVnd } from '@/domain/money';
-import { SHIP_FEES, lineTotal, orderTotal, selectableToppings, shipFeeLabel } from '@/domain/pricing';
+import { SHIP_FEES, SHIP_PAYOUTS, lineTotal, orderTotal, selectableToppings, shipFeeLabel } from '@/domain/pricing';
 import { businessDate } from '@/domain/time';
-import { DINE_LABELS, type Combo, type DeleteReason, type DineType, type Order, type Point, type Product, type Topping } from '@/domain/types';
+import { DINE_LABELS, SHIP_MODE_LABELS, type Combo, type DeleteReason, type DineType, type Order, type Point, type Product, type ShipMode, type Topping } from '@/domain/types';
 import { pos } from '@/lib/pos';
 import { Splash, errorMessage } from '@/app/ui';
 import { useIsTablet } from '@/app/useMediaQuery';
@@ -48,6 +55,8 @@ const DINE_TYPES: ReadonlyArray<{ id: DineType; Icon: typeof ShoppingBag }> = [
   { id: 'takeaway', Icon: ShoppingBag },
   { id: 'delivery', Icon: Bike },
 ];
+
+const SHIP_MODES: readonly ShipMode[] = ['shop', 'external'];
 
 const DELETE_REASONS = (['mistake', 'customer_left', 'customer_changed', 'other'] as const).map((id) => ({ id, label: DELETE_REASON_LABELS[id] }));
 
@@ -113,6 +122,8 @@ export function OrderScreen() {
       address: draftAddress(x),
       customer: draftCustomer(x),
       ship_fee: draftShipFee(x),
+      ship_mode: draftShipMode(x),
+      ship_payout: draftShipPayout(x),
       items: x.items,
     };
     let o: Order;
@@ -140,11 +151,11 @@ export function OrderScreen() {
   function flushAuto(): Promise<unknown> {
     const s = savedRef.current;
     const x = draftRef.current;
-    if (!s || !x || x.items.length === 0 || needsAddress(x) || !draftChanged(x, s)) return queueRef.current;
+    if (!s || !x || x.items.length === 0 || draftBlocker(x) || !draftChanged(x, s)) return queueRef.current;
     return flush();
   }
 
-  const autoPending = !!saved && !!draft && draft.items.length > 0 && !needsAddress(draft) && draftChanged(draft, saved);
+  const autoPending = !!saved && !!draft && draft.items.length > 0 && !draftBlocker(draft) && draftChanged(draft, saved);
   useEffect(() => {
     if (!autoPending || typingAddress || shipOpen) return;
     const t = setTimeout(() => {
@@ -176,10 +187,23 @@ export function OrderScreen() {
       if (!remote) return void navigate('/', { replace: true }); // đã thanh toán / đã xóa / không có
       adopt(remote);
     } else if (!draft && points.length > 0) {
-      setDraft(newDraft(points.find((p) => p.id === lastPointId) ?? points[0]));
+      setDraft(newDraft(points.find((p) => p.id === lastPointId) ?? points[0], pos.cachedShipDefaults()));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId, points.length]);
+
+  // Đơn mới: kiểu ship / phí / trả shipper mặc định theo đơn ship gần nhất của ca (hỏi server, mọi máy cùng quầy giống nhau).
+  // Đến muộn thì chỉ áp khi đơn chưa lưu và nhân viên chưa tự bấm.
+  useEffect(() => {
+    if (orderId) return;
+    let live = true;
+    void pos.shipDefaults().then((v) => {
+      if (live && !savedRef.current) setDraft((prev) => (prev ? withShipDefaults(prev, v) : prev));
+    });
+    return () => {
+      live = false;
+    };
+  }, [orderId]);
 
   // Máy khác vừa đổi đơn này. Đang sửa dở / đang lưu ⇒ giữ bản trên màn (lần lưu tới ghi đè);
   // chưa sửa gì ⇒ hiện bản mới. Đơn bị thanh toán / xóa ở máy khác ⇒ về hàng đợi.
@@ -208,6 +232,9 @@ export function OrderScreen() {
       address: o.address ?? '',
       customer: customerOf(o, prev?.customer ?? null),
       ship_fee: o.ship_fee ?? 0,
+      ship_mode: o.ship_mode ?? 'shop',
+      ship_payout: o.ship_payout ?? 0,
+      ship_touched: true,
       items: o.items,
     }));
   }
@@ -246,9 +273,11 @@ export function OrderScreen() {
   const total = draftTotal(d);
   const dirty = saved ? draftChanged(d, saved) : d.items.length > 0 || d.label.trim() !== '' || d.address.trim() !== '' || d.customer !== null;
   const empty = d.items.length === 0;
-  /** Đơn ship chưa nhập địa chỉ: chưa lưu / ra món / thanh toán được. */
+  /** Đơn ship chưa nhập địa chỉ / shipper ngoài chưa chọn tiền trả shipper: chưa lưu / ra món / thanh toán được. */
+  const shipBlocker = draftBlocker(d);
   const noAddress = needsAddress(d);
-  const blocked = empty || noAddress || busy;
+  const noPayout = needsShipPayout(d);
+  const blocked = empty || !!shipBlocker || busy;
   // Dòng đang chọn đã bị bớt hết / đổi đi ⇒ coi như không chọn.
   const swapLine = swapId ? d.items.find((it) => it.id === swapId) ?? null : null;
   const soldOut = soldOutAt(cat.sold_out, d.point_id, businessDate(new Date(), cat.config.timezone));
@@ -366,8 +395,8 @@ export function OrderScreen() {
 
   function back() {
     // Đơn đã lưu còn món: ghi nốt phần đang chờ tự lưu rồi về, không hỏi.
-    // (Đơn ship bị xóa mất địa chỉ ⇒ không lưu được: hỏi bỏ thay đổi.)
-    if (saved && !empty && !noAddress) void run(async () => {
+    // (Đơn ship bị xóa mất địa chỉ / thiếu tiền trả shipper ⇒ không lưu được: hỏi bỏ thay đổi.)
+    if (saved && !empty && !shipBlocker) void run(async () => {
       await flushAuto();
       navigate('/', { state: { created: createdHere.current ?? undefined } satisfies QueueFlash });
     });
@@ -378,6 +407,10 @@ export function OrderScreen() {
   const itemCount = d.items.reduce((s, it) => s + it.qty, 0);
   const isShip = d.dine_type === 'delivery';
   const shipFee = draftShipFee(d);
+  const external = draftShipMode(d) === 'external';
+  const payout = draftShipPayout(d);
+  /** Shipper ngoài: phí ship gọi là "Phụ thu". */
+  const feeNoun = external ? 'Phụ thu' : 'Phí ship';
   const cartQty = (productId: string) => d.items.reduce((s, it) => s + (it.product_id === productId ? it.qty : 0), 0);
 
   // Điện thoại: đầu đơn ở trên, thực đơn cuộn ở giữa, giỏ (thu gọn còn một dòng) + nút thao tác luôn ở đáy:
@@ -486,9 +519,11 @@ export function OrderScreen() {
             <span className="truncate text-[15px] font-semibold leading-tight">
               {empty ? 'Chưa có món' : `${DINE_LABELS[d.dine_type]}${d.label.trim() ? ` · ${d.label.trim()}` : ''} · ${itemsSummary(d.items)}`}
             </span>
-            {shipFee > 0 ? (
-              <span className="num text-xs font-medium text-ink-subtle" data-testid="cart-ship-breakdown">
-                {formatVnd(orderTotal(d.items))} + phí {formatVnd(shipFee)}
+            {shipFee > 0 || payout > 0 ? (
+              <span className="num truncate text-xs font-medium text-ink-subtle" data-testid="cart-ship-breakdown">
+                {formatVnd(orderTotal(d.items))}
+                {shipFee > 0 && ` + ${external ? 'phụ thu' : 'phí'} ${formatVnd(shipFee)}`}
+                {payout > 0 && ` · trả ship ${formatVnd(payout)}`}
               </span>
             ) : (
               <span className="text-xs text-ink-subtle">{cartOpen ? 'Bấm để thu gọn' : 'Bấm để xem giỏ'}</span>
@@ -515,10 +550,30 @@ export function OrderScreen() {
           ))}
         </div>
         {isShip && (
+          <div className="flex shrink-0 items-center gap-2">
+            <div className="segment-group flex-1 grid-cols-2" role="group" aria-label="Kiểu ship">
+              {SHIP_MODES.map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  aria-pressed={d.ship_mode === m}
+                  onClick={() => edit((x) => setShipMode(x, m))}
+                  className="btn btn-segment min-h-[36px] whitespace-nowrap rounded-[9px] px-1 text-[14px] font-medium md:min-h-[40px]"
+                  data-testid={`order-ship-mode-${m}`}
+                >
+                  {SHIP_MODE_LABELS[m]}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {isShip && (
           <div className="flex shrink-0 flex-col gap-1.5">
-            <span className="text-[13px] font-bold text-ink-subtle">Phí ship</span>
+            <span className="text-[13px] font-bold text-ink-subtle" data-testid="order-ship-fee-title">
+              {feeNoun}
+            </span>
             {/* Bấm lại mức đang chọn ⇒ bỏ phí. */}
-            <div className="grid grid-cols-4 gap-1.5" role="group" aria-label="Phí ship">
+            <div className="grid grid-cols-4 gap-1.5" role="group" aria-label={feeNoun}>
               {SHIP_FEES.map((fee) => (
                 <button
                   key={fee}
@@ -529,6 +584,33 @@ export function OrderScreen() {
                   data-testid={`order-ship-fee-${fee}`}
                 >
                   {shipFeeLabel(fee)}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {isShip && external && (
+          <div className="flex shrink-0 flex-col gap-1.5">
+            <span className="flex items-baseline justify-between gap-2 text-[13px] font-bold text-ink-subtle">
+              Trả shipper (tiền két)
+              {noPayout && (
+                <span className="font-semibold text-danger-strong" data-testid="order-payout-missing">
+                  Chưa chọn tiền trả shipper
+                </span>
+              )}
+            </span>
+            {/* Bắt buộc chọn: bấm lại mức đang chọn không bỏ được. Không cộng vào tổng đơn. */}
+            <div className="grid grid-cols-4 gap-1.5" role="group" aria-label="Trả shipper">
+              {SHIP_PAYOUTS.map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  aria-pressed={payout === v}
+                  onClick={() => edit((x) => toggleShipPayout(x, v))}
+                  className="btn btn-choice min-h-[52px] min-w-0 px-1 text-base md:min-h-[48px]"
+                  data-testid={`order-ship-payout-${v}`}
+                >
+                  {shipFeeLabel(v)}
                 </button>
               ))}
             </div>
@@ -658,7 +740,7 @@ export function OrderScreen() {
             </span>
             {shipFee > 0 && (
               <span className="flex items-center justify-between text-[15px] text-ink-subtle">
-                Phí ship <span className="num text-ink" data-testid="order-ship-fee">{formatVnd(shipFee)}</span>
+                {feeNoun} <span className="num text-ink" data-testid="order-ship-fee">{formatVnd(shipFee)}</span>
               </span>
             )}
             <span className="flex items-baseline justify-between">
@@ -717,6 +799,8 @@ export function OrderScreen() {
           customer={d.customer}
           book={book}
           shipFee={shipFee}
+          shipMode={draftShipMode(d)}
+          payout={payout}
           total={total}
           onAddress={(v) => edit((x) => ({ ...x, address: v }))}
           onCustomer={(c) => edit((x) => setCustomer(x, c))}

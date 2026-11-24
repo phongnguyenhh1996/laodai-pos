@@ -112,6 +112,18 @@ export interface OrderItem {
   toppings_snap: ToppingSnap[];
 }
 
+/** Kiểu ship (SPEC 4.2): `shop` quán ship, `external` shipper ngoài. Không phải đơn ship ⇒ `shop`. */
+export type ShipMode = 'shop' | 'external';
+
+export const SHIP_MODE_LABELS: Record<ShipMode, string> = { shop: 'Quán ship', external: 'Shipper ngoài' };
+
+/** Mặc định cho đơn ship mới = đơn ship gần nhất của ca (RPC `shift_ship_defaults`). */
+export interface ShipDefaults {
+  ship_mode: ShipMode;
+  ship_fee: Money;
+  ship_payout: Money;
+}
+
 export interface Order {
   id: string;
   device_seq: number;
@@ -133,6 +145,10 @@ export interface Order {
   delete_reason: DeleteReason | null;
   /** Phí ship (chỉ đơn ship, 0 nếu không có), đã nằm trong `total`. */
   ship_fee: Money;
+  /** Kiểu ship; không phải đơn ship ⇒ `shop`. */
+  ship_mode: ShipMode;
+  /** Tiền mặt lấy từ két trả shipper ngoài (chỉ `external`); KHÔNG nằm trong `total`. */
+  ship_payout: Money;
   /** Tiền món + phí ship. */
   total: Money;
   payment_method: PaymentMethod | null;

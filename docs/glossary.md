@@ -22,7 +22,11 @@ Thêm thuật ngữ mới vào đây ngay khi nó xuất hiện. Chi tiết nghi
 | Combo | `combos` | Món + topping cố định. Giá = tổng, không có giá combo riêng |
 | Hết món | `sold_out` | Khóa món / topping theo điểm bán trong ngày; "bán lại" = ghi `cleared_at` |
 | Loại đơn | `dine_type` | `dinein` tại chỗ, `takeaway` mang về, `delivery` ship |
-| Phí ship | `ship_fee` | Chỉ đơn ship, đã nằm trong `total` |
+| Phí ship | `ship_fee` | Chỉ đơn ship, đã nằm trong `total`. Với shipper ngoài, UI gọi là **phụ thu** |
+| Kiểu ship | `ship_mode` | `shop` quán ship, `external` shipper ngoài |
+| Shipper ngoài | `ship_mode = 'external'` | Người giao không phải của quán; quán trả tiền shipper từ két |
+| Phụ thu | `ship_fee` (khi `external`) | Khách trả thêm cho đơn shipper ngoài, một lần cho cả đơn; bill in là "Phí ship" |
+| Trả shipper | `ship_payout` | Tiền mặt lấy từ két đưa shipper ngoài; không nằm trong `total`, trừ vào tiền mặt kỳ vọng của ca thanh toán |
 | Ảnh chụp giá | `*_snap` | Giá / tên lúc bán, lưu trong đơn; đổi giá không đổi đơn cũ |
 
 ## Tiền và đối soát

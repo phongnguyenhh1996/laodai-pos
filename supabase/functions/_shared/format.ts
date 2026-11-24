@@ -55,8 +55,12 @@ interface OrderSnap {
   id: string;
   code: string;
   total: number;
-  /** Phí ship (đã nằm trong `total`); bản ghi cũ không có. */
+  /** Phí ship / phụ thu (đã nằm trong `total`); bản ghi cũ không có. */
   ship_fee?: number;
+  /** Kiểu ship (`shop` / `external`); bản ghi cũ không có ⇒ quán ship. */
+  ship_mode?: string;
+  /** Tiền mặt từ két trả shipper ngoài (không nằm trong `total`); bản ghi cũ không có. */
+  ship_payout?: number;
   status: string;
   dine_type: string;
   label: string | null;
@@ -80,6 +84,18 @@ interface Revenue {
   debt: number;
   /** Phần phí ship nằm trong `total` (bản ghi cũ không có). */
   ship_fee?: number;
+  /** Thống kê ship theo kỳ (owner_report / tổng kết ngày); bản ghi cũ không có. */
+  ship?: ShipStats;
+}
+
+/** Thống kê ship (SPEC 5). */
+interface ShipStats {
+  shop_orders: number;
+  external_orders: number;
+  shop_fee: number;
+  external_fee: number;
+  payout: number;
+  external_profit: number;
 }
 
 export type CountItem = 'cash' | 'boxes' | 'plates' | 'cans';
@@ -88,6 +104,8 @@ export interface Reconcile {
   /** Các thứ ca này đếm (bản ghi cũ không có ⇒ tiền mặt, hộp, dĩa). Thứ không đếm thì không nhắc tới. */
   count_items?: CountItem[];
   revenue: Revenue;
+  /** Thống kê ship của ca; bản ghi cũ không có. */
+  ship?: ShipStats;
   paid_orders: number;
   debt_collected: { cash: number; transfer: number };
   cash: { expected: number; counted: number | null; diff: number | null };
@@ -203,12 +221,28 @@ function countLine(label: string, c: CountLine): string {
   return `${label}: dùng ${used} / theo đơn ${c.by_orders}${diff}`;
 }
 
-function revenueLines(r: Revenue): string[] {
+/** Doanh thu + phí ship. Có thống kê ship: phí ship chỉ là của quán ship, shipper ngoài một dòng riêng. */
+function revenueLines(r: Revenue, ship: ShipStats | undefined = r.ship): string[] {
+  const fee = ship ? ship.shop_fee : r.ship_fee;
   return [
     `Doanh thu: ${vnd(r.total)} (TM ${vnd(r.cash)} · CK ${vnd(r.transfer)} · Nợ ${vnd(r.debt)})`,
-    ...(r.ship_fee ? [`Trong đó phí ship: ${vnd(r.ship_fee)}`] : []),
+    ...(fee ? [`Trong đó phí ship: ${vnd(fee)}`] : []),
+    ...(ship?.external_orders
+      ? [`Ship ngoài: ${ship.external_orders} đơn · phụ thu ${vnd(ship.external_fee)} · trả ${vnd(ship.payout)} → ${signed(ship.external_profit)}`]
+      : []),
   ];
 }
+
+/** "Shipper ngoài · phụ thu 5.000 · trả shipper 10.000" / "Quán ship · phí ship 10.000". */
+export function shipLine(o: Pick<OrderSnap, 'ship_mode' | 'ship_fee' | 'ship_payout'>): string {
+  if (o.ship_mode === 'external') {
+    return `Shipper ngoài · ${o.ship_fee ? `phụ thu ${vnd(o.ship_fee)}` : 'không phụ thu'} · trả shipper ${vnd(o.ship_payout ?? 0)}`;
+  }
+  return `Quán ship · ${o.ship_fee ? `phí ship ${vnd(o.ship_fee)}` : 'không phí ship'}`;
+}
+
+const shipChanged = (a: OrderSnap, b: OrderSnap) =>
+  (a.ship_mode ?? 'shop') !== (b.ship_mode ?? 'shop') || (a.ship_fee ?? 0) !== (b.ship_fee ?? 0) || (a.ship_payout ?? 0) !== (b.ship_payout ?? 0);
 
 const PACKS = [
   ['boxes', 'Hộp', 'hộp'],
@@ -223,7 +257,7 @@ const countedPacks = (r: Reconcile) => PACKS.filter(([k]) => counts(r).includes(
 export function shiftReport(r: Reconcile): string[] {
   const served = r.deleted_after_served.length;
   const lines = [
-    ...revenueLines(r.revenue),
+    ...revenueLines(r.revenue, r.ship),
   ];
   if (r.debt_collected.cash || r.debt_collected.transfer) {
     lines.push(`Thu nợ: TM ${vnd(r.debt_collected.cash)} · CK ${vnd(r.debt_collected.transfer)}`);
@@ -314,7 +348,7 @@ export function formatNotification(n: Notification, opts: FormatOptions): string
         `📍 ${q.order.address ?? '(chưa có địa chỉ)'}`,
         ...(q.order.label ? [`Nhãn: ${q.order.label}`] : []),
         ...q.order.items.map(itemLine),
-        ...(q.order.ship_fee ? [`Phí ship: ${vnd(q.order.ship_fee)}`] : []),
+        shipLine(q.order),
         `Tổng: ${vnd(q.order.total)}`,
         ...(who(q) ? [who(q)] : []),
       ];
@@ -350,6 +384,7 @@ export function formatNotification(n: Notification, opts: FormatOptions): string
         ...q.before.items.map(itemLine),
         `Sau: ${vnd(q.after.total)} · ${pm(q.after)}`,
         ...q.after.items.map(itemLine),
+        ...(q.after.dine_type === 'delivery' && shipChanged(q.before, q.after) ? [`Ship: ${shipLine(q.before)} → ${shipLine(q.after)}`] : []),
       ];
       for (const sid of Object.keys(q.recalculated.after)) {
         const b = q.recalculated.before[sid];

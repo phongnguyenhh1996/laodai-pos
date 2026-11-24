@@ -4,7 +4,7 @@ import type { SoldOut } from '@/domain/catalog';
 import { generateOrderCode } from '@/domain/orderCode';
 import { CLOSE_KEY } from '@/pos/ops';
 import { businessDate } from '@/domain/time';
-import type { Customer, Order, OrderItem } from '@/domain/types';
+import type { Customer, Order, OrderItem, ShipDefaults, ShipMode } from '@/domain/types';
 import {
   PosNetworkError,
   type CatalogData,
@@ -73,6 +73,10 @@ export class FakeServer {
             .map(({ id, at, amount, method }) => ({ id, at, amount, method })),
         });
       },
+      loadShipDefaults: async (shiftId) => {
+        this.net();
+        return this.shipDefaults(profileId, shiftId);
+      },
       subscribe: (pid, onPulse, onStatus: (s: ChannelStatus) => void) => {
         const l = { profileId: pid, onPulse };
         this.listeners.add(l);
@@ -99,6 +103,16 @@ export class FakeServer {
         }
       : null;
     return clone({ shift, orders: this.openOrders(profileId) });
+  }
+
+  /** Như RPC `shift_ship_defaults`: đơn ship gần nhất của ca (kể cả đã thanh toán, trừ đã xóa); quầy khác bị chặn. */
+  shipDefaults(profileId: string, shiftId: string): ShipDefaults | null {
+    const s = this.shifts.find((x) => x.id === shiftId);
+    if (!s || s.tablet_profile_id !== profileId) throw new PosNetworkError('forbidden', '42501');
+    const last = this.orders
+      .filter((o) => o.opened_shift_id === shiftId && o.dine_type === 'delivery' && o.status !== 'deleted')
+      .sort((a, b) => b.created_at.localeCompare(a.created_at) || b.device_seq - a.device_seq)[0];
+    return last ? { ship_mode: last.ship_mode, ship_fee: last.ship_fee, ship_payout: last.ship_payout } : null;
   }
 
   openOrders(profileId = this.catalog.profile.id): Order[] {
@@ -206,6 +220,16 @@ export class FakeServer {
       if (v > 50_000 || v % 1000 !== 0) throw new Reject('bad_ship_fee');
       return v;
     };
+    /** Như `private.order_ship_mode` / `private.order_ship_payout`. */
+    const ship = (x: Record<string, unknown>): { ship_mode: ShipMode; ship_payout: number } => {
+      if (x.dine_type !== 'delivery') return { ship_mode: 'shop', ship_payout: 0 };
+      const mode = (x.ship_mode as string | undefined) || 'shop';
+      if (mode !== 'shop' && mode !== 'external') throw new Reject('bad_ship_mode');
+      if (mode === 'shop') return { ship_mode: 'shop', ship_payout: 0 };
+      const v = x.ship_payout;
+      if (typeof v !== 'number' || !Number.isInteger(v) || v < 1000 || v > 50_000 || v % 1000 !== 0) throw new Reject('bad_ship_payout');
+      return { ship_mode: 'external', ship_payout: v };
+    };
 
     switch (op.kind) {
       case 'open_shift': {
@@ -250,6 +274,7 @@ export class FakeServer {
         if (s.id !== o.opened_shift_id) throw new Reject('bad_shift');
         if (!items?.length) throw new Reject('empty_items');
         const ship_fee = shipFee(o);
+        const sm = ship(o);
         if (total(items) + ship_fee !== o.total) throw new Reject('total_mismatch');
         if (o.dine_type === 'delivery' && !o.address) throw new Reject('address_required');
         if (this.order(o.id as string)) throw new Reject('order_exists');
@@ -274,6 +299,7 @@ export class FakeServer {
           deleted_at: null,
           delete_reason: null,
           ship_fee,
+          ...sm,
           total: o.total as number,
           payment_method: null,
           cash_given: null,
@@ -288,6 +314,7 @@ export class FakeServer {
         const o = open(p.order_id);
         const items = p.items as OrderItem[];
         const ship_fee = shipFee(p);
+        const sm = ship(p);
         if (total(items) + ship_fee !== p.total) throw new Reject('total_mismatch');
         if (p.dine_type === 'delivery' && !p.address) throw new Reject('address_required');
         const customer_id = this.shipCustomer(p.dine_type as string, p.address as string | null, p.customer);
@@ -300,6 +327,7 @@ export class FakeServer {
           table_no: p.table_no ?? null,
           items: clone(items),
           ship_fee,
+          ...sm,
           total: p.total,
         });
         return { data: { order: clone(o) }, catalog: !!customer_id };

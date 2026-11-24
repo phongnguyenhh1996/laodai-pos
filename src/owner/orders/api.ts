@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { OwnerEditPayload, PaidOrderSnapshot } from '@/domain/ownerEdit';
-import type { Combo, Customer, DeleteReason, DineType, Money, OrderItem, OrderStatus, PaymentMethod, Product, ToppingSnap, Topping } from '@/domain/types';
+import type { Combo, Customer, DeleteReason, DineType, Money, OrderItem, OrderStatus, PaymentMethod, Product, ShipMode, ToppingSnap, Topping } from '@/domain/types';
 
 /** Đơn (mục 7, màn chủ số 3): lọc đơn (kể cả đã xóa), sửa đơn đã thanh toán. */
 
@@ -25,6 +25,10 @@ export interface OrderListRow {
   point_name: string;
   tablet_name: string;
   total: Money;
+  /** Thiếu khi server chưa áp migration ship hai kiểu ⇒ coi như 0 / quán ship. */
+  ship_fee?: Money;
+  ship_mode?: ShipMode;
+  ship_payout?: Money;
   payment_method: PaymentMethod | null;
   owner_edited: boolean;
   created_at: string;
@@ -61,8 +65,11 @@ export interface EditableOrder extends PaidOrderSnapshot {
   menu_id: string;
   tablet_name: string;
   dine_type: DineType;
-  /** Giữ nguyên khi sửa; đã nằm trong `total`. */
+  /** Phí ship / phụ thu, đã nằm trong `total`. */
   ship_fee: Money;
+  ship_mode: ShipMode;
+  /** Tiền trả shipper ngoài (không nằm trong `total`). */
+  ship_payout: Money;
   paid_shift_id: string | null;
   opened_shift_id: string;
   /** Các ca liên quan đã đóng ⇒ sẽ được tính lại đối soát. */
@@ -80,7 +87,7 @@ export async function loadEditableOrder(client: SupabaseClient, orderId: string)
   const { data, error } = await client
     .from('orders')
     .select(
-      'id,code,status,total,payment_method,customer_id,dine_type,ship_fee,paid_shift_id,opened_shift_id,' +
+      'id,code,status,total,payment_method,customer_id,dine_type,ship_fee,ship_mode,ship_payout,paid_shift_id,opened_shift_id,' +
         'points(name,menu_id),tablet_profiles(name),order_items(id,product_id,name_snap,unit_price_snap,qty,toppings_snap,sort,removed_at)',
     )
     .eq('id', orderId);
@@ -94,6 +101,8 @@ export async function loadEditableOrder(client: SupabaseClient, orderId: string)
     customer_id: string | null;
     dine_type: DineType;
     ship_fee: Money | null;
+    ship_mode: ShipMode | null;
+    ship_payout: Money | null;
     paid_shift_id: string | null;
     opened_shift_id: string;
     points: { name: string; menu_id: string } | null;
@@ -114,6 +123,8 @@ export async function loadEditableOrder(client: SupabaseClient, orderId: string)
     customer_id: r.customer_id,
     dine_type: r.dine_type,
     ship_fee: r.ship_fee ?? 0,
+    ship_mode: r.ship_mode ?? 'shop',
+    ship_payout: r.ship_payout ?? 0,
     paid_shift_id: r.paid_shift_id,
     opened_shift_id: r.opened_shift_id,
     point_name: r.points?.name ?? '',
@@ -150,6 +161,9 @@ export async function saveOwnerEdit(client: SupabaseClient, orderId: string, pay
     p_items: payload.p_items,
     p_payment_method: payload.p_payment_method,
     p_customer_id: payload.p_customer_id,
+    p_ship_mode: payload.p_ship_mode,
+    p_ship_fee: payload.p_ship_fee,
+    p_ship_payout: payload.p_ship_payout,
   });
   if (error) throw new OrdersError(`Không lưu được: ${error.message}`);
 }

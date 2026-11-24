@@ -83,6 +83,9 @@ shift_adjustments id, shift_id, kind (boxes|plates|cash), qty, note, at  -- ch�
 orders            id, device_seq, tablet_profile_id, point_id, code,   -- code: "3F5"
                   label, table_no, dine_type (dinein|takeaway|delivery),
                   address, ship_fee,                    -- chỉ đơn ship; ship_fee 0–50.000, bội 1.000, đã nằm trong total
+                  ship_mode (shop|external),            -- kiểu ship; không phải đơn ship ⇒ shop
+                  ship_payout,                          -- trả shipper ngoài; chỉ external, 1.000–50.000, bội 1.000;
+                                                        -- KHÔNG nằm trong total, là tiền mặt lấy từ két
                   status (open|served|paid|deleted),
                   opened_shift_id, paid_shift_id,
                   created_at, served_at, paid_at, deleted_at, delete_reason,
@@ -123,12 +126,19 @@ Chủ có thể **bổ sung giữa ca** (vd. "+50 hộp", "+200k tiền lẻ") t
 - Nhân viên **thấy giá**, không sửa được giá; không có giảm giá.
 - **Ship**: địa chỉ bắt buộc, khách tùy chọn (Telegram báo khi tạo / đổi địa chỉ / đổi khách). Hàng nút **phí ship** +5k · +10k · +15k · +20k (bấm lại mức đang chọn = bỏ phí); phí cộng vào tổng đơn. Đổi sang Tại chỗ / Mang về ⇒ bỏ địa chỉ, khách và phí. Server kiểm `tổng = tiền món + phí ship` (`total_mismatch`), phí sai mức ⇒ `bad_ship_fee`.
   - Điện thoại: bấm Ship không bật bàn phím; một hàng "Địa chỉ, khách" mở bảng nhập riêng. Tablet: ô khách + địa chỉ nằm ngay trong giỏ.
+  - **Kiểu ship**: công tắc **Quán ship / Shipper ngoài** ngay trên hàng phí.
+    - **Quán ship** (`shop`): như trên, khách trả phí ship, tiền nằm trong két.
+    - **Shipper ngoài** (`external`): hàng phí đổi tên thành **"Phụ thu"** (vẫn là `ship_fee`, cùng 4 mức, bấm lại = 0, tính **một lần cho cả đơn**, không theo số món). Thêm hàng **"Trả shipper"** +5k · +10k · +15k · +20k, **bắt buộc chọn** (thiếu ⇒ chưa lưu / ra món / thanh toán được, như thiếu địa chỉ; bấm lại mức đang chọn không bỏ được). Tiền trả shipper **không** cộng vào tổng đơn.
+    - **Mặc định theo ca**: đơn ship mới lấy kiểu ship, phụ thu / phí ship và mức trả shipper của **đơn ship gần nhất của ca** (đọc từ server, nên mọi máy dùng chung quầy thấy giống nhau). Đơn ship đầu ca: Quán ship, chưa chọn phí.
+    - Đổi qua lại hai kiểu được đến khi thanh toán. Đổi sang Quán ship ⇒ bỏ tiền trả shipper (phí giữ nguyên). Đổi sang Tại chỗ / Mang về ⇒ bỏ cả kiểu ship (về `shop`) và tiền trả shipper.
+    - Server kiểm: `shop` ⇒ `ship_payout = 0`; `external` ⇒ `ship_payout` 1.000–50.000, bội 1.000 (`bad_ship_payout`); không phải đơn ship ⇒ `shop`, `0` (bỏ như bỏ địa chỉ). Bốn mức nằm ở client.
 - Đơn đang mở (`open`/`served`): nhân viên sửa món & xóa đơn được. Mọi thay đổi ghi `audit_log` (trước/sau).
   - **Xóa đơn** → chọn nhanh lý do (1 chạm: bấm nhầm / khách bỏ về / khách đổi ý / khác) → Telegram ngay, kèm nội dung đơn và trạng thái lúc xóa (đã ra món hay chưa).
 
 ### 4.3 Hàng đợi (màn hình chính tablet)
 - Hai nhóm: **Chờ ra món** (trên) và **Chờ thanh toán** (dưới), mỗi nhóm xếp theo giờ tạo, đơn cũ nhất ở trên.
 - Mỗi thẻ đơn: **số thứ tự trong hàng đợi** (1, 2, 3… đánh lại liên tục), **mã đơn** `3F5`, nhãn/bàn, giờ tạo, **đồng hồ chờ**, tóm tắt món, tổng tiền đơn.
+- Đơn ship: badge "+10k ship" (quán ship, khi phí > 0); đơn shipper ngoài thì badge **"Ship ngoài · trả 10k"** để nhắc lấy tiền két đưa shipper.
 - Chờ ra món đổi màu: vàng ≥ 5 phút, đỏ ≥ 10 phút (chủ chỉnh).
 - Bấm **Đã ra món** → chuyển nhóm, lưu `served_at`.
 - Mã đơn: 1 chữ + 2 số, ví dụ `A30` (chữ đầu bỏ `I L O`), ngẫu nhiên, không trùng trong ngày của tablet. Không phản ánh số lượng đơn.
@@ -141,6 +151,8 @@ Chọn một hình thức (không chia, không nợ một phần). Số cần th
 
 Sau khi thanh toán, đơn **biến mất khỏi tablet** và nhân viên không sửa được nữa. Tiền tính vào **ca đang mở lúc thu** (`paid_shift_id`), kể cả khi đơn được mở từ ca trước.
 
+Đơn shipper ngoài: màn thanh toán hiện dòng **"Trả shipper −10.000 (lấy từ két)"** dưới tổng để nhắc; số cần thu vẫn là tổng đơn. Tiền trả shipper **luôn là tiền mặt từ két**, bất kể khách trả TM / CK / Nợ, và được tính vào **ca thanh toán đơn** (`paid_shift_id`). Đơn bị xóa ⇒ không có khoản chi (đã đưa tiền shipper rồi mới xóa thì chủ ghi chú lúc đối soát).
+
 ### 4.5 Thu nợ (tablet)
 Chọn khách → thấy dư nợ của khách đó → nhập số tiền + hình thức → lưu `debt_payments` vào ca hiện tại. Tiền mặt thu nợ tính vào két ca. Telegram ngay.
 
@@ -151,7 +163,7 @@ Chọn khách → thấy dư nợ của khách đó → nhập số tiền + hì
 4. Server tính đối soát (mục 5) → Telegram báo cáo ca.
 
 ### 4.7 Chủ sửa đơn đã thanh toán
-Chỉ trên chế độ chủ. Sửa món / hình thức thanh toán / khách nợ, có log trước/sau, `owner_edited = true`. Phí ship giữ nguyên (tổng mới = tiền món mới + phí ship cũ). Nếu ca đã đóng → **tính lại** đối soát, đánh dấu "đã điều chỉnh".
+Chỉ trên chế độ chủ. Sửa món / hình thức thanh toán / khách nợ, có log trước/sau, `owner_edited = true`. Với đơn ship, chủ sửa được thêm **kiểu ship, phí ship / phụ thu, tiền trả shipper** (cùng luật như 4.2; tổng mới = tiền món mới + phí ship mới). Không sửa những thứ này thì giữ nguyên. Nếu ca đã đóng → **tính lại** đối soát, đánh dấu "đã điều chỉnh".
 
 ### 4.8 Hết món
 - Màn đơn có nút **"Báo hết món"** → chế độ đánh dấu: bấm món hoặc topping để báo **hết** / **bán lại**. Bấm **Xong** để về bán tiếp.
@@ -170,9 +182,18 @@ Chỉ trên chế độ chủ. Sửa món / hình thức thanh toán / khách n�
 kỳ vọng = open_float + Σ adjustments(cash)
         + Σ orders.total (cash, paid_shift = ca này)
         + Σ debt_payments.amount (cash, shift = ca này)
+        − Σ orders.ship_payout (mọi hình thức, status = paid, paid_shift = ca này)
 chênh lệch = close_cash_counted − kỳ vọng
 ```
-Phí ship nằm trong `orders.total` nên đã có trong doanh thu và tiền mặt kỳ vọng; báo cáo ca / ngày hiện thêm dòng **"trong đó phí ship"** (Σ `ship_fee` của đơn thu trong ca) khi > 0.
+Phí ship / phụ thu nằm trong `orders.total` nên đã có trong doanh thu và tiền mặt kỳ vọng. Doanh thu vẫn = Σ `total` (không trừ tiền trả shipper). Kỳ vọng có thể giảm vì một đơn CK / Nợ shipper ngoài: đúng, vì tiền thật đi ra khỏi két.
+
+**Thống kê ship** (báo cáo ca / ngày / tháng, chỉ chủ; mỗi dòng chỉ hiện khi > 0), tính trên đơn thu trong kỳ:
+- Số đơn **quán ship** / **shipper ngoài**.
+- **Phí ship** (Σ `ship_fee`, quán ship) và **phụ thu ship ngoài** (Σ `ship_fee`, shipper ngoài).
+- **Trả shipper ngoài** (Σ `ship_payout`).
+- **Lãi/lỗ ship ngoài** = phụ thu ship ngoài − trả shipper ngoài.
+
+Dòng cũ "trong đó phí ship" đổi thành các dòng trên.
 
 **Hộp** (dùng để tham khảo, không cảnh báo tự động)
 ```
@@ -206,7 +227,7 @@ Gửi vào **một nhóm Telegram**, đồng thời lưu `audit_log` và xem đ�
 | Tablet đăng nhập; vào chế độ chủ trên tablet | ✅ |
 | Mở ca; đóng ca (kèm báo cáo) | ✅ |
 | Xóa đơn | ✅ |
-| Đơn ship mới; đổi địa chỉ / khách đơn ship (kèm phí ship) | ✅ |
+| Đơn ship mới; đổi địa chỉ / khách / kiểu ship / tiền trả shipper của đơn ship (tin ghi kiểu ship, phí ship hoặc phụ thu, tiền trả shipper) | ✅ |
 | Ghi nợ; thu nợ | ✅ |
 | Chủ sửa đơn đã thanh toán | ✅ |
 | Phát hiện lỗ hổng `device_seq` | ✅ |
@@ -237,8 +258,8 @@ Thiết kế: nút ≥ 56px, chữ to, tối đa 2–3 chạm cho một đơn co
 ### Chế độ chủ (vào bằng mật khẩu chủ trên bất kỳ máy nào đã chọn quầy; giao diện tối ưu cho điện thoại)
 1. **Tổng quan** (realtime): doanh thu hôm nay theo điểm; các ca đang mở; đơn đang chờ lâu.
 2. **Ca**: danh sách ca → chi tiết đối soát (mục 5), đơn của ca, bổ sung hộp/dĩa/tiền giữa ca.
-3. **Đơn**: lọc theo ngày/điểm/nhân viên/hình thức/trạng thái (bao gồm đã xóa); sửa đơn đã thanh toán.
-4. **Báo cáo**: doanh thu theo ngày/điểm/ca/nhân viên; tỷ lệ TM/CK/Nợ theo nhân viên; **tổng CK theo ngày/điểm** để đối chiếu app ngân hàng; món bán chạy; số lần sửa/xóa theo nhân viên.
+3. **Đơn**: lọc theo ngày/điểm/nhân viên/hình thức/trạng thái (bao gồm đã xóa); sửa đơn đã thanh toán. Dòng đơn ship hiện kiểu ship (badge "Ship ngoài · trả 10k" như hàng đợi); chi tiết đơn có dòng phí ship / phụ thu và "Trả shipper".
+4. **Báo cáo**: doanh thu theo ngày/điểm/ca/nhân viên; tỷ lệ TM/CK/Nợ theo nhân viên; **tổng CK theo ngày/điểm** để đối chiếu app ngân hàng; món bán chạy; số lần sửa/xóa theo nhân viên; **thống kê ship** (mục 5).
 5. **Sổ nợ**: khách, dư nợ, lịch sử; **chuyển khoản nợ** sang khách khác; ghi thu nợ.
 6. **Nhật ký**.
 7. **Lương** (theo tháng, **chỉ tính theo ngày**, không tính theo giờ): ngày công = số ngày nhân viên có mở ca (giờ VN, mở nhiều ca trong ngày vẫn là 1 ngày; ca tính vào tháng của ngày mở ca) + ngày chủ đánh "có làm" trên lịch (không trùng ngày có ca) ± ngày công chủ chỉnh (khi nhân viên làm mà không mở ca, hoặc mở ca nhầm). Lương tháng = ngày công × lương một ngày + thưởng − trừ; còn phải trả = lương tháng − ứng − đã trả. Sinh nhật trong tháng. Lịch tháng của từng nhân viên: ngày có mở ca (tổng giờ), bấm ngày để xem ca hoặc đánh dấu "nghỉ" / "có làm" kèm lý do không bắt buộc (đổi qua lại / bỏ được; nghỉ không đổi lương, có làm +1 công; đánh trước được cho ngày sắp tới).
@@ -485,7 +506,8 @@ Có 3 công tắc. Công tắc **chỉ bật hoặc tắt việc in tự động
 ### 12.4 Bill thanh toán
 - Tự in **sau khi thanh toán thành công**, kể cả đơn ghi nợ (nếu bật công tắc).
 - Nội dung: tên quán, tên điểm bán, SĐT, địa chỉ, **mã đơn chữ to**, giờ thanh toán, Tại chỗ/Mang về, nhãn hoặc bàn, các dòng món (số lượng, đơn giá, thành tiền), dòng **Phí ship** (khi > 0), **Tổng**, "Cảm ơn quý khách", dòng chân trang tự nhập, "Không có bill = miễn phí".
-- **Không in**: hình thức thanh toán, tiền khách đưa và tiền thối, thông tin nợ, tên nhân viên.
+- Đơn shipper ngoài: phụ thu in giống hệt dòng **Phí ship** (với khách hai kiểu như nhau).
+- **Không in**: hình thức thanh toán, tiền khách đưa và tiền thối, thông tin nợ, tên nhân viên, kiểu ship, tiền trả shipper.
 - **Tablet không có nút in hay in lại bill.** Bill in lỗi thì chỉ ghi lại (12.7). Server cũng chặn: tablet chỉ tạo được **một** lệnh bill cho mỗi đơn, trong 10 phút sau khi thanh toán (gọi API trực tiếp cũng không in lại được bill cũ). Chỉ **chủ in lại từ xa**. Bản in lại **giống hệt bản gốc** (không đóng dấu "bản in lại"), theo nội dung hiện tại của đơn (kể cả khi chủ đã sửa đơn sau thanh toán) và mẫu hiện tại.
 
 ### 12.5 Mẫu in (`print_template`, một mẫu chung)

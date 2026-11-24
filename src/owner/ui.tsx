@@ -1,5 +1,7 @@
 import type { InputHTMLAttributes, ReactNode, Ref, SelectHTMLAttributes } from 'react';
 import { Check, ChevronDown, Info, Search, type LucideIcon } from 'lucide-react';
+import type { ShipStats } from '@/domain/reconcile';
+import { shipStatLines } from '@/domain/report';
 
 /** Mảnh giao diện dùng chung cho các màn chế độ chủ kiểu Makaryo (Figma R2x–R3x / T21–T35). */
 
@@ -271,5 +273,21 @@ export function KV({ label, children, testId, roomy }: { label: ReactNode; child
       <span className="text-[#6d6d6d]">{label}</span>
       <b className="num text-right font-semibold">{children}</b>
     </p>
+  );
+}
+
+/** Thống kê ship (chỉ chủ): các dòng > 0, xếp nối nhau; không có gì ⇒ không hiện. */
+export function ShipStatsLine({ stats, testId, className = '' }: { stats: ShipStats | null | undefined; testId: string; className?: string }) {
+  const lines = shipStatLines(stats);
+  if (lines.length === 0) return null;
+  return (
+    <span className={`num flex flex-wrap gap-x-3 gap-y-0.5 ${className}`} data-testid={testId}>
+      {lines.map((l, i) => (
+        <span key={l.key} data-testid={`${testId}-${l.key}`}>
+          {i > 0 && <span className="sr-only"> · </span>}
+          {l.label} <b className="font-semibold">{l.value}</b>
+        </span>
+      ))}
+    </span>
   );
 }

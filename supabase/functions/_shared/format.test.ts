@@ -72,6 +72,21 @@ const samples: Notification[] = [
       unresolved_gaps: 1,
     },
   },
+  // Shipper ngoài (SPEC 4.2 / 6): tin đơn ship + báo cáo ca có thống kê ship.
+  {
+    kind: 'delivery_order',
+    payload: {
+      ...base, ...ctx, point_name: 'Xôi A', updated: false,
+      order: { ...order, status: 'open', dine_type: 'delivery', address: '12 Lê Lợi', ship_mode: 'external', ship_fee: 5_000, ship_payout: 10_000, total: 67_000 },
+    },
+  },
+  {
+    kind: 'shift_close',
+    payload: {
+      ...base, ...ctx, closed_at: '2026-11-18T03:15:00Z', adjusted: false,
+      reconcile: { ...rec, ship: { shop_orders: 2, external_orders: 3, shop_fee: 20_000, external_fee: 15_000, payout: 30_000, external_profit: -15_000 } },
+    },
+  },
 ];
 
 describe('định dạng Telegram', () => {
@@ -131,13 +146,47 @@ describe('định dạng Telegram', () => {
       },
       opts,
     );
-    expect(msg).toContain('Phí ship: 10.000\nTổng: 72.000');
+    expect(msg).toContain('Quán ship · phí ship 10.000\nTổng: 72.000');
     const close = formatNotification(
       { kind: 'shift_close', payload: { ...base, ...ctx, reconcile: { ...rec, revenue: { ...rec.revenue, ship_fee: 25_000 } }, adjusted: false } },
       opts,
     );
     expect(close).toContain('Nợ 100.000)\nTrong đó phí ship: 25.000');
-    expect(formatNotification(samples[3]!, opts)).not.toContain('phí ship');
+    expect(formatNotification(samples[3]!, opts)).not.toContain('Trong đó phí ship');
+  });
+
+  it('shipper ngoài: tin đơn ship ghi kiểu + phụ thu + trả shipper; báo cáo ca có dòng ship ngoài; chủ đổi kiểu / trả shipper có dòng Ship', () => {
+    const ext = { ...order, status: 'open', dine_type: 'delivery', address: '12 Lê Lợi', ship_mode: 'external', ship_fee: 5_000, ship_payout: 10_000, total: 67_000 };
+    const msg = formatNotification({ kind: 'delivery_order', payload: { ...base, ...ctx, order: ext, point_name: 'Xôi A', updated: true } }, opts);
+    expect(msg).toContain('🛵 Cập nhật đơn ship');
+    expect(msg).toContain('Shipper ngoài · phụ thu 5.000 · trả shipper 10.000\nTổng: 67.000');
+    expect(formatNotification({ kind: 'delivery_order', payload: { ...base, ...ctx, order: { ...ext, ship_fee: 0 }, point_name: null, updated: false } }, opts))
+      .toContain('Shipper ngoài · không phụ thu · trả shipper 10.000');
+
+    const ship = { shop_orders: 1, external_orders: 3, shop_fee: 10_000, external_fee: 15_000, payout: 30_000, external_profit: -15_000 };
+    const close = formatNotification(
+      { kind: 'shift_close', payload: { ...base, ...ctx, reconcile: { ...rec, revenue: { ...rec.revenue, ship_fee: 25_000 }, ship }, adjusted: false } },
+      opts,
+    );
+    expect(close).toContain('Nợ 100.000)\nTrong đó phí ship: 10.000\nShip ngoài: 3 đơn · phụ thu 15.000 · trả 30.000 → −15.000');
+
+    const edit = formatNotification(
+      {
+        kind: 'owner_edit',
+        payload: {
+          ...base, order_id: 'o1', order_code: 'A30', tablet_name: 'Quầy A',
+          before: { ...ext, status: 'paid', payment_method: 'cash' }, after: { ...ext, status: 'paid', payment_method: 'cash', ship_payout: 15_000 },
+          recalculated: { before: {}, after: {} },
+        },
+      } as Notification,
+      opts,
+    );
+    expect(edit).toContain('Ship: Shipper ngoài · phụ thu 5.000 · trả shipper 10.000 → Shipper ngoài · phụ thu 5.000 · trả shipper 15.000');
+    const same = formatNotification(
+      { kind: 'owner_edit', payload: { ...base, order_id: 'o1', order_code: 'A30', tablet_name: 'Quầy A', before: { ...ext, status: 'paid' }, after: { ...ext, status: 'paid' }, recalculated: { before: {}, after: {} } } } as Notification,
+      opts,
+    );
+    expect(same).not.toContain('Ship:');
   });
 
   it('mỗi tin có link mở thẳng chi tiết trong app chủ', () => {

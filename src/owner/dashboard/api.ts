@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import type { ShipStats } from '@/domain/reconcile';
 import type { MethodSplit } from '@/domain/report';
 import type { Money, OrderStatus } from '@/domain/types';
 
@@ -11,6 +12,8 @@ export interface Revenue extends MethodSplit {
   orders: number;
   /** Phần phí ship nằm trong `total` (chỉ có ở tổng, không có ở từng ngày / điểm của báo cáo). */
   ship_fee?: Money;
+  /** Thống kê ship (quán ship / shipper ngoài); thiếu khi server chưa áp migration. */
+  ship?: ShipStats;
 }
 
 export interface Dashboard {

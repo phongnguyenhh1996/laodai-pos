@@ -3,7 +3,7 @@ import type { SoldOut } from '@/domain/catalog';
 import { canConfirmCash } from '@/domain/cash';
 import { assertQty, orderTotal } from '@/domain/pricing';
 import { businessDate } from '@/domain/time';
-import type { CountItem, DeleteReason, DineType, Money, Order, OrderItem } from '@/domain/types';
+import type { CountItem, DeleteReason, DineType, Money, Order, OrderItem, ShipDefaults, ShipMode } from '@/domain/types';
 import { PosNetworkError } from './backend';
 import type { TabletStore } from './store';
 import type { OpKind, PushResult, TabletShift, WireOp } from './types';
@@ -46,6 +46,8 @@ const REJECT_MESSAGES: Record<string, string> = {
   point_inactive: 'Điểm bán đã ngừng.',
   address_required: 'Đơn ship cần địa chỉ',
   bad_ship_fee: 'Phí ship không hợp lệ',
+  bad_ship_mode: 'Kiểu ship không hợp lệ',
+  bad_ship_payout: 'Chưa chọn tiền trả shipper',
   cash_short: 'Khách đưa chưa đủ tiền',
   customer_required: 'Cần tên khách',
   bad_customer: 'Không tìm thấy khách nợ.',
@@ -81,6 +83,15 @@ function orderShipFee(dine_type: DineType, fee: Money | null | undefined): Money
   return v;
 }
 
+/** Kiểu ship + tiền trả shipper gửi đi (cùng luật server): không phải đơn ship ⇒ shop / 0; quán ship ⇒ payout 0. */
+function orderShip(dine_type: DineType, mode: ShipMode | null | undefined, payout: Money | null | undefined): { ship_mode: ShipMode; ship_payout: Money } {
+  const ship_mode: ShipMode = dine_type === 'delivery' ? mode ?? 'shop' : 'shop';
+  if (ship_mode === 'shop') return { ship_mode, ship_payout: 0 };
+  const v = payout ?? 0;
+  if (!Number.isInteger(v) || v < 1000 || v > 50_000 || v % 1000 !== 0) throw new PosError('Chưa chọn tiền trả shipper');
+  return { ship_mode, ship_payout: v };
+}
+
 /** Khách đơn ship: id có sẵn, hoặc khách mới (`is_new`, server tạo cùng lúc lưu đơn). */
 export interface OrderCustomer {
   id: string;
@@ -114,8 +125,12 @@ export interface OrderDraft {
   table_no?: string | null;
   address?: string | null;
   customer?: OrderCustomer | null;
-  /** Phí ship (chỉ đơn ship), cộng vào tổng. */
+  /** Phí ship / phụ thu (chỉ đơn ship), cộng vào tổng. */
   ship_fee?: Money;
+  /** Kiểu ship (chỉ đơn ship); thiếu ⇒ quán ship. */
+  ship_mode?: ShipMode;
+  /** Tiền trả shipper ngoài (bắt buộc khi `external`); KHÔNG cộng vào tổng. */
+  ship_payout?: Money;
   items: OrderItem[];
 }
 
@@ -154,6 +169,8 @@ export class Pos {
    */
   private unsure = new Map<string, { op: WireOp; body: string }>();
   private listeners = new Set<(e: PosEvent) => void>();
+  /** Mặc định đơn ship lần đọc gần nhất (theo ca): dùng ngay khi mở đơn mới, và khi mất mạng. */
+  private shipCache: { shiftId: string; orderId: string | null; value: ShipDefaults | null } | null = null;
 
   constructor(
     private store: TabletStore,
@@ -182,6 +199,40 @@ export class Pos {
   /** Quên các thao tác còn chờ bấm lại (đổi máy / trong test). */
   reset(): void {
     this.unsure.clear();
+    this.shipCache = null;
+  }
+
+  /** Mặc định đơn ship đã biết của ca đang mở (không gọi server). */
+  cachedShipDefaults(): ShipDefaults | null {
+    const s = this.store.getSnapshot().open?.shift;
+    return s && this.shipCache?.shiftId === s.id ? this.shipCache.value : null;
+  }
+
+  /**
+   * Mặc định cho đơn ship mới = đơn ship gần nhất của ca, đọc từ server (mọi máy cùng quầy thấy giống nhau;
+   * tablet không đọc được đơn đã thanh toán nên phải hỏi RPC). Lỗi mạng ⇒ dùng bản đã biết.
+   */
+  async shipDefaults(): Promise<ShipDefaults | null> {
+    const s = this.store.getSnapshot().open?.shift;
+    if (!s) return null;
+    try {
+      const value = await this.store.api.loadShipDefaults(s.id);
+      this.shipCache = { shiftId: s.id, orderId: null, value };
+      return value;
+    } catch {
+      return this.cachedShipDefaults();
+    }
+  }
+
+  /**
+   * Vừa lưu đơn ship ⇒ cập nhật mặc định ngay (không chờ server): đơn mới tạo là đơn ship gần nhất của ca;
+   * sửa thì chỉ tính khi đó chính là đơn ship gần nhất máy này biết. Lần mở đơn mới sau vẫn hỏi lại server.
+   */
+  private rememberShip(o: Order, created: boolean): void {
+    if (o.dine_type !== 'delivery') return;
+    if (!created && (this.shipCache?.shiftId !== o.opened_shift_id || this.shipCache.orderId !== o.id)) return;
+    const value = { ship_mode: o.ship_mode, ship_fee: o.ship_fee, ship_payout: o.ship_payout };
+    this.shipCache = { shiftId: o.opened_shift_id, orderId: o.id, value };
   }
 
   // ---------------------------------------------------------------- đọc
@@ -286,6 +337,7 @@ export class Pos {
     const address = orderAddress(draft.dine_type, draft.address);
     const customer = orderCustomer(draft.dine_type, draft.customer);
     const ship_fee = orderShipFee(draft.dine_type, draft.ship_fee);
+    const ship = orderShip(draft.dine_type, draft.ship_mode, draft.ship_payout);
     const shift = this.shift();
     const id = draft.id ?? uuidv7();
     const order = {
@@ -297,17 +349,19 @@ export class Pos {
       address,
       opened_shift_id: shift.id,
       ship_fee,
+      ...ship,
       total: orderTotal(draft.items) + ship_fee,
     };
     const res = await this.send('create_order', id, () => ({ entity_id: id, payload: { order, customer, items: draft.items } }));
     const created = await this.applied(res, id, !!customer?.is_new);
+    this.rememberShip(created, true);
     this.emit({ type: 'order_created', order: created });
     return created;
   }
 
   async updateOrder(
     orderId: string,
-    changes: Partial<Pick<OrderDraft, 'point_id' | 'dine_type' | 'label' | 'table_no' | 'address' | 'customer' | 'ship_fee' | 'items'>>,
+    changes: Partial<Pick<OrderDraft, 'point_id' | 'dine_type' | 'label' | 'table_no' | 'address' | 'customer' | 'ship_fee' | 'ship_mode' | 'ship_payout' | 'items'>>,
   ): Promise<Order> {
     if (changes.items) validateItems(changes.items);
     this.shift();
@@ -321,6 +375,14 @@ export class Pos {
     };
     after.address = orderAddress(after.dine_type, changes.address !== undefined ? changes.address : before.address);
     after.ship_fee = orderShipFee(after.dine_type, changes.ship_fee !== undefined ? changes.ship_fee : before.ship_fee);
+    Object.assign(
+      after,
+      orderShip(
+        after.dine_type,
+        changes.ship_mode !== undefined ? changes.ship_mode : before.ship_mode,
+        changes.ship_payout !== undefined ? changes.ship_payout : before.ship_payout,
+      ),
+    );
     after.total = orderTotal(after.items) + after.ship_fee;
     // Không đổi khách ⇒ gửi lại khách đang có (server ghi đúng khách trong payload, bỏ khách nếu không phải đơn ship).
     const customer = orderCustomer(
@@ -339,10 +401,13 @@ export class Pos {
         table_no: after.table_no,
         items: after.items,
         ship_fee: after.ship_fee,
+        ship_mode: after.ship_mode,
+        ship_payout: after.ship_payout,
         total: after.total,
       },
     }));
     const updated = await this.applied(res, orderId, !!customer?.is_new);
+    this.rememberShip(updated, false);
     this.emit({ type: 'order_updated', before, after: updated });
     return updated;
   }
