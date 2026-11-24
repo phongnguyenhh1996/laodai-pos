@@ -97,7 +97,7 @@ describe('B. Ca', () => {
       cy.get(tid('rep-boxes-supply')).should('have.text', '200 + 50');
       // +200k tiền lẻ ⇒ tiền kỳ vọng tăng đúng 200.000
       cy.get(tid('adjust-kind-cash')).click();
-      cy.get(tid('adjust-qty')).type('200k');
+      cy.get(tid('adjust-qty')).type('200');
       cy.get(tid('adjust-submit')).should('contain.text', '200.000').click();
       cy.get(tid('adjustment-row')).should('have.length', 2);
       cy.get(tid('rep-cash-adj')).should('have.text', '200.000');
@@ -135,7 +135,7 @@ describe('B. Ca', () => {
     cy.get(tid('open-close-shift')).click();
     cy.get(tid('close-boxes')).type('199');
     cy.get(tid('close-plates')).type('60');
-    cy.get(tid('close-cash')).type('500000');
+    cy.get(tid('close-cash')).type('500');
     cy.get(tid('close-review')).click();
     cy.get(tid('close-confirm')).click();
     cy.get(tid('shift-closed')).should('be.visible');
@@ -182,7 +182,7 @@ describe('B. Ca', () => {
     cy.get(tid('open-close-shift')).click();
     cy.get(tid('close-boxes')).type('198');
     cy.get(tid('close-plates')).type('60');
-    cy.get(tid('close-cash')).type('540.000'); // thiếu 19.000
+    cy.get(tid('close-cash')).type('540'); // thiếu 19.000
     cy.get(tid('close-review')).click();
     cy.get(tid('close-confirm')).click();
 
@@ -223,7 +223,7 @@ describe('B. Ca', () => {
     cy.get(tid('open-close-shift')).click();
     cy.get(tid('close-boxes')).type('199');
     cy.get(tid('close-plates')).type('60');
-    cy.get(tid('close-cash')).type('531000');
+    cy.get(tid('close-cash')).type('531');
     cy.get(tid('close-review')).click();
     cy.get(tid('close-confirm')).click();
     cy.get(tid('shift-closed')).should('be.visible');
@@ -243,7 +243,7 @@ describe('B. Ca', () => {
     cy.ownerVisit('/owner/settings/products/new');
     cy.get(tid('field-menu_id')).select(SEED.menus.xoi);
     cy.get(tid('field-name')).type('Nước ngọt');
-    cy.get(tid('field-price')).type('10k');
+    cy.get(tid('field-price')).type('10');
     cy.get(tid('field-boxes_takeaway')).clear().type('0');
     cy.get(tid('field-cans')).clear().type('1');
     cy.get(tid('settings-save')).click();
@@ -270,7 +270,7 @@ describe('B. Ca', () => {
     cy.get(tid('close-cans')).should('not.exist');
     cy.get(tid('close-boxes')).type('200');
     cy.get(tid('close-plates')).type('60');
-    cy.get(tid('close-cash')).type('500000');
+    cy.get(tid('close-cash')).type('500');
     cy.get(tid('close-review')).click();
     cy.get(tid('close-confirm')).click();
     cy.get(tid('shift-closed-done')).click();
@@ -291,9 +291,9 @@ describe('B. Ca', () => {
     cy.get(tid('close-plates')).should('not.exist');
     cy.get(tid('close-boxes')).type('200');
     cy.get(tid('close-cans')).type('45');
-    cy.get(tid('close-cash')).type('520000');
+    cy.get(tid('close-cash')).type('520');
     cy.get(tid('close-review')).click();
-    cy.get(tid('close-confirm-box')).should('contain.text', 'Hộp: 200 · Lon: 45 · Tiền mặt: 520.000');
+    cy.get(tid('close-confirm-box')).should('contain.text', 'Hộp: 200 · Lon: 45 · Tiền mặt: 520.000đ');
     cy.get(tid('close-confirm')).click();
     cy.get(tid('shift-closed')).should('be.visible');
     cy.waitLive();

@@ -463,7 +463,7 @@ describe('tạo đơn & thanh toán', () => {
     expect(tid('cash-exact')).toBeInTheDocument();
     expect(tid('cash-quick-50000')).toBeInTheDocument();
     expect(tid('pay-confirm')).toBeDisabled();
-    fireEvent.change(tid('cash-manual'), { target: { value: '30k' } });
+    fireEvent.change(tid('cash-manual'), { target: { value: '30' } });
     expect(tid('cash-change')).toHaveTextContent('Chưa đủ');
     expect(tid('pay-confirm')).toBeDisabled();
     click('cash-quick-100000');
@@ -764,7 +764,7 @@ describe('đóng ca', () => {
     expect(tid('close-error')).toBeInTheDocument(); // chưa nhập
     fireEvent.change(tid('close-boxes'), { target: { value: '190' } });
     fireEvent.change(tid('close-plates'), { target: { value: '60' } });
-    fireEvent.change(tid('close-cash'), { target: { value: '480.000' } });
+    fireEvent.change(tid('close-cash'), { target: { value: '480' } });
     click('close-review');
     click('close-edit'); // sửa lại được trước khi xác nhận
     click('close-review');
@@ -801,9 +801,9 @@ describe('đóng ca', () => {
     fireEvent.change(tid('close-cans'), { target: { value: '40' } });
     click('close-review');
     expect(tid('close-error')).toHaveTextContent('Nhập đủ 3 ô');
-    fireEvent.change(tid('close-cash'), { target: { value: '545000' } });
+    fireEvent.change(tid('close-cash'), { target: { value: '545' } });
     click('close-review');
-    expect(tid('close-confirm-box')).toHaveTextContent('Hộp: 186 · Lon: 40 · Tiền mặt: 545.000');
+    expect(tid('close-confirm-box')).toHaveTextContent('Hộp: 186 · Lon: 40 · Tiền mặt: 545.000đ');
     click('close-confirm');
     await screen.findByTestId('shift-closed');
     expect(server.ops.at(-1)!.payload).toEqual({ shift_id: expect.any(String), boxes_left: 186, cans_left: 40, cash_counted: 545_000 });
@@ -873,7 +873,7 @@ describe('ghi nợ & thu nợ', () => {
     expect(row).toHaveTextContent(dayTime(o.paid_at!));
     expect(row).toHaveTextContent('39.000');
 
-    fireEvent.change(tid('debt-amount'), { target: { value: '10k' } });
+    fireEvent.change(tid('debt-amount'), { target: { value: '10' } });
     click('debt-confirm');
     await waitFor(() => expect(tid(`debt-open-${o.id}`)).toHaveTextContent('29.000/ 39.000'));
     expect(tid('debt-last-payment')).toHaveTextContent('10.000 (tiền mặt)');
@@ -889,10 +889,10 @@ describe('ghi nợ & thu nợ', () => {
     expect(screen.queryByTestId('customer-suggest-c-gv')).not.toBeInTheDocument(); // không nợ
     click('customer-suggest-c-pb');
     expect(tid('customer-balance')).toHaveTextContent('120.000');
-    fireEvent.change(tid('debt-amount'), { target: { value: '200k' } });
+    fireEvent.change(tid('debt-amount'), { target: { value: '200' } });
     click('debt-confirm');
     expect(tid('debt-error')).toHaveTextContent('lớn hơn dư nợ');
-    fireEvent.change(tid('debt-amount'), { target: { value: '50k' } });
+    fireEvent.change(tid('debt-amount'), { target: { value: '50' } });
     expect(tid('debt-confirm')).toHaveTextContent('Thu 50.000');
     click('debt-confirm');
     expect(await screen.findByTestId('debt-done')).toHaveTextContent('Đã thu nợ 50.000 (tiền mặt) – Dũng (phường B)');
@@ -904,7 +904,7 @@ describe('ghi nợ & thu nợ', () => {
 
     // Trả hết bằng chuyển khoản
     click('debt-pay-all');
-    expect(tid('debt-amount')).toHaveValue('70000');
+    expect(tid('debt-amount')).toHaveValue('70');
     click('debt-method-transfer');
     click('debt-confirm');
     await waitFor(() => expect(tid('customer-balance')).toHaveTextContent(/^0$/));

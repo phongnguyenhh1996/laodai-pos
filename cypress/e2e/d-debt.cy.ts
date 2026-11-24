@@ -90,7 +90,7 @@ describe('D. Ghi nợ & thu nợ', () => {
       cy.get(tid('open-debt')).click();
       cy.get(tid(`customer-suggest-${GV}`)).should('contain.text', '85.000').click();
       cy.get(tid('customer-balance')).should('have.text', '85.000');
-      cy.get(tid('debt-amount')).type('50000');
+      cy.get(tid('debt-amount')).type('50');
       cy.get(tid('debt-method-cash')).should('have.attr', 'aria-pressed', 'true');
       cy.get(tid('debt-confirm')).click();
       cy.get(tid('debt-done')).should('contain.text', 'Đã thu nợ 50.000 (tiền mặt)');
@@ -147,7 +147,7 @@ describe('D. Ghi nợ & thu nợ', () => {
     cy.task('db:balance', GV).should('eq', 70_000);
 
     // Chủ ghi thu nợ trên điện thoại (không thuộc ca nào)
-    cy.get(tid('owner-debt-amount')).type('70k');
+    cy.get(tid('owner-debt-amount')).type('70');
     cy.get(tid('owner-debt-submit')).should('contain.text', '70.000').click();
     cy.get(tid('debt-balance')).should('have.text', '0');
     cy.get(tid('debt-payment-row')).should('have.length', 1).and('contain.text', 'Chủ');
@@ -166,14 +166,14 @@ describe('D. Ghi nợ & thu nợ', () => {
 
     // Thu quá dư nợ ⇒ báo lỗi, không ghi
     cy.get(tid('owner-debt-method-transfer')).click().should('have.attr', 'aria-pressed', 'true');
-    cy.get(tid('owner-debt-amount')).type('60000');
+    cy.get(tid('owner-debt-amount')).type('60');
     cy.get(tid('owner-debt-submit')).click();
     cy.get(tid('owner-debt-error')).should('contain.text', 'lớn hơn dư nợ');
     cy.get(tid('debt-payment-row')).should('not.exist');
     cy.task('db:balance', GV).should('eq', 55_000);
 
     // Thu 20.000 chuyển khoản
-    cy.get(tid('owner-debt-amount')).clear().type('20k');
+    cy.get(tid('owner-debt-amount')).clear().type('20');
     cy.get(tid('owner-debt-submit')).should('contain.text', '20.000').click();
     cy.get(tid('debt-balance')).should('have.text', '35.000');
     cy.get(tid('debt-payment-row')).should('have.length', 1).and('contain.text', 'Chuyển khoản').and('contain.text', '20.000').and('contain.text', 'Chủ');

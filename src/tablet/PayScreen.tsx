@@ -4,12 +4,12 @@ import { Banknote, Bike, CircleCheckBig, ChevronLeft, Landmark, NotebookPen, Rec
 import { canConfirmCash, changeDue, quickCashOptions } from '@/domain/cash';
 import { itemsSummary, lineSummary } from '@/domain/cart';
 import { lineTotal } from '@/domain/pricing';
-import { parseMoneyInput } from '@/domain/catalog';
 import { formatVnd } from '@/domain/money';
 import { customerLabel } from '@/domain/debt';
 import { DINE_LABELS, type Customer } from '@/domain/types';
 import { pos } from '@/lib/pos';
 import { Splash, errorMessage } from '@/app/ui';
+import { MoneyInput } from '@/app/MoneyInput';
 import type { PaymentInput } from '@/pos';
 import { ChosenCustomer, CustomerSuggestions, useDebtBook } from './debt';
 import { Notice, useTablet } from './parts';
@@ -30,7 +30,8 @@ export function PayScreen() {
   const seen = useRef(false);
   const [method, setMethod] = useState<Method>('cash');
   const [given, setGiven] = useState<number | null>(null);
-  const [manual, setManual] = useState('');
+  /** Số nhập tay (null = đang dùng nút tiền nhanh / chưa nhập). */
+  const [manual, setManual] = useState<number | null>(null);
   // Ghi nợ: chọn khách có sẵn, hoặc gõ tên mới (+ mô tả, SĐT tùy chọn) ⇒ tự tạo khách.
   const [debtName, setDebtName] = useState('');
   const [debtDesc, setDebtDesc] = useState('');
@@ -55,13 +56,13 @@ export function PayScreen() {
   const change = changeDue(o.total, given);
 
   function pickQuick(amount: number) {
-    setManual('');
+    setManual(null);
     setGiven(amount);
   }
 
-  function typeManual(raw: string) {
-    setManual(raw);
-    setGiven(parseMoneyInput(raw));
+  function typeManual(amount: number | null) {
+    setManual(amount);
+    setGiven(amount);
   }
 
   async function confirm(payment: PaymentInput, flash: string) {
@@ -173,7 +174,7 @@ export function PayScreen() {
                   <button
                     key={q.amount}
                     type="button"
-                    aria-pressed={given === q.amount && manual === ''}
+                    aria-pressed={given === q.amount && manual === null}
                     onClick={() => pickQuick(q.amount)}
                     className="btn btn-choice num min-h-[52px] px-1 text-[15px] md:min-h-[56px] md:text-[17px]"
                     data-testid={q.kind === 'exact' ? 'cash-exact' : `cash-quick-${q.amount}`}
@@ -181,14 +182,7 @@ export function PayScreen() {
                     {q.kind === 'exact' ? 'Đủ tiền' : formatVnd(q.amount)}
                   </button>
                 ))}
-                <input
-                  className="input min-h-[52px] text-center text-[15px] font-semibold md:min-h-[56px] md:text-[17px]"
-                  inputMode="numeric"
-                  placeholder="Nhập tay…"
-                  value={manual}
-                  onChange={(e) => typeManual(e.target.value)}
-                  data-testid="cash-manual"
-                />
+                <MoneyInput label="Khách đưa – nhập tay" srLabel center value={manual} onChange={typeManual} testId="cash-manual" />
               </div>
               <div className="hidden flex-1 md:block" />
               <div

@@ -36,7 +36,7 @@ describe('L. Lương', () => {
     // Đặt lương ngày ở hồ sơ nhân viên (CCCD sai bị chặn ngay trên màn)
     cy.get(tid('payroll-edit-rate')).click();
     cy.get(tid('settings-editor')).should('be.visible');
-    cy.get(tid('field-day_rate')).clear().type('300k');
+    cy.get(tid('field-day_rate')).clear().type('300');
     cy.get(tid('field-id_number')).clear().type('123');
     cy.get(tid('settings-save')).click();
     cy.get(tid('settings-error')).should('contain.text', 'Căn cước công dân');
@@ -73,12 +73,12 @@ describe('L. Lương', () => {
 
     // Thưởng 50k, ứng 100k
     cy.get(tid('payroll-kind-bonus')).click();
-    cy.get(tid('payroll-amount')).type('50k');
+    cy.get(tid('payroll-amount')).type('50');
     cy.get(tid('payroll-submit')).should('contain.text', '50.000').click();
     cy.get(tid('payslip-bonus')).should('have.text', '50.000');
     cy.get(tid('payslip-total')).should('have.text', '650.000');
     cy.get(tid('payroll-kind-advance')).click();
-    cy.get(tid('payroll-amount')).type('100000');
+    cy.get(tid('payroll-amount')).type('100');
     cy.get(tid('payroll-note')).type('ứng tiền xe');
     cy.get(tid('payroll-submit')).click();
     cy.get(tid('payslip-advance')).should('have.text', '100.000');

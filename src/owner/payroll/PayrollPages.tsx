@@ -3,7 +3,7 @@ import { Link, Route, Routes, useParams, useSearchParams } from 'react-router-do
 import { Cake, ChevronLeft, ChevronRight, FileText, Info, Plus } from 'lucide-react';
 import { ErrorText, Splash, errorMessage } from '@/app/ui';
 import { useIsTablet } from '@/app/useMediaQuery';
-import { parseMoneyInput } from '@/domain/catalog';
+import { MoneyInput } from '@/app/MoneyInput';
 import { formatVnd } from '@/domain/money';
 import {
   DAY_MARK_REASON_MAX,
@@ -425,11 +425,12 @@ function EntryForm({ staffId, ym, remaining, onSaved }: { staffId: string; ym: s
   const { client } = useOwner();
   const [kind, setKind] = useState<PayrollKind>('advance');
   const [amount, setAmount] = useState('');
+  const [money, setMoney] = useState<number | null>(null);
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const activeKind = kind;
-  const parsed = activeKind === 'days' ? parseDaysInput(amount) : parseMoneyInput(amount);
+  const parsed = activeKind === 'days' ? parseDaysInput(amount) : money;
 
   async function save(k: PayrollKind, value: number | null, n: string) {
     if (!value) {
@@ -441,6 +442,7 @@ function EntryForm({ staffId, ym, remaining, onSaved }: { staffId: string; ym: s
     try {
       await addPayrollEntry(client, { staff_id: staffId, month: ym, kind: k, amount: value, note: n });
       setAmount('');
+      setMoney(null);
       setNote('');
       await onSaved();
     } catch (err) {
@@ -496,9 +498,13 @@ function EntryForm({ staffId, ym, remaining, onSaved }: { staffId: string; ym: s
             </button>
           ))}
         </div>
-        <Field label={label} suffix={activeKind === 'days' ? 'ngày' : 'đ'}>
-          <input inputMode={activeKind === 'days' ? 'text' : 'numeric'} value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" className={INPUT} data-testid="payroll-amount" />
-        </Field>
+        {activeKind === 'days' ? (
+          <Field label={label} suffix="ngày">
+            <input inputMode="text" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" className={INPUT} data-testid="payroll-amount" />
+          </Field>
+        ) : (
+          <MoneyInput size="owner" label={label} value={money} onChange={setMoney} testId="payroll-amount" />
+        )}
         <Field label="Ghi chú (tùy chọn)">
           <input value={note} maxLength={120} onChange={(e) => setNote(e.target.value)} placeholder="VD: ứng tiền xe" className={INPUT} data-testid="payroll-note" />
         </Field>

@@ -31,4 +31,5 @@ thì chuyển thành kiểm tra tự động và ghi "(tự động: …)" bên 
 ## UI
 
 - Nhân viên không bao giờ thấy doanh thu, tổng số đơn hoặc số kỳ vọng khi đếm.
+- Mọi ô tiền dùng `MoneyInput` (nhập theo nghìn, [src/app/MoneyInput.tsx](../src/app/MoneyInput.tsx)); không tự làm ô số có đuôi "đ". (tự động: ESLint `no-restricted-syntax` với `unit` / `suffix` = "đ")
 - Tablet: nút to, ít chữ, một chạm. Chế độ chủ: tối ưu cho điện thoại 390px, vẫn dùng được ở 1280px.

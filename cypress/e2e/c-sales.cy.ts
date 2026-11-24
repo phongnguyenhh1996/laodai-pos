@@ -189,7 +189,11 @@ describe('C. Bán hàng', () => {
     cards().eq(1).find('[data-testid^=queue-open-]').click();
     cy.get(tid('order-code')).invoke('text').should('match', CODE);
     cy.get(tid('order-pay')).click();
+    // Nhập tay theo nghìn: gõ 1000 = 1.000.000đ; bấm nút tiền nhanh thì ô nhập tay xóa
+    cy.get(tid('cash-manual')).type('1000').should('have.value', '1.000');
+    cy.get(tid('cash-change')).should('have.text', '972.000');
     cy.get(tid('cash-quick-50000')).click();
+    cy.get(tid('cash-manual')).should('have.value', '');
     cy.get(tid('cash-change')).should('have.text', '22.000');
     cy.get(tid('pay-confirm')).click();
 
@@ -384,7 +388,7 @@ describe('C. Bán hàng', () => {
     cy.get(tid('open-close-shift')).click();
     cy.get(tid('close-boxes')).type('198');
     cy.get(tid('close-plates')).type('60');
-    cy.get(tid('close-cash')).type('490000');
+    cy.get(tid('close-cash')).type('490');
     cy.get(tid('close-review')).click();
     cy.get(tid('close-confirm')).click();
     cy.get(tid('shift-closed')).should('be.visible');

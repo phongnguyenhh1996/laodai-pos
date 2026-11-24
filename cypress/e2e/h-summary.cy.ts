@@ -36,7 +36,7 @@ describe('H. Tổng kết ngày', () => {
     cy.get(tid('open-close-shift')).click();
     cy.get(tid('close-boxes')).type('199'); // dùng 1 = theo đơn 1 (cơm tại chỗ dùng dĩa)
     cy.get(tid('close-plates')).type('59');
-    cy.get(tid('close-cash')).type('521000'); // kỳ vọng 531.000
+    cy.get(tid('close-cash')).type('521'); // kỳ vọng 531.000
     cy.get(tid('close-review')).click();
     cy.get(tid('close-confirm')).click();
     cy.waitLive();

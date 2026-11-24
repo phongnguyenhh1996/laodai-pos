@@ -79,6 +79,8 @@ shifts            id, tablet_profile_id, staff_id, opened_at, closed_at,
                   close_boxes_left, close_plates_left, close_cash_counted,
                   status (open|closed), recalculated_at
 shift_adjustments id, shift_id, kind (boxes|plates|cash), qty, note, at  -- chủ bổ sung giữa ca
+shift_expenses    id, shift_id, amount, note, actor_kind (staff|owner), staff_id,  -- khoản chi (4.9)
+                  at, voided_at, void_actor_kind              -- amount > 0, bội 1.000; note bắt buộc
 
 orders            id, device_seq, tablet_profile_id, point_id, code,   -- code: "3F5"
                   label, table_no, dine_type (dinein|takeaway|delivery),
@@ -173,6 +175,14 @@ Chỉ trên chế độ chủ. Sửa món / hình thức thanh toán / khách n�
 - Server **không chặn** đơn có món đang hết (máy khác có thể vừa báo hết lúc nhân viên đang bấm đơn). Chỉ khóa trên giao diện.
 - Báo hết / bán lại ghi `audit_log` (kèm tên nhân viên, điểm bán), xem ở Nhật ký, lọc "Hết món". Không báo Telegram.
 
+### 4.9 Khoản chi giữa ca
+Lấy **tiền mặt từ két** của ca để mua đồ (đá, ga…). Chỉ chi, chỉ tiền mặt; chi phí trả bằng CK / tiền túi chủ không ghi ở đây. Xem [ADR 0006](docs/adr/0006-khoan-chi-giua-ca.md).
+- **Tablet**: menu phụ của hàng đợi → **Chi tiền** (cần ca đang mở). Nhập số tiền (nhập theo nghìn, mục 7) + **ghi chú bắt buộc**. Hàng nút **ghi chú gần đây**: tối đa 8 ghi chú dùng nhiều nhất 30 ngày qua, mọi quầy, so khớp không phân biệt hoa thường / khoảng trắng thừa; bấm nút chỉ điền ghi chú, **không** điền số tiền. Lưu → màn xác nhận to "Chi **50.000đ** – mua đá?" → `sync_push` (`create_expense`). Mất mạng ⇒ không lưu, như mọi thao tác ([ADR 0001](docs/adr/0001-server-la-nguon-su-that.md)).
+- Màn Chi tiền liệt kê các khoản chi của **ca đang mở** (cả khoản chủ ghi, nhãn "Chủ ghi") và tổng chi của ca. Không thấy ca khác.
+- **Hủy**: nhân viên hủy được khoản chính nhân viên ghi khi ca còn mở (`void_expense`, `voided_at`); không sửa — nhầm thì hủy rồi ghi lại. Khoản chủ ghi thì nhân viên không hủy được.
+- **Chủ**: ở chi tiết ca, nút **Ghi khoản chi** (cạnh bổ sung giữa ca), được cả với ca đã đóng; hủy hoặc sửa số tiền / ghi chú mọi khoản. Ca đã đóng ⇒ **tính lại** đối soát, đánh dấu "đã điều chỉnh".
+- Mọi ghi / hủy / sửa ghi `audit_log` và báo Telegram ngay (mục 6). Không hạn mức, không chụp ảnh.
+
 ---
 
 ## 5. Đối soát cuối ca (tính ở server)
@@ -183,6 +193,7 @@ kỳ vọng = open_float + Σ adjustments(cash)
         + Σ orders.total (cash, paid_shift = ca này)
         + Σ debt_payments.amount (cash, shift = ca này)
         − Σ orders.ship_payout (mọi hình thức, status = paid, paid_shift = ca này)
+        − Σ shift_expenses.amount (shift = ca này, voided_at is null)
 chênh lệch = close_cash_counted − kỳ vọng
 ```
 Phí ship / phụ thu nằm trong `orders.total` nên đã có trong doanh thu và tiền mặt kỳ vọng. Doanh thu vẫn = Σ `total` (không trừ tiền trả shipper). Kỳ vọng có thể giảm vì một đơn CK / Nợ shipper ngoài: đúng, vì tiền thật đi ra khỏi két.
@@ -194,6 +205,8 @@ Phí ship / phụ thu nằm trong `orders.total` nên đã có trong doanh thu v
 - **Lãi/lỗ ship ngoài** = phụ thu ship ngoài − trả shipper ngoài.
 
 Dòng cũ "trong đó phí ship" đổi thành các dòng trên.
+
+**Khoản chi** (báo cáo ca / ngày / tháng, chỉ chủ): số khoản và tổng chi (không tính khoản đã hủy), cộng theo **nhóm ghi chú giống nhau** (chuẩn hóa như ghi chú gần đây), ví dụ "mua đá · 12 lần · 240.000". Báo cáo ca liệt kê từng khoản, kể cả khoản đã hủy (gạch ngang).
 
 **Hộp** (dùng để tham khảo, không cảnh báo tự động)
 ```
@@ -213,8 +226,10 @@ Doanh thu: 2.350.000 (TM 1.600.000 · CK 650.000 · Nợ 100.000)
 Tiền mặt: đếm 2.080.000 / kỳ vọng 2.100.000 → −20.000
 Hộp: dùng 118 / theo đơn 112 → +6
 Dĩa: dùng 0 / theo đơn 0
+Chi: 3 khoản · 120.000
 Xóa: 2 đơn (1 đã ra món) · Đơn còn mở: 1
 ```
+Dòng "Chi" chỉ hiện khi có khoản chi.
 
 ---
 
@@ -229,12 +244,13 @@ Gửi vào **một nhóm Telegram**, đồng thời lưu `audit_log` và xem đ�
 | Xóa đơn | ✅ |
 | Đơn ship mới; đổi địa chỉ / khách / kiểu ship / tiền trả shipper của đơn ship (tin ghi kiểu ship, phí ship hoặc phụ thu, tiền trả shipper) | ✅ |
 | Ghi nợ; thu nợ | ✅ |
+| Ghi / hủy / chủ sửa khoản chi (mục 4.9): `💸 Chi 20.000 – mua đá · Lan · Tablet A`, `↩️ Hủy chi 20.000 – mua đá · Lan` (chủ hủy thì ghi "(chủ)"), chủ sửa thì trước → sau | ✅ |
 | Chủ sửa đơn đã thanh toán | ✅ |
 | Phát hiện lỗ hổng `device_seq` | ✅ |
 | Sửa món trong đơn đang mở | chỉ log |
 | Báo hết món / bán lại (mục 4.8) | chỉ log |
 | In / in lại / in lỗi phiếu bếp, bill; đổi mẫu in | chỉ log (mục 12) |
-| Tổng kết ngày (giờ chủ đặt) | ✅ theo lịch (`pg_cron`) |
+| Tổng kết ngày (giờ chủ đặt), có tổng chi | ✅ theo lịch (`pg_cron`) |
 
 Mỗi tin có link mở thẳng chi tiết trong app chủ.
 
@@ -245,11 +261,14 @@ Mỗi tin có link mở thẳng chi tiết trong app chủ.
 ### Tablet (chế độ bán hàng)
 1. **Đăng nhập**: đăng nhập chủ → chọn quầy (chỉ một lần).
 2. **Mở ca**: danh sách tên nhân viên → Mở ca.
-3. **Hàng đợi** (màn hình chính): hai nhóm đơn, nút lớn **+ Đơn mới**, menu phụ: Thu nợ · Đóng ca · Chế độ chủ.
+3. **Hàng đợi** (màn hình chính): hai nhóm đơn, nút lớn **+ Đơn mới**, menu phụ: Thu nợ · Chi tiền · Đóng ca · Chế độ chủ.
 4. **Đơn**: tab điểm bán, combo, món, topping, Tại chỗ/Mang về, nhãn → Lưu / Đã ra món / Thanh toán / Xóa; nút **Báo hết món** (mục 4.8).
 5. **Thanh toán**: TM / CK / Ghi nợ.
 6. **Thu nợ**.
-7. **Đóng ca**: 3 ô số → Xác nhận.
+7. **Chi tiền** (mục 4.9).
+8. **Đóng ca**: các ô đếm → Xác nhận; màn xác nhận hiện lại số đã nhập dạng đầy đủ ("2.080.000đ"), vẫn không hiện kỳ vọng.
+
+**Nhập theo nghìn** (`MoneyInput`, mọi ô tiền ở tablet và chế độ chủ: tiền khách đưa, đếm tiền đóng ca, thu nợ, khoản chi, bổ sung giữa ca và sổ lương khi đang chọn loại tiền, giá món / topping, lương một ngày, tiền lẻ đầu ca): gõ `50` = 50.000đ; ô hiện phần nghìn có dấu chấm (`1.500`) và đuôi `.000đ` cố định màu xám; không nhập được số lẻ dưới 1.000.
 
 In ấn (mục 12): trạng thái máy in + "Kết nối lại" trên hàng đợi, nút "In lại phiếu bếp" trên thẻ đơn, báo đỏ khi in lỗi.
 
@@ -257,9 +276,9 @@ Thiết kế: nút ≥ 56px, chữ to, tối đa 2–3 chạm cho một đơn co
 
 ### Chế độ chủ (vào bằng mật khẩu chủ trên bất kỳ máy nào đã chọn quầy; giao diện tối ưu cho điện thoại)
 1. **Tổng quan** (realtime): doanh thu hôm nay theo điểm; các ca đang mở; đơn đang chờ lâu.
-2. **Ca**: danh sách ca → chi tiết đối soát (mục 5), đơn của ca, bổ sung hộp/dĩa/tiền giữa ca.
+2. **Ca**: danh sách ca → chi tiết đối soát (mục 5), đơn của ca, bổ sung hộp/dĩa/tiền giữa ca, khoản chi (ghi / sửa / hủy, mục 4.9).
 3. **Đơn**: lọc theo ngày/điểm/nhân viên/hình thức/trạng thái (bao gồm đã xóa); sửa đơn đã thanh toán. Dòng đơn ship hiện kiểu ship (badge "Ship ngoài · trả 10k" như hàng đợi); chi tiết đơn có dòng phí ship / phụ thu và "Trả shipper".
-4. **Báo cáo**: doanh thu theo ngày/điểm/ca/nhân viên; tỷ lệ TM/CK/Nợ theo nhân viên; **tổng CK theo ngày/điểm** để đối chiếu app ngân hàng; món bán chạy; số lần sửa/xóa theo nhân viên; **thống kê ship** (mục 5).
+4. **Báo cáo**: doanh thu theo ngày/điểm/ca/nhân viên; tỷ lệ TM/CK/Nợ theo nhân viên; **tổng CK theo ngày/điểm** để đối chiếu app ngân hàng; món bán chạy; số lần sửa/xóa theo nhân viên; **thống kê ship** và **khoản chi theo ghi chú** (mục 5).
 5. **Sổ nợ**: khách, dư nợ, lịch sử; **chuyển khoản nợ** sang khách khác; ghi thu nợ.
 6. **Nhật ký**.
 7. **Lương** (theo tháng, **chỉ tính theo ngày**, không tính theo giờ): ngày công = số ngày nhân viên có mở ca (giờ VN, mở nhiều ca trong ngày vẫn là 1 ngày; ca tính vào tháng của ngày mở ca) + ngày chủ đánh "có làm" trên lịch (không trùng ngày có ca) ± ngày công chủ chỉnh (khi nhân viên làm mà không mở ca, hoặc mở ca nhầm). Lương tháng = ngày công × lương một ngày + thưởng − trừ; còn phải trả = lương tháng − ứng − đã trả. Sinh nhật trong tháng. Lịch tháng của từng nhân viên: ngày có mở ca (tổng giờ), bấm ngày để xem ca hoặc đánh dấu "nghỉ" / "có làm" kèm lý do không bắt buộc (đổi qua lại / bỏ được; nghỉ không đổi lương, có làm +1 công; đánh trước được cho ngày sắp tới).
@@ -342,7 +361,7 @@ Toàn bộ logic nghiệp vụ phía client nằm trong `src/domain/` dưới d�
 - Màu theo thời gian chờ: < 5 phút thường, ≥ 5 phút vàng, ≥ 10 phút đỏ. Ngưỡng lấy từ cài đặt. Đơn đã ra món không đổi màu.
 
 **Đối soát** (`domain/reconcile`, dùng chung công thức với hàm SQL, xem 10.3)
-- Tiền mặt kỳ vọng tính đủ: tiền lẻ đầu ca, tiền chủ bổ sung, đơn trả tiền mặt **theo ca thu**, tiền mặt thu nợ.
+- Tiền mặt kỳ vọng tính đủ: tiền lẻ đầu ca, tiền chủ bổ sung, đơn trả tiền mặt **theo ca thu**, tiền mặt thu nợ; trừ trả shipper và khoản chi chưa hủy.
 - Không tính: đơn chuyển khoản, đơn ghi nợ, đơn đã xóa, đơn mở ở ca này nhưng thu ở ca khác.
 - Hộp và dĩa tính **theo ca mở đơn**, bỏ qua đơn đã xóa. Danh sách "bao bì của đơn bị xóa sau khi ra món" chỉ gồm đơn có `served_at` trước thời điểm xóa.
 - Chủ sửa đơn đã thanh toán (ví dụ đổi tiền mặt thành chuyển khoản) thì kết quả đối soát tính lại phải thay đổi đúng.
@@ -376,7 +395,7 @@ Toàn bộ logic nghiệp vụ phía client nằm trong `src/domain/` dưới d�
 - Gửi `total` sai: server tự tính lại tổng từ giá menu hiện hành và từ chối nếu không khớp.
 - Đọc số kỳ vọng hay chênh lệch của ca vừa đóng (RPC đóng ca chỉ trả về `ok`).
 
-**Vai trò `tablet` ĐƯỢC:** đọc menu, nhân viên, danh sách khách và dư nợ; tạo, sửa, xóa mềm đơn đang mở của hồ sơ tablet mình; mở và đóng ca; ghi thu nợ.
+**Vai trò `tablet` ĐƯỢC:** đọc menu, nhân viên, danh sách khách và dư nợ; tạo, sửa, xóa mềm đơn đang mở của hồ sơ tablet mình; mở và đóng ca; ghi thu nợ; ghi / hủy khoản chi của ca đang mở của quầy mình, đọc khoản chi của ca đó và ghi chú gần đây. **Không** đọc khoản chi của ca đã đóng / quầy khác, không hủy khoản chủ ghi, không sửa khoản chi.
 
 **Vai trò chủ:** đọc và sửa tất cả; sửa đơn đã thanh toán thì có log trước/sau và đặt `owner_edited = true`.
 

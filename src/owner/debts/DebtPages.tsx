@@ -2,8 +2,8 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link, Route, Routes, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeftRight, Banknote, Check, ChevronRight, HandCoins, Landmark, Plus, UserRound } from 'lucide-react';
 import { ErrorText, Splash, errorMessage } from '@/app/ui';
+import { MoneyInput } from '@/app/MoneyInput';
 import { useIsTablet } from '@/app/useMediaQuery';
-import { parseMoneyInput } from '@/domain/catalog';
 import { customerLabel, debtPaymentProblem, suggestCustomers } from '@/domain/debt';
 import { formatVnd } from '@/domain/money';
 import { shortDate } from '@/domain/report';
@@ -469,12 +469,12 @@ function TransferForm({ d, picked, onDone }: { d: CustomerDebt; picked: string[]
 function PaymentForm({ d, onDone }: { d: CustomerDebt; onDone: () => Promise<void> }) {
   const { client } = useOwner();
   const [params] = useSearchParams();
-  const [amount, setAmount] = useState('');
+  const [amount, setAmount] = useState<number | null>(null);
   const [method, setMethod] = useState<'cash' | 'transfer'>('transfer');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const amountRef = useRef<HTMLInputElement>(null);
-  const parsed = parseMoneyInput(amount);
+  const parsed = amount;
 
   // Từ nút "Ghi thu nợ" ở danh sách: cuộn tới và đặt con trỏ vào ô số tiền.
   const jump = params.get('thu') === '1';
@@ -495,7 +495,7 @@ function PaymentForm({ d, onDone }: { d: CustomerDebt; onDone: () => Promise<voi
     setError(null);
     try {
       await recordOwnerDebtPayment(client, d.customer.id, parsed!, method);
-      setAmount('');
+      setAmount(null);
       await onDone();
     } catch (err) {
       setError(errorMessage(err));
@@ -532,21 +532,7 @@ function PaymentForm({ d, onDone }: { d: CustomerDebt; onDone: () => Promise<voi
             );
           })}
         </div>
-        <label className="flex flex-col gap-1.5">
-          <span className="text-[13px] font-medium leading-4 text-[#6d6d6d]">Số tiền</span>
-          <span className="flex h-[45px] items-center gap-2 rounded-xl border border-line bg-white px-3.5 focus-within:border-brand">
-            <input
-              ref={amountRef}
-              inputMode="numeric"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="0"
-              className="num min-w-0 flex-1 bg-transparent text-[15px] font-medium leading-[19px] outline-none placeholder:text-[#a3a3a3] focus-visible:ring-0"
-              data-testid="owner-debt-amount"
-            />
-            <span className="text-[13px] text-[#888]">đ</span>
-          </span>
-        </label>
+        <MoneyInput size="owner" label="Số tiền" value={amount} onChange={setAmount} inputRef={amountRef} testId="owner-debt-amount" />
         <ErrorText testId="owner-debt-error">{error}</ErrorText>
         <button type="submit" className={btn('brand', BIG_BTN)} disabled={busy} data-testid="owner-debt-submit">
           <Check aria-hidden className="h-[17px] w-[17px]" />

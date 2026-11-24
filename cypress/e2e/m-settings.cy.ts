@@ -40,8 +40,8 @@ describe('M. Cài đặt', () => {
     newEntity('toppings');
     cy.get(tid('field-menu_id')).select(SEED.menus.xoi);
     cy.get(tid('field-name')).type('Pate thêm');
-    cy.get(tid('field-price')).type('7k');
-    cy.get(tid('field-price-parsed')).should('contain.text', '7.000');
+    cy.get(tid('field-price')).type('7');
+    cy.get(tid('field-price')).should('have.value', '7');
     cy.get(tid('field-extra_box_takeaway')).check();
     cy.get(tid('settings-save')).click();
     savedId('toppings').as('topping');

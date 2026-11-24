@@ -26,7 +26,17 @@ export default tseslint.config(
   {
     files: ['src/**/*.{ts,tsx}'],
     plugins: { 'react-hooks': reactHooks },
-    rules: reactHooks.configs.recommended.rules,
+    rules: {
+      ...reactHooks.configs.recommended.rules,
+      // coding-standards (UI): mọi ô tiền dùng MoneyInput (nhập theo nghìn). Ô số tự gắn đuôi "đ" là ô tiền kiểu cũ.
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "JSXAttribute[name.name=/^(unit|suffix)$/] Literal[value='đ']",
+          message: 'Ô tiền phải dùng MoneyInput (src/app/MoneyInput.tsx, nhập theo nghìn), không tự gắn đuôi "đ".',
+        },
+      ],
+    },
   },
   {
     // Edge Function chạy trên Deno

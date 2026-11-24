@@ -3,7 +3,8 @@ import { Link, Navigate, Route, Routes, useLocation, useNavigate, useParams } fr
 import { Boxes, Check, ChevronRight, Layers, ListChecks, MapPin, Plus, Printer, Store, Users, UtensilsCrossed, type LucideIcon } from 'lucide-react';
 import { useIsTablet } from '@/app/useMediaQuery';
 import { ErrorText, Splash, errorMessage } from '@/app/ui';
-import { parseMoneyInput } from '@/domain/catalog';
+import { parseCountInput } from '@/domain/catalog';
+import { MoneyInput } from '@/app/MoneyInput';
 import { formatVnd } from '@/domain/money';
 import { TZ } from '@/domain/time';
 import { useOwner } from '../OwnerContext';
@@ -505,34 +506,24 @@ function Field({
       );
     case 'date':
       return <FormInput label={def.label} hint={def.hint} type="date" value={String(value)} disabled={disabled} onChange={(e) => onChange(def.key, e.target.value)} data-testid={testId} />;
-    case 'money':
-    case 'count': {
-      const parsed = def.kind === 'money' ? parseMoneyInput(String(value)) : null;
-      const shown = parsed !== null && String(value).trim() !== String(parsed);
+    case 'money': {
+      const vnd = parseCountInput(String(value));
       return (
-        <FormInput
+        <MoneyInput
+          size="owner"
           label={def.label}
-          unit={def.kind === 'money' ? 'đ' : def.unit}
-          hint={
-            shown || def.hint ? (
-              <>
-                {shown && (
-                  <span className="block font-medium text-[#6d6d6d]" data-testid={`${testId}-parsed`}>
-                    = {formatVnd(parsed)}
-                  </span>
-                )}
-                {def.hint}
-              </>
-            ) : undefined
-          }
-          value={String(value)}
-          inputMode="numeric"
+          hint={def.hint}
+          value={vnd}
           disabled={disabled}
-          onChange={(e) => onChange(def.key, e.target.value)}
-          data-testid={testId}
+          onChange={(v) => onChange(def.key, v === null ? '' : String(v))}
+          testId={testId}
         />
       );
     }
+    case 'count':
+      return (
+        <FormInput label={def.label} unit={def.unit} hint={def.hint} value={String(value)} inputMode="numeric" disabled={disabled} onChange={(e) => onChange(def.key, e.target.value)} data-testid={testId} />
+      );
     case 'bool':
       return (
         <label className="flex min-h-[50px] cursor-pointer items-center justify-between gap-3 py-2">

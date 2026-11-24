@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assertMoney, formatSigned, formatVnd } from './money';
+import { assertMoney, formatSigned, formatVnd, thousandsFromInput, thousandsText, toVnd } from './money';
 import { businessDate, hhmm, minutesBetween } from './time';
 
 describe('money & time', () => {
@@ -16,6 +16,28 @@ describe('money & time', () => {
     expect(formatSigned(0)).toBe('0');
     expect(formatSigned(6, false)).toBe('+6');
     expect(formatSigned(-6, false)).toBe('−6');
+  });
+
+  it('nhập theo nghìn: chữ gõ → số nghìn', () => {
+    expect(thousandsFromInput('50')).toBe(50);
+    expect(thousandsFromInput('1.500')).toBe(1500);
+    expect(thousandsFromInput(' 1 500 ')).toBe(1500);
+    expect(thousandsFromInput('0')).toBe(0);
+    expect(thousandsFromInput('007')).toBe(7);
+    expect(thousandsFromInput('999.999')).toBe(999_999);
+    for (const bad of ['', ' ', '.', 'abc', '5k', '-5', '1,5', '1e3', '1.000.000', '99999999999999999999']) expect(thousandsFromInput(bad)).toBeNull();
+  });
+
+  it('nhập theo nghìn: đổi ra đồng và hiện lại khi sửa', () => {
+    expect(toVnd(50)).toBe(50_000);
+    expect(toVnd(1500)).toBe(1_500_000);
+    expect(thousandsText(1_500_000)).toBe('1.500');
+    expect(thousandsText(50_000)).toBe('50');
+    expect(thousandsText(0)).toBe('0');
+    expect(thousandsText(25_500)).toBeNull();
+    expect(thousandsText(-1000)).toBeNull();
+    expect(thousandsText(1_000_000_000)).toBeNull();
+    for (const k of [0, 7, 50, 1500, 999_999]) expect(thousandsFromInput(thousandsText(toVnd(k))!)).toBe(k);
   });
 
   it('assertMoney', () => {

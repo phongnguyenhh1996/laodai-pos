@@ -3,7 +3,8 @@ import { Link, Route, Routes, useParams, useSearchParams } from 'react-router-do
 import { Banknote, CircleAlert, CircleCheck, Clock, Pencil, Plus, Users } from 'lucide-react';
 import { ErrorText, Splash, errorMessage } from '@/app/ui';
 import { useIsTablet } from '@/app/useMediaQuery';
-import { parseCountInput, parseMoneyInput } from '@/domain/catalog';
+import { parseCountInput } from '@/domain/catalog';
+import { MoneyInput } from '@/app/MoneyInput';
 import { formatSigned, formatVnd } from '@/domain/money';
 import { shiftDate, shortDate } from '@/domain/report';
 import { businessDate, hhmm } from '@/domain/time';
@@ -596,10 +597,11 @@ function AdjustForm({ shiftId, kinds, onSaved }: { shiftId: string; kinds: Array
   const { client } = useOwner();
   const [kind, setKind] = useState<AdjustmentKind>(kinds[0][0]);
   const [qty, setQty] = useState('');
+  const [cash, setCash] = useState<number | null>(null);
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const parsed = kind === 'cash' ? parseMoneyInput(qty) : parseCountInput(qty);
+  const parsed = kind === 'cash' ? cash : parseCountInput(qty);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -612,6 +614,7 @@ function AdjustForm({ shiftId, kinds, onSaved }: { shiftId: string; kinds: Array
     try {
       await addAdjustment(client, shiftId, kind, parsed, note);
       setQty('');
+      setCash(null);
       setNote('');
       await onSaved();
     } catch (err) {
@@ -632,10 +635,14 @@ function AdjustForm({ shiftId, kinds, onSaved }: { shiftId: string; kinds: Array
         accent
       />
       <div className="grid grid-cols-2 gap-2.5">
-        <label className="flex min-w-0 flex-col gap-1.5">
-          <span className="text-[13px] font-medium leading-4 text-[#6d6d6d]">{kind === 'cash' ? 'Số tiền' : 'Số lượng'}</span>
-          <input className={`num ${field}`} inputMode="numeric" placeholder="0" value={qty} onChange={(e) => setQty(e.target.value)} data-testid="adjust-qty" />
-        </label>
+        {kind === 'cash' ? (
+          <MoneyInput size="owner" label="Số tiền" value={cash} onChange={setCash} testId="adjust-qty" />
+        ) : (
+          <label className="flex min-w-0 flex-col gap-1.5">
+            <span className="text-[13px] font-medium leading-4 text-[#6d6d6d]">Số lượng</span>
+            <input className={`num ${field}`} inputMode="numeric" placeholder="0" value={qty} onChange={(e) => setQty(e.target.value)} data-testid="adjust-qty" />
+          </label>
+        )}
         <label className="flex min-w-0 flex-col gap-1.5">
           <span className="text-[13px] font-medium leading-4 text-[#6d6d6d]">Ghi chú (tùy chọn)</span>
           <input className={field} placeholder="VD: lấy thêm ở kho" value={note} onChange={(e) => setNote(e.target.value)} data-testid="adjust-note" />

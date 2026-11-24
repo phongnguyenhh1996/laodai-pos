@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   CatalogError, activeStaff, checkCombo, checkMenu, checkPoint, checkProduct, checkStaff, checkTabletProfile,
-  checkTopping, menuBoard, parseCountInput, parseMoneyInput, soldOutAt, sortCatalog, tabletPoints,
+  checkTopping, menuBoard, parseCountInput, soldOutAt, sortCatalog, tabletPoints,
 } from './catalog';
 import {
   CANH, CHA, COMBOS, COMBO_XOI_FULL, COM_GA, COM_MENU, PATE_CU, PRODUCTS, TOPPINGS, TRUNG, XOI_GA, XOI_MENU,
@@ -31,16 +31,6 @@ const err = (fn: () => void) => {
 };
 
 describe('nhập số', () => {
-  it('tiền: chấp nhận dấu chấm/phẩy/cách và hậu tố k', () => {
-    expect(parseMoneyInput('25.000')).toBe(25_000);
-    expect(parseMoneyInput(' 25 000 ')).toBe(25_000);
-    expect(parseMoneyInput('25,000')).toBe(25_000);
-    expect(parseMoneyInput('25k')).toBe(25_000);
-    expect(parseMoneyInput('25K')).toBe(25_000);
-    expect(parseMoneyInput('0')).toBe(0);
-    for (const bad of ['', 'abc', '-5000', '2.5k5', 'k', '1e6', '99999999999999999999']) expect(parseMoneyInput(bad)).toBeNull();
-  });
-
   it('số đếm: chỉ số nguyên ≥ 0', () => {
     expect(parseCountInput(' 50 ')).toBe(50);
     expect(parseCountInput('0')).toBe(0);

@@ -1,12 +1,13 @@
 import { Fragment, useState, type FormEvent } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { Banknote, ChevronLeft, ChevronRight, CircleCheckBig, CupSoda, Package, Soup, TriangleAlert, type LucideIcon } from 'lucide-react';
-import { parseCountInput, parseMoneyInput } from '@/domain/catalog';
+import { parseCountInput } from '@/domain/catalog';
 import { formatVnd } from '@/domain/money';
 import type { CountItem } from '@/domain/types';
 import { pos } from '@/lib/pos';
 import { CLOSE_KEY } from '@/pos';
 import { Splash, TextField, errorMessage } from '@/app/ui';
+import { MoneyInput } from '@/app/MoneyInput';
 import { Notice, useTablet } from './parts';
 
 /** Ô đếm khi đóng ca, theo thứ tự hiện. Chỉ hiện những thứ ca này đếm (công tắc của quầy, chụp lúc mở ca). */
@@ -27,6 +28,7 @@ export function CloseShiftScreen() {
   const { shift } = useTablet();
   const navigate = useNavigate();
   const [values, setValues] = useState<Partial<Record<CountItem, string>>>({});
+  const [cash, setCash] = useState<number | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
@@ -49,7 +51,7 @@ export function CloseShiftScreen() {
   if (!shift) return busy ? <Splash /> : <Navigate to="/" replace />;
 
   const fields = COUNT_FIELDS.filter((f) => shift.count_items.includes(f.item));
-  const parsed = fields.map((f) => ({ ...f, n: (f.money ? parseMoneyInput : parseCountInput)(values[f.item] ?? '') }));
+  const parsed = fields.map((f) => ({ ...f, n: f.money ? cash : parseCountInput(values[f.item] ?? '') }));
   const valid = parsed.every((f) => f.n !== null);
 
   function review(e: FormEvent) {
@@ -102,20 +104,24 @@ export function CloseShiftScreen() {
             <h3 className="text-2xl font-bold md:text-[26px]">Đóng ca – {shift.staff_name}</h3>
             <p className="text-[15px] text-ink-subtle">{fields.length ? 'Đếm rồi nhập số thực tế đang có.' : 'Quầy này không cần đếm gì khi đóng ca.'}</p>
           </div>
-          {fields.map((f) => (
-            <TextField
-              key={f.item}
-              label={f.label}
-              icon={f.icon}
-              suffix={f.unit}
-              inputMode="numeric"
-              placeholder="0"
-              value={values[f.item] ?? ''}
-              onChange={(e) => setValues((v) => ({ ...v, [f.item]: e.target.value }))}
-              disabled={confirming}
-              data-testid={TEST_ID[f.item]}
-            />
-          ))}
+          {fields.map((f) =>
+            f.money ? (
+              <MoneyInput key={f.item} label={f.label} icon={f.icon} value={cash} onChange={setCash} disabled={confirming} testId={TEST_ID[f.item]} />
+            ) : (
+              <TextField
+                key={f.item}
+                label={f.label}
+                icon={f.icon}
+                suffix={f.unit}
+                inputMode="numeric"
+                placeholder="0"
+                value={values[f.item] ?? ''}
+                onChange={(e) => setValues((v) => ({ ...v, [f.item]: e.target.value }))}
+                disabled={confirming}
+                data-testid={TEST_ID[f.item]}
+              />
+            ),
+          )}
           <Notice testId="close-error" tone="error">
             {error}
           </Notice>
@@ -137,7 +143,7 @@ export function CloseShiftScreen() {
                   {parsed.map((f, i) => (
                     <Fragment key={f.item}>
                       {i > 0 && ' · '}
-                      {f.short}: <b>{f.money ? formatVnd(f.n!) : f.n}</b>
+                      {f.short}: <b>{f.money ? `${formatVnd(f.n!)}đ` : f.n}</b>
                     </Fragment>
                   ))}
                 </p>

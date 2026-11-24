@@ -7,14 +7,6 @@ export class CatalogError extends Error {}
 
 // ---------------------------------------------------------------- nhập số
 
-/** Ô nhập tiền: "25.000", "25 000", "25,000", "25000", "25k" → 25000. Không hợp lệ → null. */
-export function parseMoneyInput(raw: string): Money | null {
-  const m = /^(\d+)(k?)$/.exec(raw.trim().toLowerCase().replace(/[\s.,]/g, ''));
-  if (!m) return null;
-  const n = Number(m[1]) * (m[2] ? 1000 : 1);
-  return Number.isSafeInteger(n) ? n : null;
-}
-
 /** Ô nhập số đếm (hộp, dĩa, thứ tự): số nguyên ≥ 0. Không hợp lệ → null. */
 export function parseCountInput(raw: string): number | null {
   const s = raw.trim();

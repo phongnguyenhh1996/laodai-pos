@@ -82,7 +82,7 @@ describe('E. Kịch bản gian lận', () => {
         const path = new URL(link).pathname;
         expect(path).to.match(/^\/owner\/orders\//);
 
-        closeShift(199, 60, '500.000');
+        closeShift(199, 60, '500');
         cy.telegramWaitFor('Đóng ca – Lan').its('text').should('contain', `Bao bì của đơn bị xóa sau khi ra món: ${code} (1 hộp)`);
 
         // Chủ mở link trong tin: chi tiết đơn + nhật ký của đơn
@@ -155,7 +155,7 @@ describe('E. Kịch bản gian lận', () => {
     cy.openShift('Lan');
     sell({ combo: 'xoiGaTrung' }); // 31.000
     sell({ combo: 'xoiXeoChaRuoc' }); // 28.000 ⇒ kỳ vọng 500.000 + 59.000 = 559.000
-    closeShift(198, 60, '539.000');
+    closeShift(198, 60, '539');
 
     // Nhân viên: chỉ "Đã đóng ca", không có số nào để "đếm cho khớp"
     cy.get('body').invoke('text').then((text) => {
@@ -222,7 +222,7 @@ describe('E. Kịch bản gian lận', () => {
     sell({ combo: 'xoiXeoChaRuoc' }); // mang về: 1 hộp
     sell({ point: 'com', product: 'comGa' }); // cơm tại chỗ: 0 hộp, 1 dĩa
     // 200 hộp đầu ca, theo đơn chỉ dùng 2 nhưng còn 190 ⇒ dùng 10, thừa 8 hộp không có đơn
-    closeShift(190, 59, '594.000'); // tiền đủ: 500.000 + 31.000 + 28.000 + 35.000
+    closeShift(190, 59, '594'); // tiền đủ: 500.000 + 31.000 + 28.000 + 35.000
     cy.get('body').should('not.contain.text', 'theo đơn');
     cy.waitLive();
 

@@ -1,12 +1,12 @@
 import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Banknote, ChevronLeft, HandCoins, Landmark, Search } from 'lucide-react';
-import { parseMoneyInput } from '@/domain/catalog';
 import { customerLabel, debtPaymentProblem } from '@/domain/debt';
 import { formatVnd } from '@/domain/money';
 import type { Customer } from '@/domain/types';
 import { pos } from '@/lib/pos';
 import { Splash, errorMessage } from '@/app/ui';
+import { MoneyInput } from '@/app/MoneyInput';
 import { ChosenCustomer, CustomerSuggestions, DebtDetails, useDebtBook } from './debt';
 import { Notice } from './parts';
 
@@ -18,7 +18,7 @@ export function DebtScreen() {
   const book = useDebtBook();
   const [query, setQuery] = useState('');
   const [customer, setCustomer] = useState<Customer | null>(null);
-  const [amount, setAmount] = useState('');
+  const [amount, setAmount] = useState<number | null>(null);
   const [method, setMethod] = useState<'cash' | 'transfer'>('cash');
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
@@ -26,11 +26,11 @@ export function DebtScreen() {
 
   if (!book) return <Splash />;
   const balance = customer ? book.balance(customer.id) : 0;
-  const parsed = parseMoneyInput(amount);
+  const parsed = amount;
 
   function pick(c: Customer) {
     setCustomer(c);
-    setAmount('');
+    setAmount(null);
     setError(null);
     setDone(null);
   }
@@ -47,7 +47,7 @@ export function DebtScreen() {
     try {
       await pos.recordDebtPayment({ customer_id: customer.id, amount: parsed!, method });
       setDone(`Đã thu nợ ${formatVnd(parsed!)} (${method === 'cash' ? 'tiền mặt' : 'chuyển khoản'}) – ${customerLabel(customer)}`);
-      setAmount('');
+      setAmount(null);
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -118,15 +118,8 @@ export function DebtScreen() {
                   })}
                 </div>
                 <div className="grid grid-cols-[1fr_auto] gap-2.5">
-                  <input
-                    className="input min-h-[56px]"
-                    inputMode="numeric"
-                    placeholder="Số tiền thu (vd. 50k)"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    data-testid="debt-amount"
-                  />
-                  <button type="button" className="btn btn-secondary" onClick={() => setAmount(String(balance))} data-testid="debt-pay-all">
+                  <MoneyInput label="Số tiền thu" srLabel value={amount} onChange={setAmount} testId="debt-amount" />
+                  <button type="button" className="btn btn-secondary" onClick={() => setAmount(balance)} data-testid="debt-pay-all">
                     Trả hết
                   </button>
                 </div>

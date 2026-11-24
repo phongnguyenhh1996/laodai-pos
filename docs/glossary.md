@@ -40,6 +40,9 @@ Thêm thuật ngữ mới vào đây ngay khi nó xuất hiện. Chi tiết nghi
 | Đếm mù | — | Nhân viên đếm cuối ca mà không thấy số kỳ vọng |
 | Đối soát | `reconcile_shift` | So hàng giao – đơn bán – tiền thu của một ca, tính ở server |
 | Bổ sung giữa ca | `shift_adjustments` | Chủ giao thêm hộp / dĩa / tiền giữa ca |
+| Khoản chi | `shift_expenses` | Tiền mặt lấy từ két của một ca để mua đồ (đá, ga…). Nhân viên ghi trên tablet (nút **"Chi tiền"**) hoặc chủ ghi ở chi tiết ca. Có số tiền + ghi chú bắt buộc, không có danh mục. Trừ vào tiền mặt kỳ vọng. Ghi nhầm thì hủy (`voided_at`) |
+| Ghi chú gần đây | — | Các ghi chú khoản chi dùng nhiều nhất 30 ngày qua, hiện thành nút để bấm lại. Tính từ lịch sử, không có bảng riêng |
+| Nhập theo nghìn | `MoneyInput` | Cách nhập mọi ô tiền: gõ `50` = 50.000đ, đuôi `.000đ` cố định |
 | Khách nợ | `customers` | Có thể gộp (`merged_into_id`) |
 | Thu nợ | `debt_payments` | Khách trả nợ, bằng TM hoặc CK |
 | Dư nợ | — | Σ đơn ghi nợ − Σ thu nợ, tính trên khách gốc sau khi gộp |

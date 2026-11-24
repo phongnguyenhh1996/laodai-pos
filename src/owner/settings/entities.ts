@@ -2,7 +2,7 @@
 import { ListChecks, Printer, type LucideIcon } from 'lucide-react';
 import {
   CatalogError, checkCombo, checkMenu, checkPoint, checkProduct, checkStaff, checkTabletProfile, checkTopping,
-  parseCountInput, parseMoneyInput,
+  parseCountInput,
 } from '@/domain/catalog';
 import { formatVnd } from '@/domain/money';
 import { formatDate, formatPhone, parseBirthday, parseIdNumber, parsePhone, type StaffDetails } from '@/domain/payroll';
@@ -74,9 +74,10 @@ const str = (f: Form, k: string) => String(f[k] ?? '');
 const bool = (f: Form, k: string) => f[k] === true;
 const list = (f: Form, k: string) => (Array.isArray(f[k]) ? (f[k] as string[]) : []);
 
+/** Ô tiền giữ số đồng dạng chữ ("25000", MoneyInput đọc / ghi); trống ⇒ lỗi. */
 function money(f: Form, k: string, label: string): number {
-  const n = parseMoneyInput(str(f, k));
-  if (n === null) throw new CatalogError(`${label}: nhập số tiền, vd. 25000 hoặc 25k`);
+  const n = parseCountInput(str(f, k));
+  if (n === null) throw new CatalogError(`${label}: nhập số tiền`);
   return n;
 }
 

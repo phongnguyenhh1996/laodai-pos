@@ -38,11 +38,10 @@ describe('G. Chủ', () => {
     cy.loginOwner();
     openSettings('products', SEED.products.xoiGa);
     cy.get(tid('price-history-row')).should('not.exist');
-    cy.get(tid('field-price')).should('have.value', '25000').clear().type('28k');
-    cy.get(tid('field-price-parsed')).should('contain.text', '28.000');
+    cy.get(tid('field-price')).should('have.value', '25').clear().type('28');
     cy.get(tid('settings-save')).click();
     cy.get(tid('settings-saved')).should('be.visible');
-    cy.get(tid('field-price')).should('have.value', '28000');
+    cy.get(tid('field-price')).should('have.value', '28');
     cy.get(tid('price-history-row'))
       .should('have.length', 1)
       .first()
