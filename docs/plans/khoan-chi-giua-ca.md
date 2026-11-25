@@ -65,10 +65,10 @@ Thứ tự deploy: **migration trước, frontend sau**.
 - [x] SPEC mục 3, 4.9, 5, 6, 7, 10.2, 10.3. Glossary. ADR 0006.
 
 ### 1. Figma
-- [ ] Tablet: mục Chi tiền trong menu phụ; màn Chi tiền (danh sách khoản của ca + tổng, nút hủy, nhãn "Chủ ghi", khoản đã hủy gạch ngang);
+- [x] Tablet: mục Chi tiền trong menu phụ; màn Chi tiền (danh sách khoản của ca + tổng, nút hủy, nhãn "Chủ ghi", khoản đã hủy gạch ngang);
       form (MoneyInput + ghi chú + hàng nút ghi chú gần đây); màn xác nhận; trạng thái mất kết nối.
-- [ ] Chủ: khối "Khoản chi" ở chi tiết ca (danh sách, Ghi khoản chi, sửa / hủy); dòng khoản chi trong báo cáo ngày / tháng.
-- [ ] Chủ duyệt.
+- [x] Chủ: khối "Khoản chi" ở chi tiết ca (danh sách, Ghi khoản chi, sửa / hủy); dòng khoản chi trong báo cáo ngày / tháng.
+- [x] Chủ duyệt.
 
 ### 2. Dữ liệu (Supabase): migration `20261125000001_shift_expenses.sql`
 - [x] Bảng `shift_expenses`: `id uuid pk` (client sinh, như `customers`), `shift_id` fk, `amount int` check `> 0 and % 1000 = 0`,
@@ -128,9 +128,9 @@ Thứ tự deploy: **migration trước, frontend sau**.
 - [x] Deploy (25/11): migration `shift_expenses` lên cloud → `telegram-dispatch` v7 → push `main` (e61bcac, Vercel tự deploy).
 
 ### 8. Retro
-- **Figma bị làm sau code** (dữ liệu + domain + UI xong trước, mục 1 vẫn chưa tick): không tự động hóa được ⇒ đã thêm vào
-  CLAUDE.md bước 2 (Figma là ticket riêng, đứng đầu, chặn mọi ticket khác). Còn nợ: vẽ Figma cho màn Chi tiền + khối Khoản chi
-  theo code hiện tại để Figma vẫn là nguồn chuẩn.
+- **Figma bị làm sau code** (dữ liệu + domain + UI xong trước): không tự động hóa được ⇒ đã thêm vào
+  CLAUDE.md bước 2 (Figma là ticket riêng, đứng đầu, chặn mọi ticket khác).
+  Figma đã vẽ bù.
 - **Deploy cửa một chiều làm tay**: push `main` không deploy migration / Edge Function; phải nhớ thứ tự migration → function → push.
   Đề xuất: CI cảnh báo khi commit đụng `supabase/migrations` hoặc `supabase/functions` mà chưa ghi đã deploy (chưa làm).
 - **G37 realtime chập chờn khi chạy cả bộ `test:db`**: chạy riêng thì qua. Chưa sửa; nếu lặp lại thì tách / tăng chờ cho test realtime.
