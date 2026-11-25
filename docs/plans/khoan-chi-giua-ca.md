@@ -124,4 +124,13 @@ Thứ tự deploy: **migration trước, frontend sau**.
 ### 7. Xong khi
 - [x] `npm run check`, `npm run test:db`, `npm run test:e2e` pass. (25/11: 374 unit, 162 db — G37 realtime chập chờn khi chạy cả bộ, chạy riêng qua —, 59 Cypress)
 - [x] Review: đúng phạm vi plan; khớp `docs/coding-standards.md`; người đọc kỹ migration + `sync_push` + công thức (cửa một chiều).
-- [ ] Retro: điều gì phải nhắc agent lần này → test / lint hoặc coding standards.
+- [x] Retro: điều gì phải nhắc agent lần này → test / lint hoặc coding standards.
+- [x] Deploy (25/11): migration `shift_expenses` lên cloud → `telegram-dispatch` v7 → push `main` (e61bcac, Vercel tự deploy).
+
+### 8. Retro
+- **Figma bị làm sau code** (dữ liệu + domain + UI xong trước, mục 1 vẫn chưa tick): không tự động hóa được ⇒ đã thêm vào
+  CLAUDE.md bước 2 (Figma là ticket riêng, đứng đầu, chặn mọi ticket khác). Còn nợ: vẽ Figma cho màn Chi tiền + khối Khoản chi
+  theo code hiện tại để Figma vẫn là nguồn chuẩn.
+- **Deploy cửa một chiều làm tay**: push `main` không deploy migration / Edge Function; phải nhớ thứ tự migration → function → push.
+  Đề xuất: CI cảnh báo khi commit đụng `supabase/migrations` hoặc `supabase/functions` mà chưa ghi đã deploy (chưa làm).
+- **G37 realtime chập chờn khi chạy cả bộ `test:db`**: chạy riêng thì qua. Chưa sửa; nếu lặp lại thì tách / tăng chờ cho test realtime.
