@@ -153,7 +153,8 @@ export function ExpenseScreen() {
           </button>
         </form>
 
-        <section className="card flex flex-col overflow-hidden" data-testid="expense-list">
+        {/* Không dùng overflow-hidden: trong grid cuộn, item có overflow khác visible bị co về min 0 → danh sách bị cắt, không cuộn tới được. */}
+        <section className="card flex flex-col" data-testid="expense-list">
           <div className="flex items-center justify-between gap-3 border-b border-line p-4">
             <span className="flex flex-col">
               <span className="text-lg font-bold">Khoản chi ca này</span>
