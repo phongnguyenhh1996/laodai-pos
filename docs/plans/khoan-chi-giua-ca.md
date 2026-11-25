@@ -45,7 +45,7 @@ Làm trước; ticket 2 dùng lại. Chỉ đổi client, không đổi dữ li�
       hoặc null), `toVnd(thousands)`, `thousandsText(vnd)` để hiện lại khi sửa giá trị cũ (giá trị không chia hết 1.000 ⇒ báo rõ, không làm tròn ngầm),
       giới hạn số chữ số an toàn (6 chữ số nghìn, vừa cột `int`). Thay chỗ dùng `parseMoneyInput` (`src/domain/catalog.ts`); bỏ hậu tố `k` vì không còn cần.
 - [x] Component `MoneyInput` (value: `Money | null`, `onChange`, `size` tablet/chủ, `label`, `testId`): `inputMode="numeric"`, phần nghìn có dấu chấm
-      khi gõ, đuôi `.000đ` xám cố định, con trỏ luôn trước đuôi.
+      khi gõ, đuôi `.000đ` cố định cùng màu và cỡ chữ với số đã gõ (ô trống: cùng màu placeholder), con trỏ luôn trước đuôi.
 - [x] Thay ở mọi ô tiền:
       - Tablet: tiền khách đưa nhập tay ([PayScreen.tsx](../../src/tablet/PayScreen.tsx)), tiền mặt đóng ca ([CloseShiftScreen.tsx](../../src/tablet/CloseShiftScreen.tsx)), thu nợ ([DebtScreen.tsx](../../src/tablet/DebtScreen.tsx)).
       - Chủ: thu nợ ([DebtPages.tsx](../../src/owner/debts/DebtPages.tsx)), bổ sung giữa ca khi chọn tiền ([ShiftPages.tsx](../../src/owner/shifts/ShiftPages.tsx)),

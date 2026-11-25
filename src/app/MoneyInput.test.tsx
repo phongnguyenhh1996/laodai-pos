@@ -44,6 +44,13 @@ describe('MoneyInput (nhập theo nghìn)', () => {
     expect(got).toEqual([1_500_000, 50_000, null]);
   });
 
+  it('đuôi .000đ cùng màu với số đã gõ; ô trống thì đuôi mờ như placeholder', () => {
+    render(<Harness />);
+    expect(screen.getByText('đ')).toHaveClass('text-ink-subtle');
+    type('50');
+    expect(screen.getByText('.000đ')).not.toHaveClass('text-ink-subtle');
+  });
+
   it('bỏ ký tự không phải số, không nhận quá 6 chữ số nghìn', () => {
     const got: Array<number | null> = [];
     render(<Harness onValue={(v) => got.push(v)} />);

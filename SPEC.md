@@ -268,7 +268,7 @@ Mỗi tin có link mở thẳng chi tiết trong app chủ.
 7. **Chi tiền** (mục 4.9).
 8. **Đóng ca**: các ô đếm → Xác nhận; màn xác nhận hiện lại số đã nhập dạng đầy đủ ("2.080.000đ"), vẫn không hiện kỳ vọng.
 
-**Nhập theo nghìn** (`MoneyInput`, mọi ô tiền ở tablet và chế độ chủ: tiền khách đưa, đếm tiền đóng ca, thu nợ, khoản chi, bổ sung giữa ca và sổ lương khi đang chọn loại tiền, giá món / topping, lương một ngày, tiền lẻ đầu ca): gõ `50` = 50.000đ; ô hiện phần nghìn có dấu chấm (`1.500`) và đuôi `.000đ` cố định màu xám; không nhập được số lẻ dưới 1.000.
+**Nhập theo nghìn** (`MoneyInput`, mọi ô tiền ở tablet và chế độ chủ: tiền khách đưa, đếm tiền đóng ca, thu nợ, khoản chi, bổ sung giữa ca và sổ lương khi đang chọn loại tiền, giá món / topping, lương một ngày, tiền lẻ đầu ca): gõ `50` = 50.000đ; ô hiện phần nghìn có dấu chấm (`1.500`) và đuôi `.000đ` cố định, **cùng màu và cỡ chữ với số đã gõ** (ô trống thì cả placeholder lẫn đuôi cùng màu placeholder); không nhập được số lẻ dưới 1.000.
 
 In ấn (mục 12): trạng thái máy in + "Kết nối lại" trên hàng đợi, nút "In lại phiếu bếp" trên thẻ đơn, báo đỏ khi in lỗi.
 

@@ -35,8 +35,8 @@ const vndOf = (text: string) => {
 const digitsIn = (s: string) => s.replace(/\D/g, '').length;
 
 /**
- * Ô tiền **nhập theo nghìn** (SPEC mục 7): gõ `50` = 50.000đ. Ô hiện phần nghìn có dấu chấm (`1.500`) và đuôi `.000đ` xám
- * cố định ngay sau chữ số, nên con trỏ luôn đứng trước đuôi. Ô trống chỉ hiện "0đ" mờ. Chỉ nhận chữ số, tối đa 6 chữ số nghìn.
+ * Ô tiền **nhập theo nghìn** (SPEC mục 7): gõ `50` = 50.000đ. Ô hiện phần nghìn có dấu chấm (`1.500`) và đuôi `.000đ`
+ * cố định ngay sau chữ số, cùng màu với số đã gõ, nên con trỏ luôn đứng trước đuôi. Ô trống chỉ hiện "0đ" mờ. Chỉ nhận chữ số, tối đa 6 chữ số nghìn.
  * Giá trị cũ không chia hết 1.000 (vd. 25.500đ) không làm tròn ngầm: ô để trống và báo rõ đến khi nhập lại.
  */
 export function MoneyInput({ value, onChange, label, srLabel, size = 'tablet', icon: Icon, hint, invalid, center, testId, className = '', inputRef, placeholder = '0', disabled, ...rest }: MoneyInputProps) {
@@ -114,7 +114,8 @@ export function MoneyInput({ value, onChange, label, srLabel, size = 'tablet', i
               data-testid={testId}
             />
           </span>
-          <span aria-hidden className={`num pointer-events-none shrink-0 ${muted}`}>
+          {/* Đã gõ số ⇒ đuôi cùng màu / cỡ chữ với số (thừa hưởng từ ô); ô trống ⇒ cùng màu placeholder. */}
+          <span aria-hidden className={`num pointer-events-none shrink-0 ${text ? '' : `font-normal ${muted}`}`}>
             {text ? SUFFIX : 'đ'}
           </span>
         </span>
