@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { Link, NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom';
-import { CloudOff, HandCoins, KeyRound, ListOrdered, Plus, Power, RefreshCw, Store, UserRound, type LucideIcon } from 'lucide-react';
+import { CloudOff, HandCoins, KeyRound, ListOrdered, Plus, Power, RefreshCw, Store, UserRound, Wallet, type LucideIcon } from 'lucide-react';
 import { startTablet, tabletStore } from '@/lib/pos';
 import { startPrinting } from '@/lib/print';
 import { ConnectionBadge } from '@/app/ConnectionBadge';
@@ -11,6 +11,7 @@ import { hhmm } from '@/domain/time';
 import type { Activation } from '@/pos';
 import { CloseShiftScreen } from './CloseShiftScreen';
 import { DebtScreen } from './DebtScreen';
+import { ExpenseScreen } from './ExpenseScreen';
 import { OpenShiftScreen } from './OpenShiftScreen';
 import { OrderScreen } from './OrderScreen';
 import { PayScreen } from './PayScreen';
@@ -23,9 +24,9 @@ import { TabletContext, type TabletCtx } from './parts';
  * Mọi thao tác ghi thẳng lên server; mất kết nối thì không lưu được (báo rõ trên màn hình).
  *
  * Khung theo Figma "Makaryo":
- * - Tablet (md+): sidebar trắng bên trái (tên quầy, ca đang mở, menu Hàng đợi / Đơn mới / Thu nợ / Đóng ca, chế độ chủ, kết nối).
+ * - Tablet (md+): sidebar trắng bên trái (tên quầy, ca đang mở, menu Hàng đợi / Đơn mới / Thu nợ / Chi tiền / Đóng ca, chế độ chủ, kết nối).
  *   Màn gọi món / thanh toán chiếm trọn màn hình (không sidebar).
- * - Điện thoại: chỉ màn hàng đợi có header một dòng + thanh đáy (Thu nợ · Đóng ca · Đơn mới); màn khác tự có header riêng.
+ * - Điện thoại: chỉ màn hàng đợi có header một dòng + thanh đáy (Thu nợ · Chi tiền · Đóng ca · Đơn); màn khác tự có header riêng.
  * Mỗi phần tử có data-testid chỉ có một bản trong DOM, đổi vị trí theo cỡ màn bằng CSS.
  */
 export function TabletHome({ activation }: { activation: Activation }) {
@@ -45,7 +46,7 @@ export function TabletHome({ activation }: { activation: Activation }) {
   const ctx = useMemo<TabletCtx | null>(
     () =>
       snap.open
-        ? { activation, catalog: snap.catalog, shift: snap.open.shift, orders: snap.open.orders, lastPointId, setLastPointId }
+        ? { activation, catalog: snap.catalog, shift: snap.open.shift, orders: snap.open.orders, expenses: snap.open.expenses ?? [], lastPointId, setLastPointId }
         : null,
     [activation, snap.catalog, snap.open, lastPointId],
   );
@@ -135,7 +136,7 @@ export function TabletHome({ activation }: { activation: Activation }) {
 
 /**
  * Menu chính. Tablet: danh sách trong sidebar. Điện thoại: thanh cố định ở đáy màn hàng đợi
- * (Thu nợ · Đóng ca là ô nhỏ, "Đơn mới" là nút cam lớn trong tầm ngón cái).
+ * (Thu nợ · Chi tiền · Đóng ca là ô nhỏ, "Đơn" là nút cam lớn trong tầm ngón cái; tablet ghi đủ "Đơn mới").
  */
 function SideNav({ onQueue }: { onQueue: boolean }) {
   return (
@@ -152,12 +153,16 @@ function SideNav({ onQueue }: { onQueue: boolean }) {
         testId="new-order"
         className="btn btn-primary order-last min-h-[64px] flex-1 rounded-2xl text-xl md:order-none md:flex-none"
       >
-        Đơn mới
+        <span className="md:hidden">Đơn</span>
+        <span className="hidden md:inline">Đơn mới</span>
       </NavItem>
-      <NavItem to="/debt" icon={HandCoins} testId="open-debt" className="btn btn-secondary w-[76px] flex-col gap-1 px-1 text-sm">
+      <NavItem to="/debt" icon={HandCoins} testId="open-debt" className="btn btn-secondary w-[72px] flex-col gap-1 px-1 text-sm">
         Thu nợ
       </NavItem>
-      <NavItem to="/shift/close" icon={Power} testId="open-close-shift" className="btn btn-secondary w-[76px] flex-col gap-1 px-1 text-sm">
+      <NavItem to="/expenses" icon={Wallet} testId="open-expenses" className="btn btn-secondary w-[72px] flex-col gap-1 px-1 text-sm">
+        Chi tiền
+      </NavItem>
+      <NavItem to="/shift/close" icon={Power} testId="open-close-shift" className="btn btn-secondary w-[72px] flex-col gap-1 px-1 text-sm">
         Đóng ca
       </NavItem>
     </nav>
@@ -237,6 +242,7 @@ function TabletRoutes({ hasShift }: { hasShift: boolean }) {
       <Route path="/order/:orderId" element={needShift(<OrderScreen />)} />
       <Route path="/order/:orderId/pay" element={needShift(<PayScreen />)} />
       <Route path="/debt" element={needShift(<DebtScreen />)} />
+      <Route path="/expenses" element={needShift(<ExpenseScreen />)} />
       {/* Đóng ca tự xử lý lúc không còn ca (ngay sau khi đóng: chỉ hiện "Đã đóng ca"). */}
       <Route path="/shift/close" element={<CloseShiftScreen />} />
       <Route path="*" element={<Navigate to="/" replace />} />

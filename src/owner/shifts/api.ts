@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { ReconcileResult } from '@/domain/reconcile';
-import type { AdjustmentKind, CountItem, DeleteReason, DineType, Money, OrderStatus, PaymentMethod, ToppingSnap } from '@/domain/types';
+import type { AdjustmentKind, CountItem, DeleteReason, DineType, Money, OrderStatus, PaymentMethod, ShiftExpense, ToppingSnap } from '@/domain/types';
 
 /** Ca (mục 7, màn chủ số 2): danh sách ca → đối soát, đơn của ca, bổ sung hộp / dĩa / tiền giữa ca. */
 
@@ -63,6 +63,8 @@ export interface ShiftDetail {
   shift: ShiftRow;
   reconcile: ReconcileResult;
   adjustments: AdjustmentRow[];
+  /** Khoản chi của ca (cả khoản đã hủy), theo giờ ghi. */
+  expenses: ShiftExpense[];
   orders: ShiftOrderRow[];
   /** Số lần nhân viên sửa đơn đang mở trong ca (từ nhật ký). */
   edits: number;
@@ -100,7 +102,7 @@ type RawOrder = Omit<ShiftOrderRow, 'items' | 'opened_by' | 'paid_by' | 'point_n
 };
 
 export async function loadShiftDetail(client: SupabaseClient, shiftId: string): Promise<ShiftDetail | null> {
-  const [shiftRes, recRes, adjRes, ordRes, editRes, printRes] = await Promise.all([
+  const [shiftRes, recRes, adjRes, ordRes, editRes, printRes, expRes] = await Promise.all([
     client.from('shifts').select(SHIFT_COLUMNS).eq('id', shiftId),
     client.rpc('reconcile_shift', { p_shift: shiftId }),
     client.from('shift_adjustments').select('id,kind,qty,note,at').eq('shift_id', shiftId).order('at'),
@@ -114,6 +116,7 @@ export async function loadShiftDetail(client: SupabaseClient, shiftId: string): 
       .order('created_at'),
     client.from('audit_log').select('id', { count: 'exact', head: true }).eq('shift_id', shiftId).eq('action', 'order_update'),
     client.rpc('owner_shift_print_issues', { p_shift: shiftId }),
+    client.from('shift_expenses').select('id,shift_id,amount,note,actor_kind,staff_id,at,voided_at,void_actor_kind').eq('shift_id', shiftId).order('at'),
   ]);
   if (shiftRes.error) fail('ca', shiftRes.error);
   const raw = (shiftRes.data as unknown as RawShift[] | null)?.[0];
@@ -122,6 +125,7 @@ export async function loadShiftDetail(client: SupabaseClient, shiftId: string): 
   if (adjRes.error) fail('bổ sung giữa ca', adjRes.error);
   if (ordRes.error) fail('đơn của ca', ordRes.error);
   if (editRes.error) fail('nhật ký', editRes.error);
+  if (expRes.error) fail('khoản chi', expRes.error);
 
   const shift = toShift(raw);
   const orders = (ordRes.data ?? []) as unknown as RawOrder[];
@@ -141,6 +145,7 @@ export async function loadShiftDetail(client: SupabaseClient, shiftId: string): 
     shift,
     reconcile: recRes.data as ReconcileResult,
     adjustments: (adjRes.data ?? []) as AdjustmentRow[],
+    expenses: (expRes.data ?? []) as ShiftExpense[],
     edits: editRes.count ?? 0,
     // Server chưa có tính năng in (chưa chạy migration) ⇒ coi như không có dòng này.
     billIssues: printRes.error ? [] : ((printRes.data ?? []) as ShiftDetail['billIssues']),
@@ -165,6 +170,30 @@ export async function addAdjustment(
   if (!Number.isInteger(qty) || qty <= 0) throw new ShiftsError('Số bổ sung phải là số nguyên dương');
   const { error } = await client.rpc('owner_adjust_shift', { p_shift: shiftId, p_kind: kind, p_qty: qty, p_note: note?.trim() || null });
   if (error) throw new ShiftsError(`Không lưu được: ${error.message}`);
+}
+
+/** Chủ ghi khoản chi vào một ca (kể cả ca đã đóng ⇒ đối soát tính lại). */
+export async function createExpense(client: SupabaseClient, shiftId: string, amount: Money, note: string): Promise<void> {
+  const { error } = await client.rpc('owner_create_expense', { p_shift: shiftId, p_amount: amount, p_note: note });
+  if (error) throw new ShiftsError(`Không lưu được: ${error.message}`);
+}
+
+/** Chủ sửa số tiền / ghi chú của một khoản chi chưa hủy. */
+export async function editExpense(client: SupabaseClient, id: string, amount: Money, note: string): Promise<void> {
+  const { error } = await client.rpc('owner_edit_expense', { p_id: id, p_amount: amount, p_note: note });
+  if (error) throw new ShiftsError(`Không lưu được: ${error.message}`);
+}
+
+/** Chủ hủy một khoản chi (cả khoản nhân viên ghi). */
+export async function voidExpense(client: SupabaseClient, id: string): Promise<void> {
+  const { error } = await client.rpc('owner_void_expense', { p_id: id });
+  if (error) throw new ShiftsError(`Không hủy được: ${error.message}`);
+}
+
+/** Ghi chú gần đây (chung với tablet). Lỗi ⇒ rỗng. */
+export async function recentExpenseNotes(client: SupabaseClient): Promise<string[]> {
+  const { data, error } = await client.rpc('recent_expense_notes');
+  return error || !Array.isArray(data) ? [] : data.filter((x): x is string => typeof x === 'string');
 }
 
 /** Thẻ ca trên màn Ca (Figma R20 / T25): ca + đối soát (doanh thu, lệch tiền) + tên điểm bán của quầy. */

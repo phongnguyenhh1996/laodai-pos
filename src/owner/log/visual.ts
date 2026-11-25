@@ -54,6 +54,9 @@ const MAP: Record<string, [LucideIcon, Tone]> = {
   print_expired: [Printer, 'red'],
   sold_out_set: [PackageX, 'amber'],
   sold_out_clear: [Package, 'green'],
+  expense_create: [Wallet, 'amber'],
+  expense_void: [Wallet, 'gray'],
+  expense_edit: [Pencil, 'amber'],
 };
 
 export function actionVisual(action: string): { icon: LucideIcon; tone: Tone } {

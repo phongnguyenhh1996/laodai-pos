@@ -1,3 +1,4 @@
+import { activeExpenseTotal } from './expenses';
 import { orderPackaging, type Packaging, type PackagingNorms } from './packaging';
 import { DEFAULT_COUNT_ITEMS, type AdjustmentKind, type CountItem, type DineType, type Money, type OrderItem, type OrderStatus, type PaymentMethod, type ShipMode } from './types';
 
@@ -45,6 +46,8 @@ export interface ReconcileInput {
   adjustments: Array<{ shift_id: string; kind: AdjustmentKind; qty: number }>;
   orders: ReconcileOrder[];
   debt_payments: Array<{ shift_id: string | null; amount: Money; method: 'cash' | 'transfer' }>;
+  /** Khoản chi (tiền mặt từ két); thiếu (dữ liệu cũ) ⇒ không có. */
+  expenses?: Array<{ shift_id: string; amount: Money; voided_at: string | null }>;
   products: PackagingNorms[];
 }
 
@@ -96,6 +99,8 @@ export interface ReconcileResult {
   ship: ShipStats;
   paid_orders: number;
   debt_collected: { cash: Money; transfer: Money };
+  /** Khoản chi chưa hủy của ca: số khoản + tổng (đã trừ vào `cash.expected`). */
+  expenses: { count: number; total: Money };
   cash: { expected: Money; counted: Money | null; diff: Money | null };
   boxes: CountLine;
   plates: CountLine;
@@ -132,7 +137,9 @@ export function reconcileShift(input: ReconcileInput): ReconcileResult {
   // Trả shipper ngoài luôn là tiền mặt lấy từ két, kể cả khách CK / Nợ (đơn đã thu trong ca này).
   const ship = shipStats(paidHere);
   const payout = paidHere.reduce((s, o) => s + (o.ship_payout ?? 0), 0);
-  const expected = shift.open_float + adj('cash') + revenue.cash + debt_collected.cash - payout;
+  const expenseRows = (input.expenses ?? []).filter((e) => e.shift_id === shift.id && e.voided_at === null);
+  const expenses = { count: expenseRows.length, total: activeExpenseTotal(expenseRows) };
+  const expected = shift.open_float + adj('cash') + revenue.cash + debt_collected.cash - payout - expenses.total;
   const counted = shift.close_cash_counted;
 
   // Bao bì: theo ca MỞ đơn, bỏ đơn đã xóa
@@ -165,6 +172,7 @@ export function reconcileShift(input: ReconcileInput): ReconcileResult {
     ship,
     paid_orders: paidHere.length,
     debt_collected,
+    expenses,
     cash: { expected, counted, diff: counted === null ? null : counted - expected },
     boxes: { used: usedBoxes, by_orders: pack.boxes, diff: usedBoxes === null ? null : usedBoxes - pack.boxes },
     plates: { used: usedPlates, by_orders: pack.plates, diff: usedPlates === null ? null : usedPlates - pack.plates },

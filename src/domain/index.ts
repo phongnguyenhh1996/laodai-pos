@@ -6,6 +6,7 @@ export * from './cash';
 export * from './orderCode';
 export * from './queue';
 export * from './reconcile';
+export * from './expenses';
 export * from './debt';
 export * from './text';
 export * from './time';

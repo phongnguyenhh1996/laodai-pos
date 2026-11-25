@@ -59,6 +59,9 @@ export const ACTION_LABELS: Record<string, string> = {
   print_template_update: 'Sửa mẫu in',
   sold_out_set: 'Báo hết món',
   sold_out_clear: 'Bán lại món',
+  expense_create: 'Ghi khoản chi',
+  expense_void: 'Hủy khoản chi',
+  expense_edit: 'Sửa khoản chi',
 };
 
 const PRINT_KIND: Record<string, string> = { kitchen: 'Phiếu bếp', bill: 'Bill', test: 'In thử' };
@@ -77,6 +80,7 @@ export const ACTION_GROUPS: Array<{ id: string; label: string; actions: string[]
   { id: 'owner', label: 'Chủ', actions: ['owner_mode', 'owner_pin_set', 'owner_pin_removed', 'owner_edit_order', 'shift_adjust', 'settings_create', 'settings_update', 'payroll_add', 'payroll_void', 'day_off_add', 'day_off_update', 'day_off_remove', 'day_work_add', 'day_work_update', 'day_work_remove'] },
   { id: 'print', label: 'In phiếu bếp / bill', actions: ['print_request', 'print_printed', 'print_failed', 'print_expired', 'print_template_update'] },
   { id: 'sold_out', label: 'Hết món', actions: ['sold_out_set', 'sold_out_clear'] },
+  { id: 'expenses', label: 'Khoản chi', actions: ['expense_create', 'expense_void', 'expense_edit'] },
   { id: 'print_issues', label: 'In lỗi / hết hạn', actions: ['print_failed', 'print_expired'] },
   { id: 'alerts', label: 'Cảnh báo (thiếu số đơn, bị từ chối, đăng nhập)', actions: ['seq_gap', 'sync_rejected', 'tablet_login', 'owner_pin_locked'] },
 ];
@@ -218,6 +222,16 @@ export function describeAudit(e: Pick<AuditEntry, 'action' | 'before' | 'after' 
     case 'shift_adjust':
       lines.push(`+${after.kind === 'cash' ? formatVnd(Number(after.qty)) : after.qty} ${ADJUST_UNIT[String(after.kind)] ?? String(after.kind)}${after.note ? ` · ${after.note}` : ''}`);
       break;
+    case 'expense_create':
+    case 'expense_void':
+      lines.push(`${formatVnd(Number(after.amount ?? 0))} – ${String(after.note ?? '')}${after.actor_kind === 'owner' ? ' · chủ ghi' : ''}`);
+      break;
+    case 'expense_edit': {
+      const prev = (e.before ?? {}) as Record<string, unknown>;
+      if (prev.amount !== after.amount) lines.push(`${formatVnd(Number(prev.amount ?? 0))} → ${formatVnd(Number(after.amount ?? 0))}`);
+      if (prev.note !== after.note) lines.push(`Ghi chú: ${String(prev.note ?? '—')} → ${String(after.note ?? '—')}`);
+      break;
+    }
     case 'debt_payment':
       lines.push(`${formatVnd(Number(after.amount ?? 0))} · ${after.method === 'cash' ? 'tiền mặt' : 'chuyển khoản'}`);
       break;

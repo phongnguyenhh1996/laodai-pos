@@ -1,4 +1,4 @@
-import type { Order } from '@/domain/types';
+import type { Order, ShiftExpense } from '@/domain/types';
 import { PosNetworkError, type ChannelStatus, type PosBackend, type PulseScope } from './backend';
 import type { Catalog } from './catalog';
 import type { OpenState, TabletShift } from './types';
@@ -225,17 +225,23 @@ export class TabletStore {
   // ---------------------------------------------------------------- kết quả thao tác (cập nhật ngay, không chờ tải lại)
 
   setShift(shift: TabletShift | null): void {
-    this.patchOpen((o) => ({ shift, orders: o.orders }));
+    // Ca khác ⇒ khoản chi của ca cũ không còn thuộc ca đang mở.
+    this.patchOpen((o) => ({ ...o, shift, expenses: shift && shift.id === o.shift?.id ? o.expenses : [] }));
+  }
+
+  /** Khoản chi vừa ghi / hủy ⇒ thêm / thay ngay trong danh sách của ca đang mở. */
+  applyExpense(e: ShiftExpense): void {
+    this.patchOpen((o) => (o.shift?.id !== e.shift_id ? o : { ...o, expenses: [...(o.expenses ?? []).filter((x) => x.id !== e.id), e].sort((a, b) => a.at.localeCompare(b.at)) }));
   }
 
   /** Đơn còn mở ⇒ thêm / thay; đơn đã thanh toán / đã xóa ⇒ bỏ khỏi hàng đợi. */
   applyOrder(order: Order): void {
     if (order.status !== 'open' && order.status !== 'served') return this.removeOrder(order.id);
-    this.patchOpen((o) => ({ shift: o.shift, orders: [...o.orders.filter((x) => x.id !== order.id), order] }));
+    this.patchOpen((o) => ({ ...o, orders: [...o.orders.filter((x) => x.id !== order.id), order] }));
   }
 
   removeOrder(id: string): void {
-    this.patchOpen((o) => ({ shift: o.shift, orders: o.orders.filter((x) => x.id !== id) }));
+    this.patchOpen((o) => ({ ...o, orders: o.orders.filter((x) => x.id !== id) }));
   }
 
   /** Đổi danh mục trong bộ nhớ ngay sau thao tác (vd. báo hết món), trước khi tải lại từ server. */

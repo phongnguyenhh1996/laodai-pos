@@ -18,6 +18,22 @@ describe('nhật ký', () => {
     expect(actionLabel('xyz')).toBe('xyz');
   });
 
+  it('khoản chi: nhãn + mô tả ghi / hủy / chủ sửa', () => {
+    expect(actionLabel('expense_create')).toBe('Ghi khoản chi');
+    expect(actionLabel('expense_void')).toBe('Hủy khoản chi');
+    expect(actionLabel('expense_edit')).toBe('Sửa khoản chi');
+    expect(actionsForFilter('expenses')).toEqual(['expense_create', 'expense_void', 'expense_edit']);
+    const exp = { amount: 20_000, note: 'mua đá', actor_kind: 'staff' };
+    expect(describeAudit({ action: 'expense_create', entity: 'shift_expense', reason: null, before: null, after: exp })).toEqual(['20.000 – mua đá']);
+    expect(describeAudit({ action: 'expense_void', entity: 'shift_expense', reason: null, before: exp, after: { ...exp, actor_kind: 'owner' } })).toEqual([
+      '20.000 – mua đá · chủ ghi',
+    ]);
+    expect(describeAudit({ action: 'expense_edit', entity: 'shift_expense', reason: null, before: exp, after: { ...exp, amount: 25_000, note: 'mua đá cây' } })).toEqual([
+      '20.000 → 25.000',
+      'Ghi chú: mua đá → mua đá cây',
+    ]);
+  });
+
   it('bộ lọc loại: nhóm → nhiều action; tên action (link Telegram) → đúng action đó; trống → không lọc', () => {
     expect(actionsForFilter('edits')).toEqual(['order_update', 'order_delete', 'owner_edit_order']);
     expect(actionsForFilter('seq_gap')).toEqual(['seq_gap']);

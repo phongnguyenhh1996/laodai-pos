@@ -359,3 +359,70 @@ describe('debtBook', () => {
     expect(debtBook(undefined).customers).toEqual([]);
   });
 });
+
+describe('khoản chi', () => {
+  it('ghi: kiểm tại máy (số tiền chẵn nghìn, ghi chú bắt buộc), ghi chú làm sạch, vào danh sách của ca ngay', async () => {
+    await boot();
+    await expect(pos.createExpense({ amount: 7_500, note: 'mua đá' })).rejects.toThrow('lớn hơn 0');
+    await expect(pos.createExpense({ amount: null, note: 'mua đá' })).rejects.toMatchObject({ reason: 'bad_expense_amount' });
+    await expect(pos.createExpense({ amount: 20_000, note: '   ' })).rejects.toThrow('Cần ghi chú');
+    expect(server.kinds).not.toContain('create_expense');
+    const e = await pos.createExpense({ amount: 20_000, note: '  mua   đá ' });
+    expect(e).toMatchObject({ amount: 20_000, note: 'mua đá', actor_kind: 'staff', voided_at: null });
+    expect(server.ops.at(-1)?.payload).toEqual({ id: e.id, shift_id: store.getSnapshot().open?.shift?.id, amount: 20_000, note: 'mua đá' });
+    expect(store.getSnapshot().open?.expenses).toEqual([e]);
+  });
+
+  it('mất phản hồi rồi bấm lại ⇒ cùng op / cùng id, server chỉ ghi một lần', async () => {
+    await boot();
+    // Mất phản hồi: lần thử lại tự động gửi đúng op cũ ⇒ server trả "duplicate" kèm khoản đã ghi.
+    server.dropNextResponse = true;
+    const first = await pos.createExpense({ amount: 20_000, note: 'mua đá' });
+    expect(server.expenses).toHaveLength(1);
+    expect(first.id).toBe(server.expenses[0].id);
+    // Mất mạng hẳn ⇒ báo lỗi; bấm lại khi có mạng ⇒ cùng id, không ghi hai lần.
+    const push = vi.spyOn(backend, 'push').mockImplementation(async (op) => {
+      await server.device().push(op);
+      throw new PosNetworkError('Failed to fetch');
+    });
+    await expect(pos.createExpense({ amount: 30_000, note: 'mua ga' })).rejects.toThrow(OFFLINE_MESSAGE);
+    push.mockRestore();
+    const again = await pos.createExpense({ amount: 30_000, note: 'mua ga' });
+    expect(server.expenses).toHaveLength(2);
+    expect(again.id).toBe(server.expenses[1].id);
+  });
+
+  it('hủy: khoản mình ghi ⇒ gạch ngay; khoản chủ ghi ⇒ server từ chối, báo rõ', async () => {
+    await boot();
+    const e = await pos.createExpense({ amount: 20_000, note: 'mua đá' });
+    const v = await pos.voidExpense(e.id);
+    expect(v.voided_at).not.toBeNull();
+    expect(store.getSnapshot().open?.expenses?.[0].voided_at).toBe(v.voided_at);
+    const o = server.ownerExpense(10_000, 'mua chanh');
+    await expect(pos.voidExpense(o.id)).rejects.toThrow('Không hủy được');
+  });
+
+  it('server không trả khoản chi ⇒ tải lại để lấy; không thấy ⇒ báo ca đã đóng', async () => {
+    await boot();
+    const push = vi.spyOn(backend, 'push');
+    push.mockImplementationOnce(async (op) => {
+      await server.device().push(op);
+      return { status: 'ok' };
+    });
+    const e = await pos.createExpense({ amount: 20_000, note: 'mua đá' });
+    expect(e.note).toBe('mua đá');
+    push.mockResolvedValueOnce({ status: 'ok' });
+    await expect(pos.voidExpense('khong-co')).rejects.toThrow('Ca đã đóng');
+    push.mockRestore();
+  });
+
+  it('ghi chú gần đây: lấy từ server; lỗi mạng ⇒ rỗng', async () => {
+    await boot();
+    await pos.createExpense({ amount: 20_000, note: 'mua đá' });
+    await pos.createExpense({ amount: 30_000, note: 'mua ga' });
+    await pos.createExpense({ amount: 5_000, note: 'Mua đá' });
+    expect(await pos.recentExpenseNotes()).toEqual(['Mua đá', 'mua ga']);
+    server.offline = true;
+    expect(await pos.recentExpenseNotes()).toEqual([]);
+  });
+});

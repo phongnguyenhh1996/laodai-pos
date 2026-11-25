@@ -1,5 +1,5 @@
 import { defineConfig } from 'cypress';
-import { resetDb, sql, tabletClient, withPg } from './tests/support/db';
+import { ownerClient, resetDb, sql, tabletClient, withPg } from './tests/support/db';
 import { ENV } from './tests/support/env';
 import { TabletSim, item, op, push, type TestItem } from './tests/support/ops';
 import { SEED } from './tests/support/seed-ids';
@@ -262,6 +262,14 @@ export default defineConfig({
           const [r] = await sql<{ b: number }>('select private.customer_balance($1) as b', [customerId]);
           return r.b;
         },
+        /** Chủ ghi khoản chi vào ca đang mở của quầy (RPC `owner_create_expense`, như từ chi tiết ca). */
+        'owner:expense': async ({ tablet, amount, note }: { tablet: TabletKey; amount: number; note: string }) => {
+          const [s] = await sql<{ id: string }>(`select id from shifts where tablet_profile_id = $1 and status = 'open'`, [SEED.tablets[tablet]]);
+          const { error } = await (await ownerClient()).rpc('owner_create_expense', { p_shift: s.id, p_amount: amount, p_note: note });
+          if (error) throw error;
+          return null;
+        },
+        'db:expenses': () => sql('select amount, note, actor_kind, voided_at is not null as voided from shift_expenses order by at'),
         /** Đối soát ca (hàm SQL). */
         'db:reconcile': async (shiftId: string) => {
           const [r] = await sql<{ r: unknown }>('select private.reconcile_shift($1) as r', [shiftId]);

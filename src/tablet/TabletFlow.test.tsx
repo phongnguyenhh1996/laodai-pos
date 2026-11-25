@@ -914,6 +914,93 @@ describe('ghi nợ & thu nợ', () => {
   });
 });
 
+describe('chi tiền (khoản chi giữa ca)', () => {
+  const rows = () => screen.queryAllByTestId('expense-row');
+
+  async function openExpenses() {
+    click('open-expenses');
+    await screen.findByTestId('expense-screen');
+  }
+
+  it('ghi khoản chi: số tiền theo nghìn + ghi chú ⇒ xác nhận to ⇒ create_expense; danh sách + tổng cập nhật ngay', async () => {
+    await startShift();
+    await openExpenses();
+    expect(tid('expense-total')).toHaveTextContent('0đ');
+    // Thiếu ghi chú ⇒ báo, không mở xác nhận.
+    fireEvent.change(tid('expense-amount'), { target: { value: '50' } });
+    click('expense-save');
+    expect(tid('expense-error')).toHaveTextContent('Cần ghi chú');
+    expect(screen.queryByTestId('expense-confirm-sheet')).not.toBeInTheDocument();
+
+    fireEvent.change(tid('expense-note'), { target: { value: 'mua đá' } });
+    expect(tid('expense-save')).toHaveTextContent('Chi 50.000đ');
+    click('expense-save');
+    expect(within(tid('expense-confirm-sheet')).getByRole('heading')).toHaveTextContent('Chi 50.000đ – mua đá?');
+    click('expense-edit'); // Sửa lại ⇒ đóng, giữ số đã nhập
+    expect(screen.queryByTestId('expense-confirm-sheet')).not.toBeInTheDocument();
+    click('expense-save');
+    click('expense-confirm');
+    expect(await screen.findByTestId('expense-done')).toHaveTextContent('Đã ghi chi 50.000đ – mua đá');
+    expect(server.ops.at(-1)).toMatchObject({ kind: 'create_expense', payload: { amount: 50_000, note: 'mua đá' } });
+    expect(rows()).toHaveLength(1);
+    expect(tid('expense-total')).toHaveTextContent('50.000đ');
+    expect(tid('expense-note')).toHaveValue('');
+  });
+
+  it('ghi chú gần đây: bấm chỉ điền ghi chú, không điền số tiền', async () => {
+    await startShift();
+    server.ownerExpense(20_000, 'mua đá');
+    server.ownerExpense(10_000, 'mua ga');
+    await openExpenses();
+    const chips = await screen.findAllByTestId('expense-recent');
+    expect(chips.map((c) => c.textContent).sort()).toEqual(['mua ga', 'mua đá']);
+    const da = chips.find((c) => c.textContent === 'mua đá')!;
+    fireEvent.click(da);
+    expect(tid('expense-note')).toHaveValue('mua đá');
+    expect(da).toHaveAttribute('aria-pressed', 'true');
+    expect(tid('expense-amount')).toHaveValue('');
+  });
+
+  it('hủy khoản mình ghi (có hỏi lại) ⇒ gạch ngang, tổng giảm; khoản chủ ghi không có nút hủy và hiện ngay qua realtime', async () => {
+    await startShift();
+    await openExpenses();
+    fireEvent.change(tid('expense-amount'), { target: { value: '20' } });
+    fireEvent.change(tid('expense-note'), { target: { value: 'ghi nhầm' } });
+    click('expense-save');
+    click('expense-confirm');
+    await waitFor(() => expect(rows()).toHaveLength(1));
+
+    click('expense-void');
+    click('expense-void-cancel');
+    expect(server.kinds).not.toContain('void_expense');
+    click('expense-void');
+    click('expense-void-confirm');
+    await waitFor(() => expect(rows()[0]).toHaveAttribute('data-voided', 'true'));
+    expect(tid('expense-total')).toHaveTextContent('0đ');
+    expect(server.ops.at(-1)?.kind).toBe('void_expense');
+
+    act(() => void server.ownerExpense(10_000, 'mua chanh'));
+    await waitFor(() => expect(rows()).toHaveLength(2));
+    const owner = rows().find((r) => r.dataset.owner)!;
+    expect(owner).toHaveTextContent('Chủ ghi');
+    expect(within(owner).queryByTestId('expense-void')).not.toBeInTheDocument();
+    expect(tid('expense-total')).toHaveTextContent('10.000đ');
+  });
+
+  it('mất kết nối ⇒ không lưu, báo rõ', async () => {
+    await startShift();
+    await openExpenses();
+    fireEvent.change(tid('expense-amount'), { target: { value: '20' } });
+    fireEvent.change(tid('expense-note'), { target: { value: 'mua đá' } });
+    server.offline = true;
+    click('expense-save');
+    click('expense-confirm');
+    expect(await screen.findByTestId('expense-error')).toHaveTextContent('mất kết nối');
+    expect(rows()).toHaveLength(0);
+    expect(server.expenses).toHaveLength(0);
+  });
+});
+
 describe('nhiều máy cùng hồ sơ tablet (realtime)', () => {
   /** Máy thứ hai đã kích hoạt cùng hồ sơ Tablet A, nói chuyện với cùng server. */
   async function otherDevice() {

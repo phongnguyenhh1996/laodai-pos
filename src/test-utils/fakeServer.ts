@@ -4,7 +4,8 @@ import type { SoldOut } from '@/domain/catalog';
 import { generateOrderCode } from '@/domain/orderCode';
 import { CLOSE_KEY } from '@/pos/ops';
 import { businessDate } from '@/domain/time';
-import type { Customer, Order, OrderItem, ShipDefaults, ShipMode } from '@/domain/types';
+import { cleanExpenseNote, normalizeExpenseNote, validateExpense } from '@/domain/expenses';
+import type { Customer, Order, OrderItem, ShiftExpense, ShipDefaults, ShipMode } from '@/domain/types';
 import {
   PosNetworkError,
   type CatalogData,
@@ -27,6 +28,8 @@ export class FakeServer {
   catalog: CatalogData;
   shifts: ServerShift[] = [];
   orders: Order[] = [];
+  /** Khoản chi (như bảng `shift_expenses`). */
+  expenses: ShiftExpense[] = [];
   debtPayments: Array<{ id: string; customer_id: string; amount: number; method: 'cash' | 'transfer'; at: string }> = [];
   /** Thao tác server đã nhận (không tính lần gửi lại), theo thứ tự. */
   ops: WireOp[] = [];
@@ -77,6 +80,10 @@ export class FakeServer {
         this.net();
         return this.shipDefaults(profileId, shiftId);
       },
+      loadRecentExpenseNotes: async () => {
+        this.net();
+        return this.recentExpenseNotes();
+      },
       subscribe: (pid, onPulse, onStatus: (s: ChannelStatus) => void) => {
         const l = { profileId: pid, onPulse };
         this.listeners.add(l);
@@ -102,7 +109,30 @@ export class FakeServer {
           count_items: [...s.count_items],
         }
       : null;
-    return clone({ shift, orders: this.openOrders(profileId) });
+    return clone({ shift, orders: this.openOrders(profileId), expenses: s ? this.expenses.filter((e) => e.shift_id === s.id) : [] });
+  }
+
+  /** Như RPC `recent_expense_notes`: ≤ 8 nhóm ghi chú chưa hủy, xếp theo số lần rồi lần gần nhất; bản viết gần nhất. */
+  recentExpenseNotes(): string[] {
+    const groups = new Map<string, { note: string; n: number; last: string }>();
+    for (const e of this.expenses) {
+      if (e.voided_at) continue;
+      const k = normalizeExpenseNote(e.note);
+      const g = groups.get(k) ?? { note: e.note, n: 0, last: '' };
+      g.n += 1;
+      if (e.at >= g.last) Object.assign(g, { note: e.note, last: e.at });
+      groups.set(k, g);
+    }
+    return [...groups.values()].sort((a, b) => b.n - a.n || b.last.localeCompare(a.last)).slice(0, 8).map((g) => g.note);
+  }
+
+  /** Chủ ghi khoản chi (như `owner_create_expense`) — để test thấy nhãn "Chủ ghi". */
+  ownerExpense(amount: number, note: string, profileId = this.catalog.profile.id): ShiftExpense {
+    const s = this.openShift(profileId)!;
+    const e: ShiftExpense = { id: crypto.randomUUID(), shift_id: s.id, amount, note, actor_kind: 'owner', staff_id: null, at: new Date().toISOString(), voided_at: null, void_actor_kind: null };
+    this.expenses.push(e);
+    this.pulse('open', profileId);
+    return clone(e);
   }
 
   /** Như RPC `shift_ship_defaults`: đơn ship gần nhất của ca (kể cả đã thanh toán, trừ đã xóa); quầy khác bị chặn. */
@@ -169,6 +199,8 @@ export class FakeServer {
     if (prev) {
       if (prev.status === 'rejected') return prev;
       const o = this.order(op.entity_id);
+      const e = op.kind.endsWith('_expense') ? this.expenses.find((x) => x.id === op.entity_id) : undefined;
+      if (e) return { status: 'duplicate', expense: clone(e) };
       return {
         status: 'duplicate',
         ...(o && (o.status === 'open' || o.status === 'served') && op.kind.endsWith('_order') && op.kind !== 'pay_order' && op.kind !== 'delete_order'
@@ -197,7 +229,7 @@ export class FakeServer {
     return clone(res);
   }
 
-  private apply(profileId: string, op: WireOp): { data?: { order?: Order; shift?: TabletShift }; catalog?: boolean } {
+  private apply(profileId: string, op: WireOp): { data?: { order?: Order; shift?: TabletShift; expense?: ShiftExpense }; catalog?: boolean } {
     const p = op.payload as Record<string, unknown>;
     const now = new Date().toISOString();
     const shift = () => {
@@ -374,6 +406,27 @@ export class FakeServer {
         this.catalog.balances[id] = (this.catalog.balances[id] ?? 0) - (p.amount as number);
         this.debtPayments.push({ id: p.id as string, customer_id: id, amount: p.amount as number, method: p.method as 'cash' | 'transfer', at: new Date().toISOString() });
         return { catalog: true };
+      }
+      case 'create_expense': {
+        const s = shift();
+        if (s.id !== p.shift_id) throw new Reject('shift_not_open');
+        const amount = typeof p.amount === 'number' ? p.amount : null;
+        const problem = validateExpense(amount, typeof p.note === 'string' ? p.note : '');
+        if (problem) throw new Reject(problem);
+        if (this.expenses.some((e) => e.id === p.id)) throw new Reject('expense_exists');
+        const e: ShiftExpense = {
+          id: p.id as string, shift_id: s.id, amount: amount!, note: cleanExpenseNote(p.note as string), actor_kind: 'staff',
+          staff_id: s.staff_id, at: now, voided_at: null, void_actor_kind: null,
+        };
+        this.expenses.push(e);
+        return { data: { expense: clone(e) } };
+      }
+      case 'void_expense': {
+        const e = this.expenses.find((x) => x.id === p.expense_id);
+        const s = e && this.shifts.find((x) => x.id === e.shift_id);
+        if (!e || !s || s.tablet_profile_id !== profileId || s.status !== 'open' || e.actor_kind !== 'staff') throw new Reject('expense_not_voidable');
+        if (!e.voided_at) Object.assign(e, { voided_at: now, void_actor_kind: 'staff' });
+        return { data: { expense: clone(e) } };
       }
       case 'set_sold_out': {
         shift();

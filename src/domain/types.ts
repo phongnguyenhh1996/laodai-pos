@@ -187,6 +187,21 @@ export interface ShiftAdjustment {
   at: string;
 }
 
+/** Khoản chi giữa ca (`shift_expenses`, SPEC 4.9): tiền mặt lấy từ két. Hủy = `voided_at`, không xóa. */
+export interface ShiftExpense {
+  id: string;
+  shift_id: string;
+  /** > 0, bội 1.000. */
+  amount: Money;
+  note: string;
+  /** `owner` ⇒ nhãn "Chủ ghi"; nhân viên không hủy được. */
+  actor_kind: 'staff' | 'owner';
+  staff_id: string | null;
+  at: string;
+  voided_at: string | null;
+  void_actor_kind: 'staff' | 'owner' | null;
+}
+
 export interface Customer {
   id: string;
   name: string;

@@ -13,6 +13,7 @@ import { useOwner } from '../OwnerContext';
 import { Chip, OwnerLayout } from '../OwnerLayout';
 import { KV, PageHead, Section, ShipStatsLine, TONE, card } from '../ui';
 import { addAdjustment, loadShiftBoard, loadShiftDetail, type ShiftCard, type ShiftDetail, type ShiftOrderRow, type ShiftRow } from './api';
+import { ExpenseSection } from './ExpenseSection';
 
 /** `/owner/shifts/*` (mục 7, màn chủ số 2). */
 export function ShiftRoutes() {
@@ -351,6 +352,11 @@ function ShiftBody({ detail, onChanged }: { detail: ShiftDetail; onChanged: () =
         <KV roomy label="Chủ bổ sung">
           <span data-testid="rep-cash-adj">{formatVnd(adj('cash'))}</span>
         </KV>
+        {(r.expenses?.total ?? 0) > 0 && (
+          <KV roomy label="Khoản chi (từ két)">
+            <span data-testid="rep-cash-expenses">{formatSigned(-(r.expenses?.total ?? 0))}</span>
+          </KV>
+        )}
         {(r.ship?.payout ?? 0) > 0 && (
           <KV roomy label="Trả shipper ngoài (từ két)">
             <span data-testid="rep-cash-payout">{formatSigned(-(r.ship?.payout ?? 0))}</span>
@@ -512,6 +518,7 @@ function ShiftBody({ detail, onChanged }: { detail: ShiftDetail; onChanged: () =
       <div className="flex flex-col gap-3.5 md:grid md:grid-cols-2 md:items-start md:gap-5">
         <div className="flex flex-col gap-3.5 md:gap-4">
           {countsCash && cash}
+          <ExpenseSection shiftId={s.id} closed={closed} expenses={detail.expenses} staffName={s.staff_name} onChanged={onChanged} />
           {packs}
           {deletes}
         </div>

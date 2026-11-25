@@ -1,6 +1,6 @@
 import { createContext, useContext, type ReactNode } from 'react';
 import { CircleAlert, CircleCheckBig, Info, X } from 'lucide-react';
-import type { Order } from '@/domain/types';
+import type { Order, ShiftExpense } from '@/domain/types';
 import type { Activation, Catalog, TabletShift } from '@/pos';
 
 /** Dữ liệu chung của màn bán hàng (lấy từ server, cập nhật realtime): máy, danh mục, ca đang mở, đơn đang mở. */
@@ -10,6 +10,8 @@ export interface TabletCtx {
   shift: TabletShift | null;
   /** Đơn đang mở của hồ sơ tablet (chung cho mọi máy dùng hồ sơ này). */
   orders: Order[];
+  /** Khoản chi của ca đang mở (cả khoản chủ ghi / đã hủy). */
+  expenses: ShiftExpense[];
   /** Điểm bán của đơn gần nhất: đơn mới mở đúng tab đang bán (vd. trưa bán cơm gà). */
   lastPointId: string | null;
   setLastPointId(id: string): void;

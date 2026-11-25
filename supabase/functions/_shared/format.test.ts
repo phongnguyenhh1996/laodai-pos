@@ -20,6 +20,8 @@ const rec: Reconcile = {
   open_orders: 1,
 };
 
+const exp = { id: 'e1', shift_id: 's1', amount: 20_000, note: 'mua đá', actor_kind: 'staff' as const };
+
 const order = {
   id: 'o1', code: 'F35', total: 62_000, status: 'served', dine_type: 'takeaway', label: null, table_no: null,
   payment_method: 'cash', customer_id: null,
@@ -87,6 +89,20 @@ const samples: Notification[] = [
       reconcile: { ...rec, ship: { shop_orders: 2, external_orders: 3, shop_fee: 20_000, external_fee: 15_000, payout: 30_000, external_profit: -15_000 } },
     },
   },
+  // Khoản chi (SPEC 4.9 / 6).
+  { kind: 'expense_created', payload: { ...base, ...ctx, expense: exp, actor: 'staff', before: null, recalculated: null } },
+  { kind: 'expense_voided', payload: { ...base, ...ctx, expense: exp, actor: 'staff', before: null, recalculated: null } },
+  {
+    kind: 'expense_edited',
+    payload: {
+      ...base, ...ctx, expense: { ...exp, amount: 25_000 }, actor: 'owner', before: exp,
+      recalculated: { before: { ...rec, cash: { expected: 2_100_000, counted: 2_080_000, diff: -20_000 } }, after: { ...rec, cash: { expected: 2_095_000, counted: 2_080_000, diff: -15_000 } } },
+    },
+  },
+  {
+    kind: 'shift_close',
+    payload: { ...base, ...ctx, closed_at: '2026-11-18T03:15:00Z', adjusted: false, reconcile: { ...rec, expenses: { count: 3, total: 120_000 } } },
+  },
 ];
 
 describe('định dạng Telegram', () => {
@@ -97,7 +113,7 @@ describe('định dạng Telegram', () => {
   it('có đủ snapshot cho mọi loại tin của đặc tả', () => {
     expect(new Set(samples.map((s) => s.kind))).toEqual(
       new Set(['tablet_login', 'owner_mode', 'shift_open', 'shift_close', 'order_deleted', 'delivery_order', 'debt_recorded', 'debt_paid',
-        'owner_edit', 'seq_gap', 'sync_rejected', 'daily_summary', 'backup_failed']),
+        'owner_edit', 'seq_gap', 'sync_rejected', 'daily_summary', 'backup_failed', 'expense_created', 'expense_voided', 'expense_edited']),
     );
   });
 
@@ -202,6 +218,26 @@ describe('định dạng Telegram', () => {
     expect(msg).toContain('kỳ vọng 500.000 (chưa đếm)');
     expect(msg).toContain('Hộp: dùng ? / theo đơn 3');
     expect(msg).toContain('Thu nợ: TM 50.000 · CK 0');
+  });
+
+  it('khoản chi: tin ghi / hủy / chủ sửa theo SPEC 6; báo cáo ca + tổng kết ngày có dòng "Chi" chỉ khi có khoản chi', () => {
+    const fmt = (n: Notification) => formatNotification(n, opts).split('\n');
+    const p = { ...base, ...ctx, expense: exp, actor: 'staff' as const, before: null, recalculated: null };
+    expect(fmt({ kind: 'expense_created', payload: p })[0]).toBe('💸 Chi 20.000 – mua đá · Lan · Tablet A');
+    expect(fmt({ kind: 'expense_voided', payload: p })[0]).toBe('↩️ Hủy chi 20.000 – mua đá · Lan');
+    expect(fmt({ kind: 'expense_voided', payload: { ...p, actor: 'owner' } })[0]).toBe('↩️ Hủy chi 20.000 – mua đá · Lan (chủ)');
+    expect(fmt({ kind: 'expense_created', payload: p }).at(-1)).toBe('🔗 https://pos.laodai.vn/owner/shifts/s1');
+    const edit = fmt(samples.find((s) => s.kind === 'expense_edited')!);
+    expect(edit[0]).toBe('✏️ Sửa chi: 20.000 – mua đá → 25.000 – mua đá · Lan · Tablet A (chủ)');
+    expect(edit[1]).toBe('Ca đã đóng → đã tính lại: tiền mặt −20.000 → −15.000');
+
+    const close = (r: Reconcile) => formatNotification({ kind: 'shift_close', payload: { ...base, ...ctx, reconcile: r, adjusted: false } }, opts);
+    expect(close({ ...rec, expenses: { count: 3, total: 120_000 } })).toContain('Dĩa: dùng 0 / theo đơn 0\nChi: 3 khoản · 120.000\nXóa:');
+    expect(close({ ...rec, expenses: { count: 0, total: 0 } })).not.toContain('Chi:');
+    expect(close(rec)).not.toContain('Chi:');
+    const day = samples.find((s) => s.kind === 'daily_summary')!.payload as object;
+    expect(formatNotification({ kind: 'daily_summary', payload: { ...day, expenses: { count: 2, total: 50_000 } } } as Notification, opts)).toContain('Chi: 2 khoản · 50.000');
+    expect(formatNotification({ kind: 'daily_summary', payload: day } as Notification, opts)).not.toContain('Chi:');
   });
 
   it('quầy chỉ đếm lon: không nhắc tiền mặt / hộp / dĩa; bao bì đơn xóa ghi lon', () => {

@@ -3,7 +3,8 @@ import type { SoldOut } from '@/domain/catalog';
 import { canConfirmCash } from '@/domain/cash';
 import { assertQty, orderTotal } from '@/domain/pricing';
 import { businessDate } from '@/domain/time';
-import type { CountItem, DeleteReason, DineType, Money, Order, OrderItem, ShipDefaults, ShipMode } from '@/domain/types';
+import { cleanExpenseNote, validateExpense } from '@/domain/expenses';
+import type { CountItem, DeleteReason, DineType, Money, Order, OrderItem, ShiftExpense, ShipDefaults, ShipMode } from '@/domain/types';
 import { PosNetworkError } from './backend';
 import type { TabletStore } from './store';
 import type { OpKind, PushResult, TabletShift, WireOp } from './types';
@@ -54,6 +55,10 @@ const REJECT_MESSAGES: Record<string, string> = {
   bad_staff: 'Nhân viên không còn làm.',
   empty_items: 'Đơn chưa có món',
   bad_item: 'Món này không còn trong menu của điểm bán.',
+  bad_expense_amount: 'Số tiền chi phải lớn hơn 0.',
+  bad_expense_note: 'Cần ghi chú (tối đa 80 ký tự).',
+  expense_not_voidable: 'Không hủy được khoản này (chủ ghi, hoặc ca đã đóng).',
+  expense_exists: 'Khoản chi này đã được ghi.',
 };
 
 export function rejectMessage(reason: string): string {
@@ -505,6 +510,46 @@ export class Pos {
       return { ...c, sold_out: input.sold_out ? [...rest, { point_id, item_kind, item_id, day, at: new Date().toISOString() }] : rest };
     });
     void this.store.refreshCatalog();
+  }
+
+  // ---------------------------------------------------------------- khoản chi
+
+  /** Ghi khoản chi (tiền mặt lấy từ két) vào ca đang mở. Bấm lại sau lỗi mạng ⇒ cùng id, không ghi hai lần. */
+  async createExpense(input: { amount: Money | null; note: string }): Promise<ShiftExpense> {
+    const problem = validateExpense(input.amount, input.note);
+    if (problem) throw new PosError(rejectMessage(problem), problem);
+    const shift = this.shift();
+    const note = cleanExpenseNote(input.note);
+    const intent = `${shift.id}:${input.amount}:${note}`;
+    const id = this.reuseId('create_expense', intent);
+    const res = await this.send('create_expense', intent, () => ({ entity_id: id, payload: { id, shift_id: shift.id, amount: input.amount, note } }));
+    return this.expenseApplied(res, id);
+  }
+
+  /** Hủy khoản chính nhân viên ghi của ca đang mở (server kiểm lại). */
+  async voidExpense(expenseId: string): Promise<ShiftExpense> {
+    const res = await this.send('void_expense', expenseId, () => ({ entity_id: expenseId, payload: { expense_id: expenseId } }));
+    return this.expenseApplied(res, expenseId);
+  }
+
+  /** Ghi chú gần đây (mọi quầy, 30 ngày). Lỗi mạng ⇒ danh sách rỗng (vẫn gõ tay được). */
+  async recentExpenseNotes(): Promise<string[]> {
+    try {
+      return await this.store.api.loadRecentExpenseNotes();
+    } catch {
+      return [];
+    }
+  }
+
+  private async expenseApplied(res: Ok, id: string): Promise<ShiftExpense> {
+    if (res.expense) {
+      this.store.applyExpense(res.expense);
+      return res.expense;
+    }
+    await this.store.refreshOpen();
+    const e = this.store.getSnapshot().open?.expenses?.find((x) => x.id === id);
+    if (!e) throw new PosError('Ca đã đóng (có thể ở máy khác).');
+    return e;
   }
 
   // ---------------------------------------------------------------- nội bộ

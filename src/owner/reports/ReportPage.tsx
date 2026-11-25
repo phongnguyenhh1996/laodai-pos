@@ -320,6 +320,36 @@ function ReportBody({ r, rangeLabel, isToday }: { r: Report; rangeLabel: string;
       ))}
     </Section>
   );
+  // Figma E10: tổng chi + cộng theo ghi chú (chỉ hiện khi có khoản chi).
+  const expenses = r.expenses && r.expenses.count > 0 && (
+    <Section
+      title="Khoản chi"
+      subtitle={`Tiền mặt lấy từ két · ${r.expenses.count} khoản`}
+      right={
+        <span aria-hidden className={`flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[10px] ${TONE.amber}`}>
+          <Wallet className="h-[17px] w-[17px]" />
+        </span>
+      }
+      testId="report-expenses"
+    >
+      <p className="flex items-baseline justify-between">
+        <span className="text-sm text-[#6d6d6d]">Tổng chi</span>
+        <b className="num text-[22px]" data-testid="report-expenses-total">
+          {formatVnd(r.expenses.total)}
+        </b>
+      </p>
+      <ul className="flex flex-col">
+        {r.expenses.by_note.map((g) => (
+          <li key={g.note} className="num flex items-center justify-between gap-2 border-t border-line py-2.5 text-sm leading-[18px]" data-testid="report-expense-group">
+            <span className="min-w-0 truncate">
+              {g.note} <span className="text-[#888]">· {g.count} lần</span>
+            </span>
+            <b className="font-semibold">{formatVnd(g.total)}</b>
+          </li>
+        ))}
+      </ul>
+    </Section>
+  );
   const top = r.top_products.length > 0 && (
     <Section title="Món bán chạy" testId="report-top">
       {r.top_products.slice(0, 10).map((p, i) => (
@@ -354,6 +384,7 @@ function ReportBody({ r, rangeLabel, isToday }: { r: Report; rangeLabel: string;
           <div className="order-1 md:order-none">{payment}</div>
           <div className="order-2 md:order-none">{byPoint}</div>
           <div className="order-4 md:order-none">{bank}</div>
+          {expenses && <div className="order-5 md:order-none">{expenses}</div>}
           {byShift && <div className="order-5 md:order-none">{byShift}</div>}
         </div>
         <div className="contents md:flex md:flex-col md:gap-4">

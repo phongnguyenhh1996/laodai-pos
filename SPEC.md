@@ -206,7 +206,7 @@ Phí ship / phụ thu nằm trong `orders.total` nên đã có trong doanh thu v
 
 Dòng cũ "trong đó phí ship" đổi thành các dòng trên.
 
-**Khoản chi** (báo cáo ca / ngày / tháng, chỉ chủ): số khoản và tổng chi (không tính khoản đã hủy), cộng theo **nhóm ghi chú giống nhau** (chuẩn hóa như ghi chú gần đây), ví dụ "mua đá · 12 lần · 240.000". Báo cáo ca liệt kê từng khoản, kể cả khoản đã hủy (gạch ngang).
+**Khoản chi** (báo cáo ca / ngày / tháng, chỉ chủ): số khoản và tổng chi (không tính khoản đã hủy), cộng theo **nhóm ghi chú giống nhau** (chuẩn hóa như ghi chú gần đây), ví dụ "mua đá · 12 lần · 240.000". Báo cáo ca liệt kê từng khoản, kể cả khoản đã hủy (gạch ngang). Báo cáo ngày / tháng tính khoản chi theo **ngày mở ca** (như danh sách ca), nên khoản chủ ghi bù cho ca hôm trước vẫn nằm ở hôm trước.
 
 **Hộp** (dùng để tham khảo, không cảnh báo tự động)
 ```

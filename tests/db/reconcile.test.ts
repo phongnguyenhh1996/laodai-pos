@@ -59,6 +59,14 @@ async function loadCase(c: Case) {
       await db.query('insert into debt_payments (id, customer_id, amount, method, shift_id, at) values (gen_random_uuid(),$1,$2,$3,$4,now())',
         [SEED.customers.dungGv, p.amount, p.method, p.shift_id]);
     }
+    const expenses: Array<{ id: string; shift_id: string; amount: number; note: string; actor_kind: string; voided_at: string | null }> =
+      ('expenses' in c.input ? c.input.expenses : undefined) ?? [];
+    for (const e of expenses) {
+      await db.query(
+        `insert into shift_expenses (id, shift_id, amount, note, actor_kind, staff_id, voided_at, void_actor_kind) values ($1,$2,$3,$4,$5,$6,$7,$8)`,
+        [e.id, e.shift_id, e.amount, e.note, e.actor_kind, e.actor_kind === 'staff' ? SEED.staff.Lan : null, e.voided_at, e.voided_at ? e.actor_kind : null],
+      );
+    }
   });
 }
 

@@ -108,6 +108,8 @@ export interface Reconcile {
   ship?: ShipStats;
   paid_orders: number;
   debt_collected: { cash: number; transfer: number };
+  /** Khoản chi chưa hủy của ca (đã trừ vào kỳ vọng); bản ghi cũ không có. */
+  expenses?: { count: number; total: number };
   cash: { expected: number; counted: number | null; diff: number | null };
   boxes: CountLine;
   plates: CountLine;
@@ -117,6 +119,26 @@ export interface Reconcile {
   deleted_after_served: Array<{ order_id: string; code: string; boxes: number; plates: number; cans?: number }>;
   open_orders: number;
 }
+
+/** Khoản chi (SPEC 4.9) trong payload tin `expense_*`. */
+interface ExpenseSnap {
+  id: string;
+  shift_id: string;
+  amount: number;
+  note: string;
+  actor_kind: 'staff' | 'owner';
+}
+
+type ExpensePayload = Base &
+  ShiftCtx & {
+    expense: ExpenseSnap;
+    /** Ai thao tác lần này. */
+    actor: 'staff' | 'owner';
+    /** Chỉ khi chủ sửa: số tiền / ghi chú trước khi sửa. */
+    before: ExpenseSnap | null;
+    /** Ca đã đóng ⇒ đối soát trước / sau. */
+    recalculated: { before: Reconcile; after: Reconcile } | null;
+  };
 
 export type Notification =
   | { kind: 'tablet_login'; payload: Base & { tablet_name: string } }
@@ -155,6 +177,9 @@ export type Notification =
         recalculated: { before: Record<string, Reconcile>; after: Record<string, Reconcile> };
       };
     }
+  | { kind: 'expense_created'; payload: ExpensePayload }
+  | { kind: 'expense_voided'; payload: ExpensePayload }
+  | { kind: 'expense_edited'; payload: ExpensePayload }
   | { kind: 'seq_gap'; payload: Base & { tablet_name: string; missing: number[]; received: number } }
   | { kind: 'sync_rejected'; payload: Base & { tablet_name: string; kind: string; reason: string } }
   | { kind: 'backup_failed'; payload: Base & { date: string; attempts: number; error: string } }
@@ -165,6 +190,8 @@ export type Notification =
         revenue: Revenue;
         by_point: Array<{ point_name: string; total: number }>;
         debt_collected: number;
+        /** Khoản chi của các ca mở trong ngày; bản ghi cũ không có. */
+        expenses?: { count: number; total: number };
         deleted: { count: number; served: number };
         shifts: Array<ShiftCtx & { status: string; reconcile: Reconcile }>;
         open_orders: number;
@@ -192,6 +219,10 @@ const REJECT_REASONS: Record<string, string> = {
   order_not_open: 'đơn không còn mở',
   point_not_allowed: 'điểm bán không thuộc tablet',
   address_required: 'đơn ship thiếu địa chỉ',
+  shift_not_open: 'ca đã đóng',
+  bad_expense_amount: 'số tiền chi không hợp lệ',
+  bad_expense_note: 'khoản chi thiếu ghi chú',
+  expense_not_voidable: 'không được hủy khoản chi này',
 };
 
 function itemLine(it: ItemSnap): string {
@@ -270,6 +301,7 @@ export function shiftReport(r: Reconcile): string[] {
     );
   }
   lines.push(...countedPacks(r).map(([k, label]) => countLine(label, r[k]!)));
+  if (r.expenses?.count) lines.push(expenseTotalLine(r.expenses));
   lines.push(`Xóa: ${r.deleted_count} đơn (${served} đã ra món) · Đơn còn mở: ${r.open_orders}`);
   if (served) {
     lines.push(
@@ -277,6 +309,30 @@ export function shiftReport(r: Reconcile): string[] {
         .map((d) => `${d.code} (${packList(d)})`)
         .join(', ')}`,
     );
+  }
+  return lines;
+}
+
+/** "Chi: 3 khoản · 120.000" (chỉ gọi khi có khoản chi). */
+function expenseTotalLine(e: { count: number; total: number }): string {
+  return `Chi: ${e.count} khoản · ${vnd(e.total)}`;
+}
+
+const expenseText = (e: Pick<ExpenseSnap, 'amount' | 'note'>) => `${vnd(e.amount)} – ${e.note}`;
+
+/** "💸 Chi 20.000 – mua đá · Lan · Tablet A"; chủ ghi / hủy ⇒ "(chủ)"; chủ sửa ⇒ trước → sau; ca đã đóng ⇒ dòng tính lại. */
+function expenseLines(kind: 'expense_created' | 'expense_voided' | 'expense_edited', q: ExpensePayload): string[] {
+  const owner = q.actor === 'owner' ? ' (chủ)' : '';
+  const place = [q.staff_name, q.tablet_name].filter(Boolean).join(' · ');
+  const head =
+    kind === 'expense_created'
+      ? `💸 Chi ${expenseText(q.expense)} · ${place}${owner}`
+      : kind === 'expense_voided'
+        ? `↩️ Hủy chi ${expenseText(q.expense)} · ${q.staff_name ?? ''}${owner}`
+        : `✏️ Sửa chi: ${q.before ? expenseText(q.before) : '?'} → ${expenseText(q.expense)} · ${place}${owner}`;
+  const lines = [head];
+  if (q.recalculated) {
+    lines.push(`Ca đã đóng → đã tính lại: tiền mặt ${signed(q.recalculated.before.cash.diff)} → ${signed(q.recalculated.after.cash.diff)}`);
   }
   return lines;
 }
@@ -394,6 +450,12 @@ export function formatNotification(n: Notification, opts: FormatOptions): string
       link = `${app}/owner/orders/${q.order_id}`;
       break;
     }
+    case 'expense_created':
+    case 'expense_voided':
+    case 'expense_edited':
+      lines = expenseLines(n.kind, n.payload);
+      link = `${app}/owner/shifts/${n.payload.expense.shift_id}`;
+      break;
     case 'backup_failed': {
       const q = n.payload;
       lines = [
@@ -427,6 +489,7 @@ export function formatNotification(n: Notification, opts: FormatOptions): string
         ...q.by_point.map((b) => `• ${b.point_name}: ${vnd(b.total)}`),
       ];
       if (q.debt_collected) lines.push(`Thu nợ: ${vnd(q.debt_collected)}`);
+      if (q.expenses?.count) lines.push(expenseTotalLine(q.expenses));
       lines.push(`Xóa: ${q.deleted.count} đơn (${q.deleted.served} đã ra món)`);
       if (q.shifts.length) {
         lines.push('Ca:');

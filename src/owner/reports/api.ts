@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import type { ExpenseStats } from '@/domain/expenses';
 import type { ReconcileResult } from '@/domain/reconcile';
 import type { Money } from '@/domain/types';
 import type { Revenue } from '../dashboard/api';
@@ -41,10 +42,15 @@ export interface Report {
     reconcile: ReconcileResult;
   }>;
   top_products: Array<{ product_id: string; name: string; qty: number; revenue: Money }>;
+  /** Khoản chi của các ca mở trong kỳ (RPC `owner_expense_report`); server cũ chưa có ⇒ null. */
+  expenses: ExpenseStats | null;
 }
 
 export async function loadReport(client: SupabaseClient, from: string, to: string): Promise<Report> {
-  const { data, error } = await client.rpc('owner_report', { p_from: from, p_to: to });
+  const [{ data, error }, exp] = await Promise.all([
+    client.rpc('owner_report', { p_from: from, p_to: to }),
+    client.rpc('owner_expense_report', { p_from: from, p_to: to }),
+  ]);
   if (error) throw new ReportError(`Không tải được báo cáo: ${error.message}`);
-  return data as Report;
+  return { ...(data as Omit<Report, 'expenses'>), expenses: exp.error ? null : (exp.data as ExpenseStats) };
 }

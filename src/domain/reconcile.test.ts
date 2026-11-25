@@ -75,6 +75,15 @@ describe('reconcile: quy tắc', () => {
     expect(d.deleted_after_served).toEqual([{ order_id: expect.any(String), code: 'F24', boxes: 3, plates: 0, cans: 0 }]);
   });
 
+  it('khoản chi: kỳ vọng trừ khoản chưa hủy của ca này (cả khoản chủ ghi); doanh thu không đổi', () => {
+    const k = run('khoan-chi');
+    const base = run('chu-sua-truoc');
+    expect(k.expenses).toEqual({ count: 3, total: 20_000 + 30_000 + 10_000 });
+    expect(k.cash.expected).toBe(base.cash.expected - 60_000);
+    expect(k.revenue).toEqual(base.revenue);
+    expect(base.expenses).toEqual({ count: 0, total: 0 });
+  });
+
   it('đơn xóa có served_at sau deleted_at (dữ liệu lạ) không tính là "xóa sau khi ra món"', () => {
     const c = cases.find((x) => x.name === 'co-ban')!;
     const odd = c.input.orders.map((o) =>

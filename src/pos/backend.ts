@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { DebtHistory } from '@/domain/debt';
-import { DEFAULT_COUNT_ITEMS, type Order, type OrderItem, type ShipDefaults } from '@/domain/types';
+import { DEFAULT_COUNT_ITEMS, type Order, type OrderItem, type ShiftExpense, type ShipDefaults } from '@/domain/types';
 import { createSupabaseCatalogSource, type CatalogData } from './catalog';
 import type { OpenState, PushResult, TabletShift, WireOp } from './types';
 
@@ -20,6 +20,8 @@ export interface PosBackend {
   loadDebtHistory(customerId: string): Promise<DebtHistory>;
   /** Kiểu ship / phí / tiền trả shipper của đơn ship gần nhất của ca (RPC `shift_ship_defaults`); chưa có ⇒ null. */
   loadShipDefaults(shiftId: string): Promise<ShipDefaults | null>;
+  /** Ghi chú gần đây của khoản chi (RPC `recent_expense_notes`): tối đa 8 chữ, không số tiền. */
+  loadRecentExpenseNotes(): Promise<string[]>;
   /** Nghe thay đổi của hồ sơ tablet + danh mục. Trả hàm hủy đăng ký. */
   subscribe(profileId: string, onPulse: (scope: PulseScope) => void, onStatus: (s: ChannelStatus) => void): () => void;
 }
@@ -36,9 +38,14 @@ export class PosNetworkError extends Error {
 }
 
 export function parsePushResult(data: unknown): PushResult {
-  const d = data as { status?: unknown; reason?: unknown; order?: Order; shift?: TabletShift } | null;
+  const d = data as { status?: unknown; reason?: unknown; order?: Order; shift?: TabletShift; expense?: ShiftExpense } | null;
   if (d?.status === 'ok' || d?.status === 'duplicate') {
-    return { status: d.status, ...(d.order ? { order: normalizeOrder(d.order) } : {}), ...(d.shift ? { shift: d.shift } : {}) };
+    return {
+      status: d.status,
+      ...(d.order ? { order: normalizeOrder(d.order) } : {}),
+      ...(d.shift ? { shift: d.shift } : {}),
+      ...(d.expense ? { expense: normalizeExpense(d.expense) } : {}),
+    };
   }
   if (d?.status === 'rejected') return { status: 'rejected', reason: typeof d.reason === 'string' ? d.reason : 'unknown' };
   throw new PosNetworkError(`Phản hồi sync_push không hợp lệ: ${JSON.stringify(data)}`);
@@ -83,6 +90,14 @@ function normalizeOrder(o: Order): Order {
   };
 }
 
+export const EXPENSE_COLUMNS = 'id,shift_id,amount,note,actor_kind,staff_id,at,voided_at,void_actor_kind';
+
+/** Khoản chi từ server: chỉ giữ các trường của `ShiftExpense`. */
+export function normalizeExpense(e: ShiftExpense): ShiftExpense {
+  const { id, shift_id, amount, note, actor_kind, staff_id, at, voided_at, void_actor_kind } = e;
+  return { id, shift_id, amount, note, actor_kind, staff_id: staff_id ?? null, at, voided_at: voided_at ?? null, void_actor_kind: void_actor_kind ?? null };
+}
+
 /** Kết quả `shift_ship_defaults`: null hoặc ba trường; dữ liệu lạ ⇒ null (về Quán ship, chưa chọn phí). */
 export function parseShipDefaults(data: unknown): ShipDefaults | null {
   const d = data as Partial<ShipDefaults> | null;
@@ -116,6 +131,12 @@ export async function loadOpenStateFrom(client: SupabaseClient, profileId: strin
   if (sRes.error) throw new PosNetworkError(`Không đọc được ca đang mở: ${sRes.error.message}`);
   if (oRes.error) throw new PosNetworkError(`Không đọc được đơn đang mở: ${oRes.error.message}`);
   const raw = (sRes.data as unknown as RawShift[] | null)?.[0];
+  let expenses: ShiftExpense[] = [];
+  if (raw) {
+    const eRes = await client.from('shift_expenses').select(EXPENSE_COLUMNS).eq('shift_id', raw.id).order('at');
+    if (eRes.error) throw new PosNetworkError(`Không đọc được khoản chi: ${eRes.error.message}`);
+    expenses = ((eRes.data ?? []) as unknown as ShiftExpense[]).map(normalizeExpense);
+  }
   const shift: TabletShift | null = raw
     ? {
         id: raw.id,
@@ -140,7 +161,7 @@ export async function loadOpenStateFrom(client: SupabaseClient, profileId: strin
       .sort((a, b) => a.sort - b.sort)
       .map(({ id, product_id, name_snap, unit_price_snap, qty, toppings_snap }) => ({ id, product_id, name_snap, unit_price_snap, qty, toppings_snap })),
   }));
-  return { shift, orders };
+  return { shift, orders, expenses };
 }
 
 let channelSeq = 0;
@@ -170,6 +191,11 @@ export function createSupabaseBackend(client: SupabaseClient): PosBackend {
       const { data, error } = await client.rpc('shift_ship_defaults', { p_shift: shiftId });
       if (error) throw new PosNetworkError(`Không tải được mặc định đơn ship: ${error.message}`, error.code ?? null);
       return parseShipDefaults(data);
+    },
+    async loadRecentExpenseNotes() {
+      const { data, error } = await client.rpc('recent_expense_notes');
+      if (error) throw new PosNetworkError(`Không tải được ghi chú gần đây: ${error.message}`, error.code ?? null);
+      return Array.isArray(data) ? data.filter((x): x is string => typeof x === 'string') : [];
     },
     subscribe(profileId, onPulse, onStatus) {
       const openKey = `profile:${profileId}`;

@@ -41,7 +41,7 @@ describe('parseShipDefaults', () => {
 
 type Res = { data: unknown; error: { message: string; code?: string } | null };
 
-function fakeClient(opts: { rpc?: () => Promise<Res>; shifts?: Res; orders?: Res } = {}) {
+function fakeClient(opts: { rpc?: () => Promise<Res>; shifts?: Res; orders?: Res; expenses?: Res } = {}) {
   const handlers: Array<(m: unknown) => void> = [];
   let statusCb: ((s: string) => void) | null = null;
   const filters: Array<[string, unknown]> = [];
@@ -49,6 +49,7 @@ function fakeClient(opts: { rpc?: () => Promise<Res>; shifts?: Res; orders?: Res
     const q = Object.assign(Promise.resolve(res), {
       eq: (c: string, v: unknown) => (filters.push([c, v]), q),
       in: (c: string, v: unknown) => (filters.push([c, v]), q),
+      order: (c: string) => (filters.push(['order', c]), q),
     });
     return q;
   };
@@ -58,7 +59,9 @@ function fakeClient(opts: { rpc?: () => Promise<Res>; shifts?: Res; orders?: Res
   };
   const client = {
     rpc: vi.fn(opts.rpc ?? (async () => ({ data: { status: 'ok' }, error: null }))),
-    from: (t: string) => ({ select: () => query((t === 'shifts' ? opts.shifts : opts.orders) ?? { data: [], error: null }) }),
+    from: (t: string) => ({
+      select: () => query((t === 'shifts' ? opts.shifts : t === 'shift_expenses' ? opts.expenses : opts.orders) ?? { data: [], error: null }),
+    }),
     channel: vi.fn(() => channel),
     removeChannel: vi.fn(async () => 'ok'),
   };
@@ -137,6 +140,28 @@ describe('loadOpenStateFrom', () => {
     expect(await loadOpenStateFrom(noStaff.client, 'tab-a')).toMatchObject({ shift: { staff_name: '?' }, orders: [] });
     const none = fakeClient({ shifts: { data: null, error: null } });
     expect((await loadOpenStateFrom(none.client, 'tab-a')).shift).toBeNull();
+    expect((await loadOpenStateFrom(none.client, 'tab-a')).expenses).toEqual([]);
+  });
+
+  it('khoản chi của ca đang mở: theo ca, xếp theo giờ, chỉ giữ trường của ShiftExpense; lỗi ⇒ PosNetworkError', async () => {
+    const shifts = { data: [{ id: 's', staff: { name: 'Lan' } }], error: null };
+    const e = { id: 'e1', shift_id: 's', amount: 20000, note: 'mua đá', actor_kind: 'staff', staff_id: 'st', at: 't', voided_at: null, void_actor_kind: null, extra: 1 };
+    const f = fakeClient({ shifts, expenses: { data: [e], error: null } });
+    const { extra: _x, ...want } = e;
+    expect((await loadOpenStateFrom(f.client, 'tab-a')).expenses).toEqual([want]);
+    expect(f.filters).toContainEqual(['shift_id', 's']);
+    expect(f.filters).toContainEqual(['order', 'at']);
+    await expect(loadOpenStateFrom(fakeClient({ shifts, expenses: { data: null, error: { message: 'boom' } } }).client, 'x')).rejects.toThrow('khoản chi: boom');
+    expect(parsePushResult({ status: 'ok', expense: e })).toEqual({ status: 'ok', expense: want });
+  });
+
+  it('ghi chú gần đây: RPC recent_expense_notes, chỉ giữ chữ; lỗi ⇒ PosNetworkError', async () => {
+    const f = fakeClient({ rpc: async () => ({ data: ['mua đá', 3, 'mua ga'], error: null }) });
+    expect(await createSupabaseBackend(f.client).loadRecentExpenseNotes()).toEqual(['mua đá', 'mua ga']);
+    expect(f.raw.rpc).toHaveBeenCalledWith('recent_expense_notes');
+    expect(await createSupabaseBackend(fakeClient({ rpc: async () => ({ data: null, error: null }) }).client).loadRecentExpenseNotes()).toEqual([]);
+    const bad = createSupabaseBackend(fakeClient({ rpc: async () => ({ data: null, error: { message: 'x' } }) }).client);
+    await expect(bad.loadRecentExpenseNotes()).rejects.toThrow(PosNetworkError);
   });
 
   it('lỗi đọc ⇒ PosNetworkError', async () => {

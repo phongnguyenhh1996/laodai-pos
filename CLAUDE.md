@@ -27,6 +27,7 @@ npm run test:all     # unit + db + e2e
 
 1. **Grill trước khi code**: hỏi đến khi rõ phạm vi. Từ mới thì thêm vào glossary, quyết định khó đảo ngược thì viết ADR.
 2. **Task lớn**: viết kế hoạch vào `docs/plans/<ten>.md` (mục tiêu, phạm vi, không làm, tiêu chí xong), chia thành ticket nhỏ, mỗi ticket một phiên.
+   Có đụng UI ⇒ **vẽ Figma là một ticket riêng, đứng đầu**: vẽ mọi màn / trạng thái, chủ duyệt xong mới làm các ticket khác (kể cả dữ liệu, domain).
 3. **Implement**, rồi `npm run check`. Đụng SQL / RLS thì chạy thêm `npm run test:db`.
 4. **Review**: (a) đúng và chỉ đúng phạm vi kế hoạch, (b) khớp `docs/coding-standards.md`.
 5. **Retro**: điều gì phải nhắc agent lần này? Ưu tiên biến nó thành test / kiểm tra tự động; không được thì thêm vào coding standards.

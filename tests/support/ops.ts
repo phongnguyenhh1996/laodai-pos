@@ -113,6 +113,14 @@ export class TabletSim {
     return push(this.c, op('close_shift', id, { shift_id: id, boxes_left, plates_left, cash_counted }));
   }
 
+  createExpense(amount: number | string | null, note: string | null, id = uuidv7(), shift_id = this.shiftId) {
+    return push(this.c, op('create_expense', id, { id, shift_id, amount, note }));
+  }
+
+  voidExpense(expense_id: string) {
+    return push(this.c, op('void_expense', expense_id, { expense_id }));
+  }
+
   debtPayment(customer_id: string, amount: number, method: 'cash' | 'transfer' = 'cash') {
     const id = uuidv7();
     return push(this.c, op('debt_payment', id, { id, customer_id, amount, method, shift_id: this.shiftId }));

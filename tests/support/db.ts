@@ -10,7 +10,7 @@ const SEED_SQL = readFileSync(fileURLToPath(new URL('../../supabase/seed.sql', i
 
 const BUSINESS_TABLES = [
   'print_jobs', 'print_template', 'live_pulse', 'owner_device_pins', 'owner_mode_devices', 'notifications', 'seq_gaps', 'sync_ops', 'audit_log', 'debt_payments', 'order_items', 'orders', 'customers',
-  'shift_adjustments', 'shifts', 'price_history', 'combos', 'toppings', 'products', 'tablet_profiles', 'points',
+  'shift_expenses', 'shift_adjustments', 'shifts', 'price_history', 'combos', 'toppings', 'products', 'tablet_profiles', 'points',
   'menus', 'staff', 'settings',
 ];
 

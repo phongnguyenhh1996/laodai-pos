@@ -22,6 +22,7 @@ class ManualBackend implements PosBackend {
   push = vi.fn();
   loadDebtHistory = vi.fn();
   loadShipDefaults = vi.fn();
+  loadRecentExpenseNotes = vi.fn();
   loadOpenState = () => new Promise<OpenState>((resolve, reject) => this.openCalls.push({ resolve, reject }));
   loadCatalog = () => new Promise<typeof CATALOG>((resolve, reject) => this.catalogCalls.push({ resolve, reject }));
   subscribe(_p: string, onPulse: (s: PulseScope) => void, onStatus: (s: ChannelStatus) => void) {
@@ -192,7 +193,7 @@ describe('TabletStore', () => {
     store.setShift(SHIFT);
     store.applyOrder(order('o2'));
     store.applyOrder({ ...order('o1'), status: 'served' });
-    expect(store.getSnapshot().open).toEqual({ shift: SHIFT, orders: [order('o2'), order('o1', 'served')] });
+    expect(store.getSnapshot().open).toEqual({ shift: SHIFT, orders: [order('o2'), order('o1', 'served')], expenses: [] });
     store.applyOrder(order('o2', 'paid'));
     store.removeOrder('o1');
     expect(store.getSnapshot().open?.orders).toEqual([]);
@@ -202,6 +203,25 @@ describe('TabletStore', () => {
     store.reportOk();
     store.reportOk();
     expect(store.getSnapshot().error).toBeNull();
+  });
+
+  it('khoản chi vừa ghi / hủy vào ngay danh sách của ca đang mở (theo giờ); ca khác bị bỏ; đổi ca ⇒ danh sách mới', async () => {
+    const { backend, store } = setup();
+    store.start('tab-a');
+    await backend.answer({ shift: SHIFT, orders: [] });
+    const exp = (id: string, at: string, extra = {}) => ({
+      id, shift_id: SHIFT.id, amount: 20000, note: 'mua đá', actor_kind: 'staff' as const, staff_id: 's', at, voided_at: null, void_actor_kind: null, ...extra,
+    });
+    store.applyExpense(exp('e2', '2026-11-25T02:00:00Z'));
+    store.applyExpense(exp('e1', '2026-11-25T01:00:00Z'));
+    store.applyExpense({ ...exp('x', '2026-11-25T03:00:00Z'), shift_id: 'other' });
+    expect(store.getSnapshot().open?.expenses?.map((e) => e.id)).toEqual(['e1', 'e2']);
+    store.applyExpense(exp('e1', '2026-11-25T01:00:00Z', { voided_at: '2026-11-25T04:00:00Z', void_actor_kind: 'staff' }));
+    expect(store.getSnapshot().open?.expenses?.[0].voided_at).not.toBeNull();
+    store.setShift(SHIFT);
+    expect(store.getSnapshot().open?.expenses).toHaveLength(2);
+    store.setShift({ ...SHIFT, id: 'sh2' });
+    expect(store.getSnapshot().open?.expenses).toEqual([]);
   });
 
   it('thao tác ghi xen vào lúc đang tải ⇒ bỏ kết quả tải cũ, tải lại', async () => {

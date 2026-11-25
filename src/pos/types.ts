@@ -1,4 +1,4 @@
-import type { Order, Shift } from '@/domain/types';
+import type { Order, Shift, ShiftExpense } from '@/domain/types';
 
 /** Máy đã kích hoạt cho hồ sơ tablet nào (lưu trên máy, kèm phiên vai trò `tablet` của supabase-js). */
 export interface Activation {
@@ -24,7 +24,9 @@ export type OpKind =
   | 'pay_order'
   | 'delete_order'
   | 'debt_payment'
-  | 'set_sold_out';
+  | 'set_sold_out'
+  | 'create_expense'
+  | 'void_expense';
 
 /** Một thao tác gửi lên RPC `sync_push`. `op_id` là khóa idempotent: gửi lại sau khi mất phản hồi không bị ghi hai lần. */
 export interface WireOp {
@@ -37,11 +39,13 @@ export interface WireOp {
 }
 
 export type PushResult =
-  | { status: 'ok' | 'duplicate'; order?: Order; shift?: TabletShift }
+  | { status: 'ok' | 'duplicate'; order?: Order; shift?: TabletShift; expense?: ShiftExpense }
   | { status: 'rejected'; reason: string };
 
 /** Trạng thái hiện tại của hồ sơ tablet trên server. */
 export interface OpenState {
   shift: TabletShift | null;
   orders: Order[];
+  /** Khoản chi của ca đang mở (cả khoản chủ ghi, cả khoản đã hủy), theo giờ ghi. Thiếu ⇒ chưa có. */
+  expenses?: ShiftExpense[];
 }

@@ -70,55 +70,58 @@ Thứ tự deploy: **migration trước, frontend sau**.
 - [ ] Chủ: khối "Khoản chi" ở chi tiết ca (danh sách, Ghi khoản chi, sửa / hủy); dòng khoản chi trong báo cáo ngày / tháng.
 - [ ] Chủ duyệt.
 
-### 2. Dữ liệu (Supabase): migration `2026112xxxxxxx_shift_expenses.sql`
-- [ ] Bảng `shift_expenses`: `id uuid pk` (client sinh, như `customers`), `shift_id` fk, `amount int` check `> 0 and % 1000 = 0`,
+### 2. Dữ liệu (Supabase): migration `20261125000001_shift_expenses.sql`
+- [x] Bảng `shift_expenses`: `id uuid pk` (client sinh, như `customers`), `shift_id` fk, `amount int` check `> 0 and % 1000 = 0`,
       `note text not null` check `length(btrim(note)) between 1 and 80`, `actor_kind` (`staff`|`owner`), `staff_id` (null nếu chủ),
       `at timestamptz default now()`, `voided_at`, `void_actor_kind`. Index `(shift_id)`, `(at)`.
-- [ ] RLS: `tablet` chỉ `select` dòng của ca **đang mở** của quầy mình; không `insert` / `update` / `delete` trực tiếp. Chủ đọc tất cả.
+- [x] RLS: `tablet` chỉ `select` dòng của ca **đang mở** của quầy mình; không `insert` / `update` / `delete` trực tiếp. Chủ đọc tất cả.
       Không ai hard delete.
-- [ ] `sync_push`: thêm `create_expense` (ca phải đang mở và thuộc quầy; idempotent theo `op_id`; `actor_kind = staff`, `staff_id` = nhân viên của ca)
+- [x] `sync_push`: thêm `create_expense` (ca phải đang mở và thuộc quầy; idempotent theo `op_id`; `actor_kind = staff`, `staff_id` = nhân viên của ca)
       và `void_expense` (chỉ khoản `staff` của ca đang mở của quầy mình, chưa hủy; hủy lại ⇒ không đổi). Lỗi: `bad_expense_amount`,
       `bad_expense_note`, `shift_not_open`, `expense_not_voidable`.
-- [ ] RPC `recent_expense_notes()` (`tablet` + chủ): ≤ 8 ghi chú, 30 ngày, mọi quầy, chưa hủy, nhóm theo `lower(regexp_replace(btrim(note), '\s+', ' ', 'g'))`,
+- [x] RPC `recent_expense_notes()` (`tablet` + chủ): ≤ 8 ghi chú, 30 ngày, mọi quầy, chưa hủy, nhóm theo `lower(regexp_replace(btrim(note), '\s+', ' ', 'g'))`,
       xếp theo số lần rồi lần gần nhất, trả bản viết gần nhất của nhóm. **Chỉ trả chữ**, không số tiền / số lần.
-- [ ] RPC chủ: `owner_create_expense(shift, amount, note)`, `owner_edit_expense(id, amount, note)`, `owner_void_expense(id)`;
+- [x] RPC chủ: `owner_create_expense(shift, amount, note)`, `owner_edit_expense(id, amount, note)`, `owner_void_expense(id)`;
       ca đã đóng ⇒ `recalculated_at`. Audit trước/sau.
-- [ ] `private.reconcile_shift` (bản mới nhất: `20261124000001_ship_external.sql`): kỳ vọng tiền mặt `− Σ amount (voided_at is null)`;
+- [x] `private.reconcile_shift` (bản mới nhất: `20261124000001_ship_external.sql`): kỳ vọng tiền mặt `− Σ amount (voided_at is null)`;
       thêm vào kết quả `expenses: {count, total}`.
-- [ ] Báo cáo / tổng quan chủ (`private.revenue_json` hoặc hàm chung mới `private.expense_stats`): tổng chi + nhóm theo ghi chú chuẩn hóa cho ngày / tháng / ca.
+- [x] Báo cáo / tổng quan chủ (`private.revenue_json` hoặc hàm chung mới `private.expense_stats`): tổng chi + nhóm theo ghi chú chuẩn hóa cho ngày / tháng / ca.
       Chi tiết ca trả danh sách khoản (kể cả đã hủy).
-- [ ] Telegram: tin ghi / hủy / sửa (mẫu ở SPEC mục 6); báo cáo đóng ca thêm dòng "Chi" khi có; `build_daily_summary` thêm tổng chi
+      Làm: RPC riêng `owner_expense_report(from, to)` (không chép lại `owner_report`); khoản chi tính vào ngày **mở ca**
+      (như `by_shift`), nên chủ ghi bù cho ca hôm qua vẫn nằm ở hôm qua. Chi tiết ca: chủ đọc thẳng bảng (RLS), nhóm ở client
+      bằng `expenseStats`. Bảng có trong `supabase_realtime` để màn chủ tự tải lại.
+- [x] Telegram: tin ghi / hủy / sửa (mẫu ở SPEC mục 6; kind `expense_created` / `expense_voided` / `expense_edited`, ca đã đóng kèm đối soát trước / sau); báo cáo đóng ca thêm dòng "Chi" khi có; `build_daily_summary` thêm tổng chi
       (hàm đang không chạy theo lịch — migration `20261120000004` — nhưng để bật lại là có).
-- [ ] `tests/fixtures/reconcile-cases.json`: thêm ca `khoan-chi` (2 khoản nhân viên, 1 khoản chủ, 1 khoản đã hủy). Mọi ca cũ có `expenses` = 0, `cash` giữ nguyên.
-- [ ] Test DB (`tests/db/expenses.test.ts`): constraint (0, 7.500, ghi chú rỗng / toàn khoảng trắng); `create_expense` idempotent;
+- [x] `tests/fixtures/reconcile-cases.json`: thêm ca `khoan-chi` (2 khoản nhân viên, 1 khoản chủ, 1 khoản đã hủy). Mọi ca cũ có `expenses` = 0, `cash` giữ nguyên.
+- [x] Test DB (`tests/db/expenses.test.ts`): constraint (0, 7.500, ghi chú rỗng / toàn khoảng trắng); `create_expense` idempotent;
       ca đóng / quầy khác ⇒ từ chối; RLS tablet không đọc khoản của ca đã đóng / quầy khác; tablet không hủy khoản chủ ghi / ca đóng;
       `recent_expense_notes` gộp "Mua đá" / " mua  đá " và không lộ số tiền; chủ sửa khoản ca đóng ⇒ kỳ vọng đổi + `recalculated_at`;
       audit + Telegram cho mỗi thao tác; đóng ca ⇒ RPC vẫn chỉ trả `ok`.
 
 ### 3. Domain (`src/domain/`, hàm thuần)
-- [ ] `types.ts`: `ShiftExpense`.
-- [ ] `expenses.ts`: `normalizeExpenseNote`, `validateExpense` (amount, note), `activeExpenseTotal`.
-- [ ] `reconcile.ts`: trừ khoản chi; khối `expenses`. Chạy chung fixture với test SQL.
-- [ ] `audit.ts`: nhãn "Ghi khoản chi", "Hủy khoản chi", "Sửa khoản chi: 20.000 → 25.000".
-- [ ] Telegram format (`supabase/functions/_shared/format.ts`): ba tin + dòng "Chi" trong báo cáo ca; cập nhật snapshot.
+- [x] `types.ts`: `ShiftExpense`.
+- [x] `expenses.ts`: `normalizeExpenseNote`, `validateExpense` (amount, note), `activeExpenseTotal` (+ `cleanExpenseNote`, `expenseStats` cộng theo ghi chú).
+- [x] `reconcile.ts`: trừ khoản chi; khối `expenses`. Chạy chung fixture với test SQL.
+- [x] `audit.ts`: nhãn "Ghi khoản chi", "Hủy khoản chi", "Sửa khoản chi: 20.000 → 25.000".
+- [x] Telegram format (`supabase/functions/_shared/format.ts`): ba tin + dòng "Chi" trong báo cáo ca; cập nhật snapshot.
 
 ### 4. Tablet
-- [ ] `src/pos`: op `create_expense`, `void_expense` qua `sync_push` với `op_id` (gửi lại dùng lại `op_id`).
-- [ ] Menu phụ hàng đợi: "Chi tiền" (cạnh Thu nợ).
-- [ ] Màn Chi tiền theo Figma: danh sách + tổng, form, ghi chú gần đây, xác nhận, hủy (có hỏi lại), mất kết nối.
-- [ ] Nghe `live_pulse` để thấy khoản chủ vừa ghi.
+- [x] `src/pos`: op `create_expense`, `void_expense` qua `sync_push` với `op_id` (gửi lại dùng lại `op_id`).
+- [x] Menu phụ hàng đợi: "Chi tiền" (cạnh Thu nợ). Điện thoại: thanh đáy Thu nợ · Chi tiền · Đóng ca · "Đơn" (tablet vẫn "Đơn mới").
+- [x] Màn Chi tiền theo Figma: danh sách + tổng, form, ghi chú gần đây, xác nhận, hủy (có hỏi lại), mất kết nối.
+- [x] Nghe `live_pulse` để thấy khoản chủ vừa ghi.
 
 ### 5. Chế độ chủ
-- [ ] Chi tiết ca: khối Khoản chi (ghi / sửa / hủy), ca đã đóng hiện "đã điều chỉnh"; số kỳ vọng / chênh lệch cập nhật.
-- [ ] Báo cáo ngày / tháng: tổng chi + nhóm theo ghi chú. Nhật ký: lọc "Khoản chi".
+- [x] Chi tiết ca: khối Khoản chi (ghi / sửa / hủy), ca đã đóng hiện "đã điều chỉnh"; số kỳ vọng / chênh lệch cập nhật.
+- [x] Báo cáo ngày / tháng: tổng chi + nhóm theo ghi chú. Nhật ký: lọc "Khoản chi".
 
 ### 6. E2E (Cypress)
-- [ ] Nhân viên ghi chi 20k "mua đá" → đóng ca đếm đúng (kỳ vọng đã trừ) → chủ thấy chênh lệch 0 và khoản chi trong chi tiết ca.
-- [ ] Ghi chú gần đây xuất hiện ở lần sau, bấm chỉ điền ghi chú.
-- [ ] Nhân viên hủy khoản của mình; không thấy nút hủy ở khoản "Chủ ghi".
-- [ ] Chủ sửa khoản chi của ca đã đóng ⇒ "đã điều chỉnh".
+- [x] Nhân viên ghi chi 20k "mua đá" → đóng ca đếm đúng (kỳ vọng đã trừ) → chủ thấy chênh lệch 0 và khoản chi trong chi tiết ca.
+- [x] Ghi chú gần đây xuất hiện ở lần sau, bấm chỉ điền ghi chú.
+- [x] Nhân viên hủy khoản của mình; không thấy nút hủy ở khoản "Chủ ghi".
+- [x] Chủ sửa khoản chi của ca đã đóng ⇒ "đã điều chỉnh".
 
 ### 7. Xong khi
-- [ ] `npm run check`, `npm run test:db`, `npm run test:e2e` pass.
-- [ ] Review: đúng phạm vi plan; khớp `docs/coding-standards.md`; người đọc kỹ migration + `sync_push` + công thức (cửa một chiều).
+- [x] `npm run check`, `npm run test:db`, `npm run test:e2e` pass. (25/11: 374 unit, 162 db — G37 realtime chập chờn khi chạy cả bộ, chạy riêng qua —, 59 Cypress)
+- [x] Review: đúng phạm vi plan; khớp `docs/coding-standards.md`; người đọc kỹ migration + `sync_push` + công thức (cửa một chiều).
 - [ ] Retro: điều gì phải nhắc agent lần này → test / lint hoặc coding standards.

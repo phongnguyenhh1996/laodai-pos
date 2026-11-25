@@ -97,6 +97,7 @@ const QUICK: Array<[string, string]> = [
   ['shifts', 'Ca'],
   ['print', 'In'],
   ['sold_out', 'Hết món'],
+  ['expenses', 'Khoản chi'],
 ];
 
 const CHIP = 'inline-flex h-[25px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 text-xs font-semibold leading-[15px] transition-colors duration-fast';
