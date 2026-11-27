@@ -847,7 +847,7 @@ describe('ghi nợ & thu nợ', () => {
     fireEvent.change(tid('debt-desc'), { target: { value: 'xe ôm' } });
     click('pay-debt-confirm');
     expect(await screen.findByTestId('queue-flash')).toHaveTextContent('Hùng (xe ôm)');
-    const c = server.ops.at(-1)!.payload.customer as Record<string, unknown>;
+    const c = server.lastOp('pay_order').payload.customer!;
     expect(c).toMatchObject({ is_new: true, name: 'Hùng', description: 'xe ôm', phone: null });
 
     click('open-debt');

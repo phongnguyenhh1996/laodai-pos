@@ -2,7 +2,8 @@
 // server cấp mã đơn / số thứ tự, gửi lại an toàn (idempotent), Realtime báo thay đổi qua live_pulse (kể cả "đã thanh toán").
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { PosError, createSupabaseBackend } from '@/pos';
+import type { CreateOrderFields } from '@/domain/orderWrite';
+import { PosError, createSupabaseBackend, type WireOp } from '@/pos';
 import { anonClient, resetDb, sql, tabletClient } from '../support/db';
 import { item } from '../support/ops';
 import { SEED } from '../support/seed-ids';
@@ -110,17 +111,19 @@ describe('gửi lại sau khi mất phản hồi', () => {
     const shift = m1.store.getSnapshot().open!.shift!;
     const backend = createSupabaseBackend(tabA1);
     const it = item('xoiGa');
-    const op = {
-      op_id: crypto.randomUUID(), kind: 'create_order' as const, entity_id: crypto.randomUUID(),
-      payload: { items: [it], order: { point_id: SEED.points.xoiA, dine_type: 'takeaway', opened_shift_id: shift.id, total: it.unit_price_snap } },
+    const id = crypto.randomUUID();
+    const order: CreateOrderFields = {
+      id, point_id: SEED.points.xoiA, label: null, table_no: null, dine_type: 'takeaway', address: null, opened_shift_id: shift.id,
+      ship_fee: 0, ship_mode: 'shop', ship_payout: 0, total: it.unit_price_snap,
     };
-    (op.payload.order as Record<string, unknown>).id = op.entity_id;
+    const op: WireOp = { op_id: crypto.randomUUID(), kind: 'create_order', entity_id: id, payload: { order, customer: null, items: [it] } };
     const first = await backend.push(op);
     const again = await backend.push(op);
     expect(first).toMatchObject({ status: 'ok', order: { id: op.entity_id, device_seq: 1 } });
     expect(again).toMatchObject({ status: 'duplicate', order: { id: op.entity_id, code: (first as { order: { code: string } }).order.code } });
 
-    const bad = { ...op, op_id: crypto.randomUUID(), entity_id: crypto.randomUUID(), payload: { items: [item('xoiGa')], order: { ...op.payload.order, id: crypto.randomUUID(), total: 1 } } };
+    const badId = crypto.randomUUID();
+    const bad: WireOp = { ...op, op_id: crypto.randomUUID(), entity_id: badId, payload: { order: { ...order, id: badId, total: 1 }, customer: null, items: [item('xoiGa')] } };
     expect(await backend.push(bad)).toEqual({ status: 'rejected', reason: 'total_mismatch' });
     expect(await backend.push(bad)).toEqual({ status: 'rejected', reason: 'total_mismatch' });
   });

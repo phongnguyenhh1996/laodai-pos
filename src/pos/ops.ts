@@ -7,10 +7,11 @@ import { cleanExpenseNote, validateExpense } from '@/domain/expenses';
 import type { CountItem, DeleteReason, DineType, Money, Order, OrderItem, ShiftExpense, ShipDefaults, ShipMode } from '@/domain/types';
 import { PosNetworkError } from './backend';
 import type { TabletStore } from './store';
-import type { OpKind, PushResult, TabletShift, WireOp } from './types';
+import type { OrderCustomerPayload, RejectReason } from '@/domain/orderWrite';
+import type { CloseKey, DebtCustomerPayload, OpKind, OpPayloads, PushResult, TabletShift, WireOp, WireOpOf } from './types';
 
 /** Thứ cần đếm ⇒ khóa số gửi lên khi đóng ca. */
-export const CLOSE_KEY = { cash: 'cash_counted', boxes: 'boxes_left', plates: 'plates_left', cans: 'cans_left' } as const satisfies Record<CountItem, string>;
+export const CLOSE_KEY = { cash: 'cash_counted', boxes: 'boxes_left', plates: 'plates_left', cans: 'cans_left' } as const satisfies Record<CountItem, CloseKey>;
 
 /**
  * Thao tác của tablet: kiểm tra tại máy (để báo lỗi ngay), rồi ghi thẳng lên server qua `sync_push`.
@@ -23,7 +24,7 @@ export class PosError extends Error {
   constructor(
     message: string,
     /** Lý do server từ chối (null khi lỗi tại máy / lỗi mạng). */
-    readonly reason: string | null = null,
+    readonly reason: RejectReason | null = null,
   ) {
     super(message);
     this.name = 'PosError';
@@ -32,7 +33,7 @@ export class PosError extends Error {
 
 export const OFFLINE_MESSAGE = 'Không lưu được: mất kết nối máy chủ. Kiểm tra mạng rồi bấm lại.';
 
-const REJECT_MESSAGES: Record<string, string> = {
+const REJECT_MESSAGES: Partial<Record<RejectReason, string>> = {
   order_not_open: 'Đơn này đã được thanh toán hoặc xóa (có thể ở máy khác).',
   order_not_found: 'Không tìm thấy đơn (có thể đã bị xóa ở máy khác).',
   already_served: 'Đơn đã ra món.',
@@ -61,8 +62,15 @@ const REJECT_MESSAGES: Record<string, string> = {
   expense_exists: 'Khoản chi này đã được ghi.',
 };
 
-export function rejectMessage(reason: string): string {
+export function rejectMessage(reason: RejectReason): string {
   return REJECT_MESSAGES[reason] ?? `Máy chủ từ chối thao tác (${reason}).`;
+}
+
+/** Dựng thao tác mới (op_id mới) cho một `kind`. */
+function wireOp<K extends OpKind>(kind: K, entity_id: string, payload: OpPayloads[K]): WireOp {
+  const op: WireOpOf<K> = { op_id: uuidv7(), kind, entity_id, payload };
+  // `WireOpOf<K>` với K cụ thể luôn là một nhánh của `WireOp`; TS không tự thu hẹp được K tổng quát.
+  return op as WireOp;
 }
 
 const OPEN_STATUSES = new Set(['open', 'served']);
@@ -107,7 +115,7 @@ export interface OrderCustomer {
 }
 
 /** Chỉ đơn ship mới giữ khách; khách mới phải có tên. */
-function orderCustomer(dine_type: DineType, c: OrderCustomer | null | undefined): Record<string, unknown> | null {
+function orderCustomer(dine_type: DineType, c: OrderCustomer | null | undefined): OrderCustomerPayload | null {
   if (dine_type !== 'delivery' || !c) return null;
   if (!c.is_new) return { id: c.id };
   const name = c.name?.trim().slice(0, 60);
@@ -257,12 +265,12 @@ export class Pos {
   // ---------------------------------------------------------------- gửi
 
   /** `intent`: khóa của thao tác theo ý người bấm (để nhận ra lần bấm lại sau lỗi mạng). */
-  private async send(kind: OpKind, intent: string, build: () => Omit<WireOp, 'op_id' | 'kind'>): Promise<Ok> {
+  private async send<K extends OpKind>(kind: K, intent: string, build: () => { entity_id: string; payload: OpPayloads[K] }): Promise<Ok> {
     const key = `${kind}:${intent}`;
     const fresh = build();
     const body = JSON.stringify(fresh.payload);
     const prev = this.unsure.get(key);
-    const op: WireOp = prev && prev.body === body ? prev.op : { op_id: uuidv7(), kind, ...fresh };
+    const op = prev && prev.body === body ? prev.op : wireOp(kind, fresh.entity_id, fresh.payload);
 
     let res: PushResult | undefined;
     let lastErr: unknown;
@@ -323,7 +331,7 @@ export class Pos {
    */
   async closeShift(counts: { boxes_left?: number; plates_left?: number; cans_left?: number; cash_counted?: Money }): Promise<void> {
     const shift = this.shift();
-    const input: Record<string, number> = {};
+    const input: Partial<Record<CloseKey, number>> = {};
     for (const item of shift.count_items) {
       const k = CLOSE_KEY[item];
       const v = counts[k];
@@ -450,7 +458,7 @@ export class Pos {
     const shift = this.shift();
     const o = this.openOrder(orderId);
     let cash_given: Money | null = null;
-    let customer: Record<string, unknown> | null = null;
+    let customer: DebtCustomerPayload | null = null;
 
     if (payment.method === 'cash') {
       if (!canConfirmCash(o.total, payment.cash_given)) throw new PosError('Khách đưa chưa đủ tiền');
@@ -458,7 +466,8 @@ export class Pos {
     } else if (payment.method === 'debt') {
       const name = payment.customer.name.trim();
       if (!name) throw new PosError('Cần tên khách ghi nợ');
-      const prev = this.unsure.get(`pay_order:${orderId}`)?.op.payload.customer as { id?: string; is_new?: boolean } | null | undefined;
+      const prevOp = this.unsure.get(`pay_order:${orderId}`)?.op;
+      const prev = prevOp?.kind === 'pay_order' ? prevOp.payload.customer : null;
       const newId = !payment.customer.id && prev?.is_new ? prev.id : undefined;
       customer = {
         id: payment.customer.id ?? newId ?? uuidv7(),

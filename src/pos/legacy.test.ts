@@ -70,7 +70,7 @@ describe('drainLegacyOutbox', () => {
     const push = vi.fn<PosBackend['push']>()
       .mockResolvedValueOnce({ status: 'ok' })
       .mockResolvedValueOnce({ status: 'duplicate' })
-      .mockResolvedValueOnce({ status: 'rejected', reason: 'x' });
+      .mockResolvedValueOnce({ status: 'rejected', reason: 'order_not_open' });
     expect(await drainLegacyOutbox(backend(push), idb)).toEqual({ sent: 2, rejected: 1, remaining: 0 });
     expect(push.mock.calls.map((c) => c[0])).toEqual([1, 2, 3].map((n) => {
       const { seq: _s, attempts: _a, last_error: _l, ...w } = op(n, ['open_shift', 'create_order', 'pay_order'][n - 1]);

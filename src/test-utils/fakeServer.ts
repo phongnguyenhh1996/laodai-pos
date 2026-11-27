@@ -2,6 +2,7 @@
 // cấp mã đơn + số thứ tự, từ chối khi đơn / ca không còn mở, và báo thay đổi (live_pulse) cho mọi máy đang nghe.
 import type { SoldOut } from '@/domain/catalog';
 import { generateOrderCode } from '@/domain/orderCode';
+import type { RejectReason } from '@/domain/orderWrite';
 import { CLOSE_KEY } from '@/pos/ops';
 import { businessDate } from '@/domain/time';
 import { cleanExpenseNote, normalizeExpenseNote, validateExpense } from '@/domain/expenses';
@@ -15,6 +16,7 @@ import {
   type PulseScope,
   type PushResult,
   type TabletShift,
+  type OpKind,
   type WireOp,
 } from '@/pos';
 
@@ -22,7 +24,11 @@ type ServerShift = TabletShift & { status: 'open' | 'closed'; close?: Record<str
 
 const clone = <T>(v: T): T => structuredClone(v);
 
-class Reject extends Error {}
+class Reject extends Error {
+  constructor(readonly reason: RejectReason) {
+    super(reason);
+  }
+}
 
 export class FakeServer {
   catalog: CatalogData;
@@ -33,6 +39,13 @@ export class FakeServer {
   debtPayments: Array<{ id: string; customer_id: string; amount: number; method: 'cash' | 'transfer'; at: string }> = [];
   /** Thao tác server đã nhận (không tính lần gửi lại), theo thứ tự. */
   ops: WireOp[] = [];
+
+  /** Thao tác `kind` gửi gần nhất (để test đọc payload có kiểu). Chưa có ⇒ ném. */
+  lastOp<K extends OpKind>(kind: K): Extract<WireOp, { kind: K }> {
+    const op = this.ops.filter((x): x is Extract<WireOp, { kind: K }> => x.kind === kind).at(-1);
+    if (!op) throw new Error(`Chưa có thao tác ${kind}`);
+    return op;
+  }
   /** Mất mạng: mọi lời gọi ném lỗi mạng. */
   offline = false;
   /** Tải danh mục lỗi (vd. phiên tablet hết hạn). */
@@ -216,7 +229,7 @@ export class FakeServer {
       if (out.catalog) scopes = ['open', 'catalog'];
     } catch (e) {
       if (!(e instanceof Reject)) throw e;
-      res = { status: 'rejected', reason: e.message };
+      res = { status: 'rejected', reason: e.reason };
       scopes = [];
     }
     this.results.set(op.op_id, res.status === 'rejected' ? res : { status: 'ok' });

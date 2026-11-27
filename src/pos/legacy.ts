@@ -94,7 +94,9 @@ export async function drainLegacyOutbox(backend: PosBackend, idb: IDBFactory | u
   let rejected = 0;
   for (const [i, e] of data.outbox.entries()) {
     try {
-      const res = await backend.push({ op_id: e.op_id, kind: e.kind, entity_id: e.entity_id, payload: e.payload, performed_at: e.performed_at });
+      // Payload theo hình dạng của bản offline cũ (có thể thiếu / thừa trường so với `OpPayloads`): server tự kiểm.
+      const op = { op_id: e.op_id, kind: e.kind, entity_id: e.entity_id, payload: e.payload, performed_at: e.performed_at } as WireOp;
+      const res = await backend.push(op);
       if (res.status === 'rejected') rejected++;
       else sent++;
     } catch (err) {

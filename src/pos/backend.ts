@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { DebtHistory } from '@/domain/debt';
 import { DEFAULT_COUNT_ITEMS, type Order, type OrderItem, type ShiftExpense, type ShipDefaults } from '@/domain/types';
+import { parseRejectReason } from '@/domain/orderWrite';
 import { createSupabaseCatalogSource, type CatalogData } from './catalog';
 import type { OpenState, PushResult, TabletShift, WireOp } from './types';
 
@@ -47,7 +48,7 @@ export function parsePushResult(data: unknown): PushResult {
       ...(d.expense ? { expense: normalizeExpense(d.expense) } : {}),
     };
   }
-  if (d?.status === 'rejected') return { status: 'rejected', reason: typeof d.reason === 'string' ? d.reason : 'unknown' };
+  if (d?.status === 'rejected') return { status: 'rejected', reason: parseRejectReason(d.reason) };
   throw new PosNetworkError(`Phản hồi sync_push không hợp lệ: ${JSON.stringify(data)}`);
 }
 

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { COMBO_XOI_FULL, CHA, TRUNG, XOI_GA } from '@/domain/fixtures';
 import { orderTotal } from '@/domain/pricing';
+import type { RejectReason } from '@/domain/orderWrite';
 import type { OrderItem } from '@/domain/types';
 import { CATALOG } from '@/test-utils/tablet';
 import { FakeServer } from '@/test-utils/fakeServer';
@@ -151,7 +152,7 @@ describe('ship hai kiểu', () => {
     await boot();
     await expect(pos.createOrder(ship({ ship_mode: 'external', ship_fee: 5000 }))).rejects.toThrow('Chưa chọn tiền trả shipper');
     const o = await pos.createOrder(ship({ ship_mode: 'external', ship_fee: 5000, ship_payout: 10000 }));
-    const sent = server.ops.at(-1)!.payload.order as Record<string, unknown>;
+    const sent = server.lastOp('create_order').payload.order;
     expect(sent).toMatchObject({ ship_mode: 'external', ship_payout: 10000, ship_fee: 5000, total: orderTotal([line()]) + 5000 });
     expect(o).toMatchObject({ ship_mode: 'external', ship_payout: 10000 });
 
@@ -222,7 +223,7 @@ describe('thanh toán & nợ', () => {
     const o = await pos.createOrder(draft());
     await expect(pos.payOrder(o.id, { method: 'debt', customer: { name: ' ' } })).rejects.toThrow('Cần tên khách');
     await pos.payOrder(o.id, { method: 'debt', customer: { name: ' Hùng ', description: ' ', phone: ' 09 ' } });
-    const c = server.ops.at(-1)!.payload.customer as { id: string };
+    const c = server.lastOp('pay_order').payload.customer!;
     expect(c).toMatchObject({ is_new: true, name: 'Hùng', description: null, phone: '09' });
     expect(debtBook(store.getSnapshot().catalog).balance(c.id)).toBe(39_000);
   });
@@ -317,7 +318,8 @@ describe('gửi lên server', () => {
     expect(err).toMatchObject({ reason: 'price_mismatch', message: 'Giá món vừa được chủ thay đổi. Kiểm tra lại đơn.' });
     vi.spyOn(backend, 'push').mockRejectedValueOnce(new TypeError('bug'));
     await expect(pos.createOrder(draft())).rejects.toThrow('bug');
-    expect(rejectMessage('weird')).toBe('Máy chủ từ chối thao tác (weird).');
+    // Server mới hơn có thể trả mã chưa có trong danh mục.
+    expect(rejectMessage('weird' as RejectReason)).toBe('Máy chủ từ chối thao tác (weird).');
   });
 
   it('chưa mở ca / đơn không có ⇒ báo tại máy, không gửi', async () => {

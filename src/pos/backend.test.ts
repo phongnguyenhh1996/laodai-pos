@@ -78,7 +78,7 @@ describe('createSupabaseBackend', () => {
   it('push gọi sync_push; lỗi RPC / lỗi fetch ⇒ PosNetworkError', async () => {
     const f = fakeClient();
     const b = createSupabaseBackend(f.client);
-    const op = { op_id: '1', kind: 'serve_order' as const, entity_id: 'o', payload: {} };
+    const op = { op_id: '1', kind: 'serve_order' as const, entity_id: 'o', payload: { order_id: 'o' } };
     expect(await b.push(op)).toEqual({ status: 'ok' });
     expect(f.raw.rpc).toHaveBeenCalledWith('sync_push', { op });
     const e1 = createSupabaseBackend(fakeClient({ rpc: async () => ({ data: null, error: { message: 'JWT expired', code: 'PGRST301' } }) }).client);
