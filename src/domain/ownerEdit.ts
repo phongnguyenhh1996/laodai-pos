@@ -2,6 +2,7 @@
 // đơn ship sửa thêm kiểu ship, phí ship / phụ thu, tiền trả shipper.
 // Hàm thuần: màn sửa giữ bản nháp, chỉ gửi những phần đã đổi lên RPC `owner_edit_order`
 // (server ghi nhật ký trước/sau, đặt owner_edited, tính lại ca đã đóng, báo Telegram).
+import { SHIP_MESSAGES, shipProblem } from './orderWrite';
 import { orderTotal } from './pricing';
 import type { DineType, Money, OrderItem, PaymentMethod, ShipMode } from './types';
 
@@ -87,7 +88,9 @@ const debtCustomer = (d: Pick<OwnerEditDraft, 'payment_method' | 'customer_id'>)
 export function editProblem(d: OwnerEditDraft, original: PaidOrderSnapshot): string | null {
   if (d.items.length === 0) return 'Đơn phải còn ít nhất một món';
   if (d.payment_method === 'debt' && !d.customer_id) return 'Ghi nợ cần chọn khách';
-  if (original.dine_type === 'delivery' && d.ship_mode === 'external' && d.ship_payout <= 0) return 'Chưa chọn tiền trả shipper';
+  // Cùng luật ship với tablet và server (`orderWrite.ts`): mức phí hợp lệ, shipper ngoài bắt buộc tiền trả shipper.
+  const ship = original.dine_type === 'delivery' ? shipProblem({ ...d, dine_type: 'delivery' }) : null;
+  if (ship) return SHIP_MESSAGES[ship];
   if (!editPayload(d, original)) return 'Chưa thay đổi gì';
   return null;
 }

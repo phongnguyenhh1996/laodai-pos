@@ -6,18 +6,12 @@ import {
   addCombo,
   addProduct,
   canSwitchPoint,
-  draftAddress,
   draftChanged,
-  draftBlocker,
-  draftCustomer,
-  draftShipFee,
-  draftShipMode,
-  draftShipPayout,
+  draftProblem,
+  draftShip,
   draftTotal,
   itemsSummary,
   lineSummary,
-  needsAddress,
-  needsShipPayout,
   newDraft,
   replaceWithCombo,
   replaceWithProduct,
@@ -37,6 +31,7 @@ import { DELETE_REASON_LABELS } from '@/domain/audit';
 import { customerLabel } from '@/domain/debt';
 import { soldOutAt, tabletPoints, type SoldOutSet } from '@/domain/catalog';
 import { formatVnd } from '@/domain/money';
+import { shipProblem } from '@/domain/orderWrite';
 import { SHIP_FEES, SHIP_PAYOUTS, lineTotal, orderTotal, selectableToppings, shipFeeLabel } from '@/domain/pricing';
 import { businessDate } from '@/domain/time';
 import { DINE_LABELS, SHIP_MODE_LABELS, type Combo, type DeleteReason, type DineType, type Order, type Point, type Product, type ShipMode, type Topping } from '@/domain/types';
@@ -119,11 +114,11 @@ export function OrderScreen() {
       point_id: x.point_id,
       dine_type: x.dine_type,
       label: x.label,
-      address: draftAddress(x),
-      customer: draftCustomer(x),
-      ship_fee: draftShipFee(x),
-      ship_mode: draftShipMode(x),
-      ship_payout: draftShipPayout(x),
+      address: x.address,
+      customer: x.customer,
+      ship_fee: x.ship_fee,
+      ship_mode: x.ship_mode,
+      ship_payout: x.ship_payout,
       items: x.items,
     };
     let o: Order;
@@ -151,11 +146,11 @@ export function OrderScreen() {
   function flushAuto(): Promise<unknown> {
     const s = savedRef.current;
     const x = draftRef.current;
-    if (!s || !x || x.items.length === 0 || draftBlocker(x) || !draftChanged(x, s)) return queueRef.current;
+    if (!s || !x || draftProblem(x) || !draftChanged(x, s)) return queueRef.current;
     return flush();
   }
 
-  const autoPending = !!saved && !!draft && draft.items.length > 0 && !draftBlocker(draft) && draftChanged(draft, saved);
+  const autoPending = !!saved && !!draft && !draftProblem(draft) && draftChanged(draft, saved);
   useEffect(() => {
     if (!autoPending || typingAddress || shipOpen) return;
     const t = setTimeout(() => {
@@ -274,10 +269,11 @@ export function OrderScreen() {
   const dirty = saved ? draftChanged(d, saved) : d.items.length > 0 || d.label.trim() !== '' || d.address.trim() !== '' || d.customer !== null;
   const empty = d.items.length === 0;
   /** Đơn ship chưa nhập địa chỉ / shipper ngoài chưa chọn tiền trả shipper: chưa lưu / ra món / thanh toán được. */
-  const shipBlocker = draftBlocker(d);
-  const noAddress = needsAddress(d);
-  const noPayout = needsShipPayout(d);
-  const blocked = empty || !!shipBlocker || busy;
+  const problem = draftProblem(d);
+  const noAddress = problem === 'address_required';
+  // Thiếu cả địa chỉ lẫn tiền trả shipper ⇒ báo cả hai (server chỉ trả lý do đầu tiên).
+  const noPayout = shipProblem(d) === 'bad_ship_payout';
+  const blocked = !!problem || busy;
   // Dòng đang chọn đã bị bớt hết / đổi đi ⇒ coi như không chọn.
   const swapLine = swapId ? d.items.find((it) => it.id === swapId) ?? null : null;
   const soldOut = soldOutAt(cat.sold_out, d.point_id, businessDate(new Date(), cat.config.timezone));
@@ -396,7 +392,7 @@ export function OrderScreen() {
   function back() {
     // Đơn đã lưu còn món: ghi nốt phần đang chờ tự lưu rồi về, không hỏi.
     // (Đơn ship bị xóa mất địa chỉ / thiếu tiền trả shipper ⇒ không lưu được: hỏi bỏ thay đổi.)
-    if (saved && !empty && !shipBlocker) void run(async () => {
+    if (saved && !problem) void run(async () => {
       await flushAuto();
       navigate('/', { state: { created: createdHere.current ?? undefined } satisfies QueueFlash });
     });
@@ -406,9 +402,8 @@ export function OrderScreen() {
 
   const itemCount = d.items.reduce((s, it) => s + it.qty, 0);
   const isShip = d.dine_type === 'delivery';
-  const shipFee = draftShipFee(d);
-  const external = draftShipMode(d) === 'external';
-  const payout = draftShipPayout(d);
+  const { ship_fee: shipFee, ship_mode: shipMode, ship_payout: payout } = draftShip(d);
+  const external = shipMode === 'external';
   /** Shipper ngoài: phí ship gọi là "Phụ thu". */
   const feeNoun = external ? 'Phụ thu' : 'Phí ship';
   const cartQty = (productId: string) => d.items.reduce((s, it) => s + (it.product_id === productId ? it.qty : 0), 0);
@@ -799,7 +794,7 @@ export function OrderScreen() {
           customer={d.customer}
           book={book}
           shipFee={shipFee}
-          shipMode={draftShipMode(d)}
+          shipMode={shipMode}
           payout={payout}
           total={total}
           onAddress={(v) => edit((x) => ({ ...x, address: v }))}

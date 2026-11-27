@@ -39,7 +39,7 @@ Fake đã lệch SQL (không kiểm `point_not_allowed`, `point_inactive`, `pric
   - **`TabletSim`**: dựng op bằng builder có kiểu; test cố tình gửi payload sai / cũ giữ `op()` thô, có ghi chú.
   - Không đụng UI ⇒ không cần ticket Figma.
 - [x] T1: `WireOp` có kiểu cho 11 `kind` + `RejectReason` (`npm run check`). `OpPayloads` / `WireOp` ở `pos/types.ts`, payload tạo / sửa đơn + `RejectReason` ở `domain/orderWrite.ts`; `FakeServer.lastOp(kind)` cho test đọc payload có kiểu; `legacy.ts` ép kiểu một chỗ (payload bản offline cũ)
-- [ ] T2: `orderWrite.ts`; `ops`, `cart`, `ownerEdit` gọi chung (`npm run check`)
+- [x] T2: `orderWrite.ts`; `ops`, `cart`, `ownerEdit` gọi chung (`npm run check`). `normalizeOrderWrite` trả `{ ok, order }` (đơn đã chuẩn hóa), payload dựng bằng `createOrderPayload` / `updateOrderPayload`; `shipFields` / `shipProblem` / `SHIP_MESSAGES` dùng chung cho tablet và form chủ. `cart` còn `draftProblem` + `draftShip`; ops kiểm theo thứ tự SQL (loại đơn → địa chỉ → ship → khách → món), lỗi tại máy có `reason`. Thêm câu cho `bad_qty`, `bad_dine_type`
 - [ ] T3: `fakeServer` dùng `orderWrite` + contract suite trên cả hai adapter `PosBackend` (`npm run check` + `npm run test:db`)
 - [ ] T4: `TabletSim` dùng builder có kiểu, bỏ `device_seq` / `code` / `status` / `served_at` / `paid_at` / `opened_at` (`npm run check` + `npm run test:db`)
 

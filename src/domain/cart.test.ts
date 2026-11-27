@@ -5,20 +5,15 @@ import {
   addLine,
   addProduct,
   canSwitchPoint,
-  draftAddress,
   draftChanged,
-  draftBlocker,
-  draftShipFee,
-  draftShipMode,
-  draftShipPayout,
-  needsShipPayout,
+  draftProblem,
+  draftShip,
   setShipMode,
   toggleShipPayout,
   withShipDefaults,
   draftTotal,
   itemsSummary,
   lineSummary,
-  needsAddress,
   newDraft,
   replaceWithCombo,
   replaceWithProduct,
@@ -179,14 +174,13 @@ describe('cart', () => {
   it('đơn ship: bắt buộc địa chỉ; địa chỉ chỉ tính khi là đơn ship', () => {
     const items = addProduct([], 'l1', XOI_GA, [], XOI_MENU);
     const d = { ...newDraft(XOI_A), items };
-    expect(needsAddress(d)).toBe(false);
+    expect(draftProblem(d)).toBeNull();
     const ship = setDineType(d, 'delivery');
-    expect(needsAddress(ship)).toBe(true);
-    expect(needsAddress({ ...ship, address: '   ' })).toBe(true);
-    expect(needsAddress({ ...ship, address: '12 Lê Lợi' })).toBe(false);
-    expect(draftAddress({ ...ship, address: '  12 Lê Lợi ' })).toBe('12 Lê Lợi');
-    // Gõ địa chỉ rồi đổi về Mang về ⇒ không gửi địa chỉ.
-    expect(draftAddress({ ...d, address: '12 Lê Lợi' })).toBeNull();
+    expect(draftProblem(ship)).toBe('address_required');
+    expect(draftProblem({ ...ship, address: '   ' })).toBe('address_required');
+    expect(draftProblem({ ...ship, address: '12 Lê Lợi' })).toBeNull();
+    // Chưa có món ⇒ chưa lưu được.
+    expect(draftProblem({ ...d, items: [] })).toBe('empty_items');
 
     const saved = { point_id: 'xoi-a', dine_type: 'delivery' as DineType, label: null, address: '12 Lê Lợi', items };
     expect(draftChanged({ ...ship, address: '12 Lê Lợi ' }, saved)).toBe(false);
@@ -203,7 +197,7 @@ describe('cart', () => {
     expect(draftTotal(toggleShipFee(a, 15_000))).toBe(30_000);
     expect(toggleShipFee(a, 10_000).ship_fee).toBe(0);
     // Phí còn trong nháp nhưng không phải đơn ship ⇒ không tính, không gửi.
-    expect(draftShipFee({ ...a, dine_type: 'takeaway' })).toBe(0);
+    expect(draftShip({ ...a, dine_type: 'takeaway' }).ship_fee).toBe(0);
     expect(draftTotal({ ...a, dine_type: 'takeaway' })).toBe(15_000);
     expect(setDineType(a, 'takeaway').ship_fee).toBe(0);
     expect(setDineType(a, 'delivery').ship_fee).toBe(10_000);
@@ -219,17 +213,17 @@ describe('cart', () => {
     const items = addProduct([], 'l1', XOI_XEO, [], XOI_MENU); // 15.000
     const ship = { ...setDineType({ ...newDraft(XOI_A), items }, 'delivery'), address: '12 Lê Lợi' };
     expect(ship).toMatchObject({ ship_mode: 'shop', ship_payout: 0 });
-    expect(draftBlocker(ship)).toBeNull();
+    expect(draftProblem(ship)).toBeNull();
 
     const ext = setShipMode(toggleShipFee(ship, 5_000), 'external');
-    expect(needsShipPayout(ext)).toBe(true);
-    expect(draftBlocker(ext)).toBe('Chưa chọn tiền trả shipper');
-    expect(draftBlocker({ ...ext, address: '' })).toBe('Thiếu địa chỉ ship');
+    expect(draftProblem(ext)).toBe('bad_ship_payout');
+    // Như server: thiếu địa chỉ báo trước.
+    expect(draftProblem({ ...ext, address: '' })).toBe('address_required');
     const paid = toggleShipPayout(ext, 10_000);
-    expect(draftBlocker(paid)).toBeNull();
+    expect(draftProblem(paid)).toBeNull();
     // Phụ thu nằm trong tổng, trả shipper thì không.
     expect(draftTotal(paid)).toBe(20_000);
-    expect([draftShipMode(paid), draftShipFee(paid), draftShipPayout(paid)]).toEqual(['external', 5_000, 10_000]);
+    expect(draftShip(paid)).toEqual({ ship_mode: 'external', ship_fee: 5_000, ship_payout: 10_000 });
     // Bấm lại mức trả shipper đang chọn không bỏ được.
     expect(toggleShipPayout(paid, 10_000).ship_payout).toBe(10_000);
     expect(toggleShipPayout(paid, 15_000).ship_payout).toBe(15_000);
@@ -239,8 +233,8 @@ describe('cart', () => {
     // Rời Ship: về shop / 0, không gửi gì.
     const take = setDineType(paid, 'takeaway');
     expect(take).toMatchObject({ ship_mode: 'shop', ship_fee: 0, ship_payout: 0 });
-    expect([draftShipMode({ ...paid, dine_type: 'dinein' }), draftShipPayout({ ...paid, dine_type: 'dinein' })]).toEqual(['shop', 0]);
-    expect(needsShipPayout({ ...ext, dine_type: 'takeaway' })).toBe(false);
+    expect(draftShip({ ...paid, dine_type: 'dinein' })).toEqual({ ship_mode: 'shop', ship_fee: 0, ship_payout: 0 });
+    expect(draftProblem({ ...ext, dine_type: 'takeaway' })).toBeNull();
 
     const saved = { point_id: 'xoi-a', dine_type: 'delivery' as DineType, label: null, address: '12 Lê Lợi', items, ship_fee: 5_000, ship_mode: 'external' as const, ship_payout: 10_000 };
     expect(draftChanged(paid, saved)).toBe(false);
