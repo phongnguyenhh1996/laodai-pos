@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { formatNotification, signed, vnd, type Notification, type Reconcile } from './format';
+import { formatNotification, signed, vnd, type Notification } from './format';
+import type { StoredReconcile } from './reconcile';
 
 const opts = { appUrl: 'https://pos.laodai.vn/' };
 // 05:42 giờ VN = 22:42Z hôm trước
@@ -8,7 +9,7 @@ const base = { performed_at: AT, synced_at: '2026-11-17T22:42:03Z' };
 const offline = { performed_at: AT, synced_at: '2026-11-18T00:10:00Z' };
 const ctx = { shift_id: 's1', staff_name: 'Lan', tablet_name: 'Tablet A', opened_at: AT, closed_at: null };
 
-const rec: Reconcile = {
+const rec: StoredReconcile = {
   revenue: { total: 2_350_000, cash: 1_600_000, transfer: 650_000, debt: 100_000 },
   paid_orders: 80,
   debt_collected: { cash: 0, transfer: 0 },
@@ -210,7 +211,7 @@ describe('định dạng Telegram', () => {
   });
 
   it('ca chưa đếm / không chênh lệch', () => {
-    const r: Reconcile = { ...rec, cash: { expected: 500_000, counted: null, diff: null }, deleted_after_served: [], deleted_count: 0,
+    const r: StoredReconcile = { ...rec, cash: { expected: 500_000, counted: null, diff: null }, deleted_after_served: [], deleted_count: 0,
       boxes: { used: null, by_orders: 3, diff: null }, debt_collected: { cash: 50_000, transfer: 0 } };
     const msg = formatNotification({ kind: 'shift_close', payload: { ...base, ...ctx, reconcile: r, adjusted: true } }, opts);
     expect(msg).toContain('🟢 Đóng ca');
@@ -231,7 +232,7 @@ describe('định dạng Telegram', () => {
     expect(edit[0]).toBe('✏️ Sửa chi: 20.000 – mua đá → 25.000 – mua đá · Lan · Tablet A (chủ)');
     expect(edit[1]).toBe('Ca đã đóng → đã tính lại: tiền mặt −20.000 → −15.000');
 
-    const close = (r: Reconcile) => formatNotification({ kind: 'shift_close', payload: { ...base, ...ctx, reconcile: r, adjusted: false } }, opts);
+    const close = (r: StoredReconcile) => formatNotification({ kind: 'shift_close', payload: { ...base, ...ctx, reconcile: r, adjusted: false } }, opts);
     expect(close({ ...rec, expenses: { count: 3, total: 120_000 } })).toContain('Dĩa: dùng 0 / theo đơn 0\nChi: 3 khoản · 120.000\nXóa:');
     expect(close({ ...rec, expenses: { count: 0, total: 0 } })).not.toContain('Chi:');
     expect(close(rec)).not.toContain('Chi:');
@@ -241,7 +242,7 @@ describe('định dạng Telegram', () => {
   });
 
   it('quầy chỉ đếm lon: không nhắc tiền mặt / hộp / dĩa; bao bì đơn xóa ghi lon', () => {
-    const r: Reconcile = {
+    const r: StoredReconcile = {
       ...rec, count_items: ['cans'], cash: { expected: 275_000, counted: null, diff: null },
       boxes: { used: null, by_orders: 1, diff: null }, plates: { used: null, by_orders: 0, diff: null },
       cans: { used: 6, by_orders: 5, diff: 1 },

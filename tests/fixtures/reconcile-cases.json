@@ -1,5 +1,5 @@
 {
-  "$comment": "Bộ dữ liệu đối soát dùng chung cho src/domain/reconcile.test.ts và tests/db/reconcile.test.ts. Đổi công thức ⇒ sửa file này, cả hai test phải pass.",
+  "$comment": "Ghim kết quả của private.reconcile_shift (implementation duy nhất), chạy ở tests/db/reconcile.test.ts. Đổi công thức ⇒ sửa file này, npm run test:db phải pass.",
   "products": [
     { "id": "00000000-0000-4000-8000-0000000000a1", "name": "Xôi", "boxes_takeaway": 1, "boxes_dinein": 1, "plates_dinein": 0, "cans": 0 },
     { "id": "00000000-0000-4000-8000-0000000000a2", "name": "Cơm gà", "boxes_takeaway": 1, "boxes_dinein": 0, "plates_dinein": 1, "cans": 0 },

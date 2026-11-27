@@ -24,7 +24,7 @@ thì chuyển thành kiểm tra tự động và ghi "(tự động: …)" bên 
 ## Test
 
 - Mỗi lỗi gặp khi dùng thật phải có test tái hiện trước khi sửa.
-- Đổi công thức đối soát ⇒ cập nhật `tests/fixtures/reconcile-cases.json`, test TS và test SQL đều pass.
+- Đổi công thức đối soát ⇒ migration mới cho `private.reconcile_shift` + cập nhật `tests/fixtures/reconcile-cases.json`, `npm run test:db` pass. Thêm trường vào kết quả ⇒ sửa `ReconcileResult` (và `StoredReconcile` nếu bản ghi cũ không có) ở `supabase/functions/_shared/reconcile.ts`. Không viết lại công thức bằng TS.
 - Test qua giao diện công khai của module, không kiểm tra chi tiết bên trong.
 - Đổi chữ trên UI ⇒ cập nhật Cypress dùng chữ đó.
 

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { EMPTY_SHIP_STATS } from './reconcile';
+import type { ShipStats } from './reconcile';
 import { longWaiting, methodShares, shiftDate, shipStatLines, shortDate } from './report';
+
+const EMPTY_SHIP_STATS: ShipStats = { shop_orders: 0, external_orders: 0, shop_fee: 0, external_fee: 0, payout: 0, external_profit: 0 };
 
 describe('methodShares (tỷ lệ TM / CK / Nợ)', () => {
   it('chia phần trăm, cộng lại đúng 100', () => {

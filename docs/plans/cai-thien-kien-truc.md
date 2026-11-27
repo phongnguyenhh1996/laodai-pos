@@ -47,8 +47,14 @@ Fake đã lệch SQL (không kiểm `point_not_allowed`, `point_inactive`, `pric
 
 `reconcileShift` trong `src/domain/reconcile.ts` không có caller production. `supabase/functions/_shared/format.ts` khai lại `Reconcile` / `ShipStats` / `CountItem`.
 
-- [ ] Grill: xóa bản TS hay giữ làm spec dễ đọc; cập nhật ADR 0006 theo quyết định
-- [ ] File kiểu kết quả dùng chung cho app và Edge Function
+- [x] Grill (2026-11-27), đã chốt: **xóa** bản TS (`reconcileShift`, `shipStats`). SQL + fixture là implementation duy nhất (ADR 0001);
+  test quy tắc dễ đọc chuyển sang `tests/db/reconcile.test.ts` chạy trên SQL. Đổi lại: công thức chỉ được kiểm khi chạy `npm run test:db`
+  (CI chỉ chạy `npm run check`, trước đây CI cũng chỉ kiểm bản sao TS chứ không kiểm SQL). ADR 0006, SPEC 10, coding standards đã sửa theo.
+- [x] File kiểu kết quả dùng chung `supabase/functions/_shared/reconcile.ts` (nằm trong tsconfig app, Deno import được): `ReconcileResult`
+  đầy đủ cho app (RPC sống); `StoredReconcile` dẫn xuất từ nó, trường thêm sau thành optional, cho `format.ts` đọc payload đã lưu.
+  `src/domain/reconcile.ts` chỉ re-export kiểu; `CountItem` của `domain/types` lấy từ file chung
+- [x] Xóa luôn `src/domain/packaging.ts` (cũng không còn caller production sau khi xóa `reconcileShift`). Các ca của `packaging.test.ts`
+  chuyển sang `tests/db/reconcile.test.ts`, gọi thẳng `private.order_packaging`
 
 ### 3. Seam dữ liệu màn chủ (Strong)
 

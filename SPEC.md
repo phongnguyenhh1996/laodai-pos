@@ -294,7 +294,7 @@ Mỗi bước chỉ được tính là **xong** khi các test ghi trong ngoặc 
 2. Auth chủ, kích hoạt tablet, vai trò `tablet`, chế độ chủ trên tablet. *(10.3 RLS; E2E A1–A5, E27)*
 3. Lớp dữ liệu tablet: RPC idempotent `sync_push`, server cấp mã đơn / `device_seq`, Realtime (`live_pulse`). *(unit `src/pos`; 10.3 idempotent + nhiều máy)* — ban đầu là lớp offline (Dexie + outbox), đã thay bằng realtime.
 4. Cài đặt của chủ: menu/món/topping/combo/giá, nhân viên, điểm bán, hồ sơ tablet. *(unit pricing; E2E G32, G37)*
-5. Mở ca → tạo/sửa/xóa đơn → hàng đợi → ra món → thanh toán. *(unit pricing/packaging/cash/orderCode/queue; E2E B6–B9, C10–C16)*
+5. Mở ca → tạo/sửa/xóa đơn → hàng đợi → ra món → thanh toán. *(unit pricing/cash/orderCode/queue, bao bì ở test SQL; E2E B6–B9, C10–C16)*
 6. Ghi nợ, thu nợ, sổ nợ (chuyển nợ). *(unit debt; E2E D17–D20)*
 7. Đóng ca, đếm mù, đối soát server-side. *(unit + SQL reconcile dùng chung bộ dữ liệu mẫu; E2E E23, E25)*
 8. Audit log + Telegram + tổng kết ngày. *(snapshot format; E2E E21, E22, H38)*
@@ -341,7 +341,7 @@ Toàn bộ logic nghiệp vụ phía client nằm trong `src/domain/` dưới d�
 - Món hoặc topping đã ngừng bán (`active = false`) không xuất hiện trong lưới chọn.
 - Số lượng 0 hoặc âm bị từ chối.
 
-**Bao bì** (`domain/packaging`)
+**Bao bì** (chỉ có ở hàm SQL `private.order_packaging`, test trong `tests/db/reconcile.test.ts`)
 - Xôi mang về và xôi tại chỗ: mỗi phần 1 hộp.
 - Cơm mang về: 1 hộp, cộng 1 hộp cho mỗi topping có cờ `extra_box_takeaway`. Có test cho trường hợp 2 topping có cờ.
 - Cơm tại chỗ: 1 dĩa, 0 hộp, kể cả khi có topping gắn cờ.
@@ -360,7 +360,7 @@ Toàn bộ logic nghiệp vụ phía client nằm trong `src/domain/` dưới d�
 - Số thứ tự trong hàng đợi đánh lại liên tục 1, 2, 3… khi có đơn rời hàng.
 - Màu theo thời gian chờ: < 5 phút thường, ≥ 5 phút vàng, ≥ 10 phút đỏ. Ngưỡng lấy từ cài đặt. Đơn đã ra món không đổi màu.
 
-**Đối soát** (`domain/reconcile`, dùng chung công thức với hàm SQL, xem 10.3)
+**Đối soát** (chỉ có ở hàm SQL `reconcile_shift`, test trong `tests/db/reconcile.test.ts`, xem 10.3)
 - Tiền mặt kỳ vọng tính đủ: tiền lẻ đầu ca, tiền chủ bổ sung, đơn trả tiền mặt **theo ca thu**, tiền mặt thu nợ; trừ trả shipper và khoản chi chưa hủy.
 - Không tính: đơn chuyển khoản, đơn ghi nợ, đơn đã xóa, đơn mở ở ca này nhưng thu ở ca khác.
 - Hộp và dĩa tính **theo ca mở đơn**, bỏ qua đơn đã xóa. Danh sách "bao bì của đơn bị xóa sau khi ra món" chỉ gồm đơn có `served_at` trước thời điểm xóa.
@@ -404,7 +404,7 @@ Toàn bộ logic nghiệp vụ phía client nằm trong `src/domain/` dưới d�
 - Mỗi thay đổi trên đơn sinh đúng một dòng `audit_log`, có `before` và `after`.
 - Server cấp `device_seq` và mã đơn (bỏ qua số / mã máy gửi lên): hai máy cùng hồ sơ tạo đơn cùng lúc ⇒ số liên tiếp, mã khác nhau, không lỗ hổng.
 - Hai máy cùng hồ sơ: chung một ca; máy này thanh toán thì máy kia thu lại bị từ chối; máy nghe Realtime thấy đơn mới và thấy đơn biến mất khi được thanh toán ở máy khác. Tablet chỉ đọc được `live_pulse` của chính hồ sơ mình + danh mục.
-- Hàm đối soát SQL cho **cùng kết quả** với `domain/reconcile` trên cùng một bộ dữ liệu mẫu (bảng dữ liệu kiểm thử dùng chung, đặt trong `tests/fixtures/reconcile-cases.json`).
+- Hàm đối soát SQL cho đúng kết quả ghim trong bộ dữ liệu mẫu `tests/fixtures/reconcile-cases.json`. Đây là implementation duy nhất của công thức; app và Edge Function chỉ đọc kết quả, kiểu ở `supabase/functions/_shared/reconcile.ts`.
 - Chủ sửa đơn của ca đã đóng thì `recalculated_at` được cập nhật.
 - Mỗi tablet chỉ có một ca mở: mở ca thứ hai trên cùng tablet bị từ chối.
 - `pg_cron` tổng kết ngày gọi Edge Function với đúng khoảng thời gian (theo múi giờ `Asia/Ho_Chi_Minh`).

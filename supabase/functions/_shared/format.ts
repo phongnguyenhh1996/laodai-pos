@@ -1,5 +1,7 @@
 // Định dạng tin Telegram. Thuần TS, không phụ thuộc Deno/Node ⇒ dùng chung cho Edge Function và Vitest.
 
+import type { CountItem, CountLine, ShipStats, StoredReconcile } from './reconcile.ts';
+
 export const TZ = 'Asia/Ho_Chi_Minh';
 const MINUS = '−';
 
@@ -71,54 +73,8 @@ interface OrderSnap {
   items: ItemSnap[];
 }
 
-interface CountLine {
-  used: number | null;
-  by_orders: number;
-  diff: number | null;
-}
-
-interface Revenue {
-  total: number;
-  cash: number;
-  transfer: number;
-  debt: number;
-  /** Phần phí ship nằm trong `total` (bản ghi cũ không có). */
-  ship_fee?: number;
-  /** Thống kê ship theo kỳ (owner_report / tổng kết ngày); bản ghi cũ không có. */
-  ship?: ShipStats;
-}
-
-/** Thống kê ship (SPEC 5). */
-interface ShipStats {
-  shop_orders: number;
-  external_orders: number;
-  shop_fee: number;
-  external_fee: number;
-  payout: number;
-  external_profit: number;
-}
-
-export type CountItem = 'cash' | 'boxes' | 'plates' | 'cans';
-
-export interface Reconcile {
-  /** Các thứ ca này đếm (bản ghi cũ không có ⇒ tiền mặt, hộp, dĩa). Thứ không đếm thì không nhắc tới. */
-  count_items?: CountItem[];
-  revenue: Revenue;
-  /** Thống kê ship của ca; bản ghi cũ không có. */
-  ship?: ShipStats;
-  paid_orders: number;
-  debt_collected: { cash: number; transfer: number };
-  /** Khoản chi chưa hủy của ca (đã trừ vào kỳ vọng); bản ghi cũ không có. */
-  expenses?: { count: number; total: number };
-  cash: { expected: number; counted: number | null; diff: number | null };
-  boxes: CountLine;
-  plates: CountLine;
-  /** Bản ghi cũ không có. */
-  cans?: CountLine;
-  deleted_count: number;
-  deleted_after_served: Array<{ order_id: string; code: string; boxes: number; plates: number; cans?: number }>;
-  open_orders: number;
-}
+/** Doanh thu trong đối soát đã lưu; tổng kết ngày có thêm thống kê ship theo kỳ (bản ghi cũ không có). */
+type Revenue = StoredReconcile['revenue'] & { ship?: ShipStats };
 
 /** Khoản chi (SPEC 4.9) trong payload tin `expense_*`. */
 interface ExpenseSnap {
@@ -137,14 +93,14 @@ type ExpensePayload = Base &
     /** Chỉ khi chủ sửa: số tiền / ghi chú trước khi sửa. */
     before: ExpenseSnap | null;
     /** Ca đã đóng ⇒ đối soát trước / sau. */
-    recalculated: { before: Reconcile; after: Reconcile } | null;
+    recalculated: { before: StoredReconcile; after: StoredReconcile } | null;
   };
 
 export type Notification =
   | { kind: 'tablet_login'; payload: Base & { tablet_name: string } }
   | { kind: 'owner_mode'; payload: Base & { tablet_name: string } }
   | { kind: 'shift_open'; payload: Base & ShiftCtx }
-  | { kind: 'shift_close'; payload: Base & ShiftCtx & { reconcile: Reconcile; adjusted: boolean } }
+  | { kind: 'shift_close'; payload: Base & ShiftCtx & { reconcile: StoredReconcile; adjusted: boolean } }
   | { kind: 'order_deleted'; payload: Base & ShiftCtx & { order: OrderSnap; reason: string; was_served: boolean } }
   | {
       kind: 'delivery_order';
@@ -174,7 +130,7 @@ export type Notification =
         tablet_name: string;
         before: OrderSnap;
         after: OrderSnap;
-        recalculated: { before: Record<string, Reconcile>; after: Record<string, Reconcile> };
+        recalculated: { before: Record<string, StoredReconcile>; after: Record<string, StoredReconcile> };
       };
     }
   | { kind: 'expense_created'; payload: ExpensePayload }
@@ -193,7 +149,7 @@ export type Notification =
         /** Khoản chi của các ca mở trong ngày; bản ghi cũ không có. */
         expenses?: { count: number; total: number };
         deleted: { count: number; served: number };
-        shifts: Array<ShiftCtx & { status: string; reconcile: Reconcile }>;
+        shifts: Array<ShiftCtx & { status: string; reconcile: StoredReconcile }>;
         open_orders: number;
         unresolved_gaps: number;
       };
@@ -281,11 +237,11 @@ const PACKS = [
   ['cans', 'Lon', 'lon'],
 ] as const;
 
-const counts = (r: Reconcile): CountItem[] => r.count_items ?? ['cash', 'boxes', 'plates'];
+const counts = (r: StoredReconcile): CountItem[] => r.count_items ?? ['cash', 'boxes', 'plates'];
 /** Bao bì ca này đếm, theo thứ tự Hộp · Dĩa · Lon. */
-const countedPacks = (r: Reconcile) => PACKS.filter(([k]) => counts(r).includes(k) && r[k]);
+const countedPacks = (r: StoredReconcile) => PACKS.filter(([k]) => counts(r).includes(k) && r[k]);
 
-export function shiftReport(r: Reconcile): string[] {
+export function shiftReport(r: StoredReconcile): string[] {
   const served = r.deleted_after_served.length;
   const lines = [
     ...revenueLines(r.revenue, r.ship),
@@ -343,7 +299,7 @@ export function packList(d: { boxes: number; plates: number; cans?: number }): s
   return parts.join(', ') || '0 hộp';
 }
 
-function shiftIcon(r: Reconcile): string {
+function shiftIcon(r: StoredReconcile): string {
   const bad = (r.cash.diff ?? 0) !== 0 || r.deleted_after_served.length > 0;
   return bad ? '🔴' : '🟢';
 }

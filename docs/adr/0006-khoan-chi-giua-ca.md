@@ -21,7 +21,7 @@ về kỹ thuật cho phép số âm, nhưng chỉ chủ ghi được và không
 - Nhân viên tự giảm được tiền mặt kỳ vọng. Rủi ro này chấp nhận được vì chủ thấy từng khoản trên Telegram ngay lúc đó.
 - Tablet được đọc các khoản chi của ca đang mở của quầy mình, cùng tổng của chúng. Đây là số do chính nhân viên ghi nên không
   lộ doanh thu hay kỳ vọng ([ADR 0002](0002-tablet-khong-thay-doanh-thu.md)). Không được đọc khoản chi của ca đã đóng hay ca khác.
-- Đổi công thức ⇒ `reconcile-cases.json`, `src/domain/reconcile.ts` và `private.reconcile_shift` đổi cùng nhau.
+- Đổi công thức ⇒ `reconcile-cases.json` và `private.reconcile_shift` đổi cùng nhau. *(Sửa 2026-11-27: bỏ bản TS `src/domain/reconcile.ts`, nó không chạy trong production và chỉ là bản sao phải giữ khớp. SQL là implementation duy nhất; kiểu kết quả dùng chung ở `supabase/functions/_shared/reconcile.ts`. Xem [cai-thien-kien-truc.md](../plans/cai-thien-kien-truc.md) ứng viên 2.)*
 - **Không** ghi khoản chi bằng `shift_adjustments` âm. **Không** dùng khoản chi cho chi phí không lấy từ két (CK, tiền túi chủ).
 
 ## Phương án đã loại

@@ -119,7 +119,7 @@ supabase/migrations   schema, RLS, RPC `sync_push` (server cấp mã đơn / s�
 supabase/functions    `telegram-dispatch`, `activate-tablet`, `owner-pin-unlock` (vào chế độ chủ bằng PIN), `nightly-backup` (sao lưu hằng đêm),
                       `_shared/format.ts` (định dạng tin), `_shared/backup.ts` (đọc bản chụp)
 scripts/db-restore.mjs  khôi phục DB từ file sao lưu (`scripts/restore/lib.mjs`)
-tests/fixtures/reconcile-cases.json  bộ dữ liệu đối soát dùng chung cho test TS và SQL
+tests/fixtures/reconcile-cases.json  bộ dữ liệu ghim kết quả đối soát của `reconcile_shift` (test SQL)
 tests/db/          test DB (Vitest + Supabase local); `pos-client.test.ts` chạy tablet realtime thật: hai máy cùng hồ sơ, Realtime, idempotent
 tests/telegram-mock/  server giả Telegram (`GET /__messages`)
 cypress/           E2E

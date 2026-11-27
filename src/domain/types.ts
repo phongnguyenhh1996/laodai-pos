@@ -10,8 +10,9 @@ export const DINE_LABELS: Record<DineType, string> = { dinein: 'Tại chỗ', ta
 export type OrderStatus = 'open' | 'served' | 'paid' | 'deleted';
 export type PaymentMethod = 'cash' | 'transfer' | 'debt';
 export type AdjustmentKind = 'boxes' | 'plates' | 'cans' | 'cash';
+import type { CountItem } from '../../supabase/functions/_shared/reconcile';
 /** Những thứ nhân viên đếm khi đóng ca (bật/tắt theo quầy). */
-export type CountItem = 'cash' | 'boxes' | 'plates' | 'cans';
+export type { CountItem };
 export const COUNT_ITEMS: readonly CountItem[] = ['cash', 'boxes', 'plates', 'cans'];
 /** Quầy cũ / chưa đặt: đếm tiền mặt, hộp, dĩa (chưa đếm lon). */
 export const DEFAULT_COUNT_ITEMS: readonly CountItem[] = ['cash', 'boxes', 'plates'];
