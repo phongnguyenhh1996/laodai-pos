@@ -1,7 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { ENV } from '../support/env';
 import { anonClient, ownerClient, resetDb, sql, tabletClient } from '../support/db';
-import { TabletSim, item, op, push } from '../support/ops';
+import { TabletSim, item, push, wire } from '../support/ops';
 import { SEED } from '../support/seed-ids';
 import { telegramClear, waitForMessage } from '../support/telegram';
 
@@ -36,7 +36,7 @@ describe('Telegram qua Edge Function', () => {
     await sim.openShift('Lan');
     const o = await sim.createOrder([item('xoiGa')]);
     await sim.serve(o.id);
-    const del = op('delete_order', o.id, { order_id: o.id, reason: 'customer_left' }, new Date(Date.now() - 30 * 60_000).toISOString());
+    const del = wire('delete_order', o.id, { order_id: o.id, reason: 'customer_left', status_before: 'served' }, new Date(Date.now() - 30 * 60_000).toISOString());
     await push(tab, del);
     const m = await waitForMessage((x) => x.text.includes('Xóa đơn'));
     expect(m.text).toContain('ĐÃ RA MÓN');

@@ -4,7 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { v7 as uuidv7 } from 'uuid';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { ownerClient, resetDb, sql, tabletClient } from '../support/db';
-import { TabletSim, op, push } from '../support/ops';
+import { TabletSim, op, push, wire } from '../support/ops';
 import { SEED } from '../support/seed-ids';
 
 let tabA: SupabaseClient;
@@ -66,7 +66,7 @@ describe('nhân viên ghi / hủy qua sync_push', () => {
 
   it('idempotent theo op_id: gửi lại ⇒ duplicate, không ghi thêm; cùng id khác op ⇒ expense_exists', async () => {
     const id = uuidv7();
-    const o = op('create_expense', id, { id, shift_id: simA.shiftId, amount: 20000, note: 'mua đá' });
+    const o = wire('create_expense', id, { id, shift_id: simA.shift, amount: 20000, note: 'mua đá' });
     expect(await push(tabA, o)).toMatchObject({ status: 'ok' });
     expect(await push(tabA, o)).toMatchObject({ status: 'duplicate', expense: { id } });
     expect(await simA.createExpense(20000, 'mua đá', id)).toEqual({ status: 'rejected', reason: 'expense_exists' });
@@ -75,17 +75,22 @@ describe('nhân viên ghi / hủy qua sync_push', () => {
   });
 
   it('số tiền / ghi chú sai ⇒ từ chối, không lưu', async () => {
+    // Op thô: cố tình gửi kiểu sai (chuỗi, null) như máy lỗi / bản cũ.
+    const raw = (amount: unknown, note: unknown) => {
+      const id = uuidv7();
+      return push(tabA, op('create_expense', id, { id, shift_id: simA.shift, amount, note }));
+    };
     for (const bad of [0, 7500, -1000, null, 'abc', '1e3']) {
-      expect(await simA.createExpense(bad, 'mua đá'), String(bad)).toEqual({ status: 'rejected', reason: 'bad_expense_amount' });
+      expect(await raw(bad, 'mua đá'), String(bad)).toEqual({ status: 'rejected', reason: 'bad_expense_amount' });
     }
     for (const bad of [null, '', '   ', 'x'.repeat(81)]) {
-      expect(await simA.createExpense(20000, bad), String(bad)).toEqual({ status: 'rejected', reason: 'bad_expense_note' });
+      expect(await raw(20000, bad), String(bad)).toEqual({ status: 'rejected', reason: 'bad_expense_note' });
     }
     expect(await sql('select id from shift_expenses')).toEqual([]);
   });
 
   it('ca của quầy khác / ca đã đóng ⇒ từ chối', async () => {
-    expect((await simA.createExpense(20000, 'mua đá', uuidv7(), simB.shiftId)).status).toBe('rejected');
+    expect((await simA.createExpense(20000, 'mua đá', uuidv7(), simB.shift)).status).toBe('rejected');
     const closedShift = simA.shiftId!;
     expect(await simA.closeShift(0, 0, 0)).toMatchObject({ status: 'ok' });
     expect(await simA.createExpense(20000, 'mua đá', uuidv7(), closedShift)).toEqual({ status: 'rejected', reason: 'shift_not_open' });

@@ -2,14 +2,19 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { ownerClient, resetDb, sql, tabletClient } from '../support/db';
-import { TabletSim, op, push } from '../support/ops';
+import type { OpPayloads } from '@/pos/types';
+import { TabletSim, op, push, wire } from '../support/ops';
 import { SEED } from '../support/seed-ids';
 
 let tab: SupabaseClient;
 let sim: TabletSim;
 
-const mark = (payload: Record<string, unknown>, at?: string) =>
-  op('set_sold_out', String(payload.item_id), { shift_id: sim.shiftId, point_id: SEED.points.xoiA, item_kind: 'product', sold_out: true, ...payload }, at);
+type Mark = OpPayloads['set_sold_out'];
+const markPayload = (p: Partial<Mark>): Mark =>
+  ({ shift_id: sim.shift, point_id: SEED.points.xoiA, item_kind: 'product', item_id: '', sold_out: true, ...p });
+const mark = (p: Partial<Mark> & Pick<Mark, 'item_id'>, at?: string) => wire('set_sold_out', p.item_id, markPayload(p), at);
+/** Op thô: cố tình gửi giá trị ngoài kiểu (`combo`, `'yes'`). */
+const markRaw = (p: Record<string, unknown> & Pick<Mark, 'item_id'>) => op('set_sold_out', p.item_id, { ...markPayload({}), ...p });
 
 const today = async (c: SupabaseClient) => {
   const { data, error } = await c.rpc('sold_out_today');
@@ -63,8 +68,8 @@ describe('hết món', () => {
   it('từ chối: điểm bán không thuộc quầy, món của menu khác, chưa mở ca', async () => {
     expect(await push(tab, mark({ point_id: SEED.points.xoiB, item_id: SEED.products.xoiGa }))).toEqual({ status: 'rejected', reason: 'point_not_allowed' });
     expect(await push(tab, mark({ item_id: SEED.products.comGa }))).toEqual({ status: 'rejected', reason: 'bad_item' });
-    expect(await push(tab, mark({ item_kind: 'combo', item_id: SEED.combos.xoiGaTrung }))).toEqual({ status: 'rejected', reason: 'bad_item_kind' });
-    expect(await push(tab, mark({ item_id: SEED.products.xoiGa, sold_out: 'yes' }))).toEqual({ status: 'rejected', reason: 'bad_sold_out' });
+    expect(await push(tab, markRaw({ item_kind: 'combo', item_id: SEED.combos.xoiGaTrung }))).toEqual({ status: 'rejected', reason: 'bad_item_kind' });
+    expect(await push(tab, markRaw({ item_id: SEED.products.xoiGa, sold_out: 'yes' }))).toEqual({ status: 'rejected', reason: 'bad_sold_out' });
     expect(await sim.closeShift(190, 60, 500_000)).toMatchObject({ status: 'ok' });
     expect(await push(tab, mark({ item_id: SEED.products.xoiGa }))).toEqual({ status: 'rejected', reason: 'shift_not_open' });
     expect(await sql(`select 1 from sold_out`)).toHaveLength(0);

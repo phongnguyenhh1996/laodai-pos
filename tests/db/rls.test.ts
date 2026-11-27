@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { anonClient, ownerClient, resetDb, sql, tabletClient } from '../support/db';
-import { TabletSim, item } from '../support/ops';
+import { TabletSim, item, debtCustomer } from '../support/ops';
 import { SEED } from '../support/seed-ids';
 
 // 10.3: vai trò tablet KHÔNG lấy được doanh thu, kể cả khi gọi API trực tiếp.
@@ -170,7 +170,7 @@ describe('vai trò tablet ĐƯỢC', () => {
 
   it('xem lịch sử nợ của khách: ngày, mã đơn, món (dù không đọc được đơn đã thanh toán)', async () => {
     const o = await simA.createOrder([item('xoiGa', [], 2)]);
-    await simA.pay(o.id, o.total, 'debt', { customer: { id: SEED.customers.dungPhuongB, name: 'Dũng' } });
+    await simA.pay(o.id, o.total, 'debt', { customer: debtCustomer(SEED.customers.dungPhuongB, 'Dũng') });
     const { data, error } = await tabA.rpc('customer_debt_history', { p_customer: SEED.customers.dungPhuongB });
     expect(error).toBeNull();
     const row = (data as { orders: Array<{ id: string; code: string; paid_at: string; total: number; items: unknown[] }> }).orders.find((x) => x.id === o.id);

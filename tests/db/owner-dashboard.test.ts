@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { ownerClient, resetDb, sql, tabletClient } from '../support/db';
-import { TabletSim, item } from '../support/ops';
+import { TabletSim, item, debtCustomer } from '../support/ops';
 import { SEED } from '../support/seed-ids';
 
 // Bước 9: dashboard, danh sách đơn có lọc, báo cáo (đối chiếu chuyển khoản, theo nhân viên) — chỉ chủ.
@@ -11,7 +11,7 @@ let tabA: SupabaseClient;
 const ids: Record<string, string> = {};
 let today: string;
 
-const debtTo = (customer: keyof typeof SEED.customers) => ({ customer: { id: SEED.customers[customer], name: 'Dũng' } });
+const debtTo = (customer: keyof typeof SEED.customers) => ({ customer: debtCustomer(SEED.customers[customer], 'Dũng') });
 
 beforeAll(async () => {
   await resetDb();

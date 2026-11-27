@@ -4,7 +4,7 @@ import { readSnapshot, snapshotFiles, type Snapshot } from '../../supabase/funct
 import { finishRestore, loadSnapshot, parseBackupZip, verifyCounts } from '../../scripts/restore/lib.mjs';
 import { ENV } from '../support/env';
 import { anonClient, ownerClient, resetDb, serviceClient, sql, tabletClient, withPg } from '../support/db';
-import { TabletSim, item } from '../support/ops';
+import { TabletSim, item, debtCustomer } from '../support/ops';
 import { SEED } from '../support/seed-ids';
 import { telegramClear, telegramMessages, waitForMessage } from '../support/telegram';
 
@@ -24,7 +24,7 @@ async function someBusiness() {
   const a = await sim.createOrder([item('xoiGa', ['trung'], 2)]);
   await sim.pay(a.id, a.total, 'cash');
   const b = await sim.createOrder([item('xoiXeo')]);
-  await sim.pay(b.id, b.total, 'debt', { customer: { id: SEED.customers.dungGv, name: 'Dũng' } });
+  await sim.pay(b.id, b.total, 'debt', { customer: debtCustomer(SEED.customers.dungGv, 'Dũng') });
   await sim.debtPayment(SEED.customers.dungGv, 10_000);
   // Đợi các tin Telegram do thao tác trên sinh ra gửi xong (telegram-dispatch cập nhật notifications bất đồng bộ).
   await expect

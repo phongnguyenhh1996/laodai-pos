@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { ownerClient, resetDb, sql, tabletClient } from '../support/db';
-import { TabletSim, item } from '../support/ops';
+import { TabletSim, item, debtCustomer } from '../support/ops';
 import { SEED } from '../support/seed-ids';
 
 // In phiếu bếp & bill (SPEC mục 12): lệnh in, khóa nhận lệnh, hết hạn, RLS, báo cáo ca.
@@ -28,7 +28,7 @@ beforeEach(async () => {
 
 async function paidOrder() {
   const o = await sim.createOrder([item('xoiGa', ['trung'], 2)]);
-  await sim.pay(o.id, o.total, 'debt', { customer: { id: SEED.customers.dungGv, name: 'Dũng' } });
+  await sim.pay(o.id, o.total, 'debt', { customer: debtCustomer(SEED.customers.dungGv, 'Dũng') });
   // TabletSim gửi giờ thực hiện lùi 1 giờ; tablet thật dùng giờ server.
   await sql('update orders set paid_at = now() where id = $1', [o.id]);
   return o;

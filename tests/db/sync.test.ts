@@ -1,7 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { beforeEach, describe, expect, it } from 'vitest';
+import type { CloseKey } from '@/pos/types';
 import { ownerClient, resetDb, sql, tabletClient } from '../support/db';
-import { TabletSim, item, op, push, tick } from '../support/ops';
+import { TabletSim, debtCustomer, item, op, push, tick, wire } from '../support/ops';
 import { SEED } from '../support/seed-ids';
 
 let tab: SupabaseClient;
@@ -48,7 +49,7 @@ describe('sync_push', () => {
   it('đơn ship có khách: tạo khách mới cùng đơn, lưu địa chỉ gần nhất, báo Telegram kèm khách; trả tiền vẫn giữ khách', async () => {
     const newId = '01900000-0000-7000-8000-00000000c0de';
     const o = await sim.createOrder([item('xoiGa')], {
-      dine_type: 'delivery', address: '5 Hai Bà Trưng', customer: { id: newId, is_new: true, name: ' Anh Tú ', phone: '0912 345 678' },
+      dine_type: 'delivery', address: '5 Hai Bà Trưng', customer: { id: newId, is_new: true, name: ' Anh Tú ', description: null, phone: '0912 345 678' },
     });
     expect(o.result).toMatchObject({ status: 'ok', order: { customer_id: newId } });
     expect(await sql('select name, phone, address from customers where id = $1', [newId])).toEqual([
@@ -78,7 +79,7 @@ describe('sync_push', () => {
 
   // Luật phí ship (phí sai, tổng lệch, mang về bỏ phí): hợp đồng ghi đơn (order-write-contract.test.ts).
   it('phí ship: tổng = món + phí; chủ sửa món giữ phí; doanh thu tách phí ship', async () => {
-    const ship = { dine_type: 'delivery', address: '12 Lê Lợi' };
+    const ship = { dine_type: 'delivery', address: '12 Lê Lợi' } as const;
     const o = await sim.createOrder([item('xoiGa')], { ...ship, ship_fee: 10000, total: 35000 });
     expect(o.result).toMatchObject({ status: 'ok' });
     expect(await sql('select ship_fee, total from orders where id = $1', [o.id])).toEqual([{ ship_fee: 10000, total: 35000 }]);
@@ -106,7 +107,7 @@ describe('sync_push', () => {
     const o = sim.createOrderOp([item('xoiGa')]);
     expect(await push(tab, o.op)).toMatchObject({ status: 'ok' });
     expect(await push(tab, o.op)).toMatchObject({ status: 'duplicate' });
-    const p = op('pay_order', o.id, { order_id: o.id, paid_shift_id: sim.shiftId, method: 'transfer', total: o.total });
+    const p = wire('pay_order', o.id, { order_id: o.id, paid_shift_id: sim.shift, method: 'transfer', cash_given: null, total: o.total, customer: null });
     expect(await push(tab, p)).toMatchObject({ status: 'ok' });
     expect(await push(tab, p)).toMatchObject({ status: 'duplicate' });
     expect(await sql('select id from orders where id = $1', [o.id])).toHaveLength(1);
@@ -141,10 +142,13 @@ describe('sync_push', () => {
   });
 
   it('server cấp số thứ tự + mã đơn: số / mã máy gửi lên bị bỏ qua ⇒ không trùng, không lỗ hổng', async () => {
-    const o1 = sim.createOrderOp([item('xoiGa')], { device_seq: 7, code: 'AAA' });
-    const o2 = sim.createOrderOp([item('xoiGa')], { device_seq: 7, code: 'AAA' });
-    const r1 = await push(tab, o1.op);
-    const r2 = await push(tab, o2.op);
+    // Payload kiểu bản offline cũ (máy tự đánh số / mã) ⇒ op thô.
+    const legacy = () => {
+      const { id, op: o } = sim.createOrderOp([item('xoiGa')]);
+      return op('create_order', id, { ...o.payload, order: { ...o.payload.order, device_seq: 7, code: 'AAA' } });
+    };
+    const r1 = await push(tab, legacy());
+    const r2 = await push(tab, legacy());
     expect([r1, r2]).toMatchObject([{ status: 'ok', order: { device_seq: 1 } }, { status: 'ok', order: { device_seq: 2 } }]);
     const rows = await sql<{ device_seq: number; code: string }>('select device_seq, code from orders order by device_seq');
     expect(rows.map((r) => r.device_seq)).toEqual([1, 2]);
@@ -186,10 +190,10 @@ describe('sync_push', () => {
     const [log] = await sql(`select action, reason from audit_log where action = 'sync_rejected'`);
     expect(log).toEqual({ action: 'sync_rejected', reason: 'point_not_allowed' });
     expect(await sql(`select 1 from notifications where kind = 'sync_rejected'`)).toHaveLength(1);
-    // dữ liệu rác cũng bị từ chối thay vì làm lỗi RPC
+    // dữ liệu rác cũng bị từ chối thay vì làm lỗi RPC (op thô: cố tình sai)
     const junk = op('pay_order', o.id, { order_id: 'not-a-uuid' });
     expect((await push(tab, junk)).status).toBe('rejected');
-    const future = op('serve_order', o.id, { order_id: o.id }, new Date(Date.now() + 3600_000).toISOString());
+    const future = wire('serve_order', o.id, { order_id: o.id }, new Date(Date.now() + 3600_000).toISOString());
     expect(await push(tab, future)).toEqual({ status: 'rejected', reason: 'performed_at_in_future' });
   });
 
@@ -263,7 +267,7 @@ describe('sync_push', () => {
     const o = await sim.createOrder([item('xoiGa', [], 3)]);
     await sim.pay(o.id, o.total);
     const id = sim.shiftId!;
-    const close = (p: Record<string, unknown>) => push(tab, op('close_shift', id, { shift_id: id, ...p }));
+    const close = (p: Partial<Record<CloseKey, number>>) => push(tab, wire('close_shift', id, { shift_id: id, ...p }));
     expect(await close({ cash_counted: 500000 })).toMatchObject({ status: 'rejected' });
     expect(await close({ cans_left: 45, cash_counted: 500000 + o.total, boxes_left: 7 })).toMatchObject({ status: 'ok' });
     expect(await sql('select close_boxes_left, close_plates_left, close_cans_left from shifts where id = $1', [id])).toEqual([
@@ -280,7 +284,7 @@ describe('sync_push', () => {
 
   it('thu nợ: lưu vào ca hiện tại, báo Telegram kèm dư nợ còn lại', async () => {
     const o = await sim.createOrder([item('xoiGa')]);
-    await sim.pay(o.id, o.total, 'debt', { customer: { id: SEED.customers.dungGv, name: 'Dũng' } });
+    await sim.pay(o.id, o.total, 'debt', { customer: debtCustomer(SEED.customers.dungGv, 'Dũng') });
     expect(await sim.debtPayment(SEED.customers.dungGv, 10000)).toMatchObject({ status: 'ok' });
     const [p] = await sql('select shift_id, amount from debt_payments');
     expect(p).toEqual({ shift_id: sim.shiftId, amount: 10000 });

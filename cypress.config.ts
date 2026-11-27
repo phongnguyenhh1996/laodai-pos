@@ -1,18 +1,19 @@
 import { defineConfig } from 'cypress';
 import { ownerClient, resetDb, sql, tabletClient, withPg } from './tests/support/db';
 import { ENV } from './tests/support/env';
-import { TabletSim, item, op, push, type TestItem } from './tests/support/ops';
+import type { OrderItem } from '@/domain/types';
+import { TabletSim, debtCustomer, item, push, wire } from './tests/support/ops';
 import { SEED } from './tests/support/seed-ids';
 import { telegramClear, telegramMessages, waitForMessage } from './tests/support/telegram';
 
 // Trạng thái kịch bản G32 giữa các task (tablet giả lập phía server).
-let g32: { sim: TabletSim; orderId: string; line: TestItem } | null = null;
+let g32: { sim: TabletSim; orderId: string; line: OrderItem } | null = null;
 
 type TabletKey = keyof typeof SEED.tablets;
 type ProductKey = keyof typeof SEED.products;
 type ToppingKey = keyof typeof SEED.toppings;
 
-// Tablet giả lập phía server, giữ qua các task trong một kịch bản (device_seq liên tục). Xóa khi db:reset.
+// Tablet giả lập phía server, giữ qua các task trong một kịch bản (cùng ca qua các task). Xóa khi db:reset.
 const sims = new Map<TabletKey, TabletSim>();
 async function simFor(tablet: TabletKey): Promise<TabletSim> {
   let sim = sims.get(tablet);
@@ -41,15 +42,15 @@ interface SellArgs {
 /** Tạo (và thu tiền) một đơn trên tablet giả lập. Trả id, mã, tổng. */
 async function simSell(a: SellArgs) {
   const sim = await simFor(a.tablet);
-  const extra = a.point ? { point_id: SEED.points[a.point], dine_type: a.point === 'com' ? 'dinein' : 'takeaway' } : {};
+  const extra = a.point ? { point_id: SEED.points[a.point], dine_type: a.point === 'com' ? ('dinein' as const) : ('takeaway' as const) } : {};
   const o = await sim.createOrder([item(a.product, a.toppings ?? [], a.qty ?? 1)], extra);
   ok('tạo đơn', o.result);
   if (a.method) {
-    const customer = a.customer ? { customer: { id: SEED.customers[a.customer], name: 'Dũng' } } : {};
+    const customer = a.customer ? { customer: debtCustomer(SEED.customers[a.customer], 'Dũng') } : {};
     ok('thanh toán', await sim.pay(o.id, o.total, a.method, customer));
   }
   // Mã đơn do server cấp (mã máy gửi lên bị bỏ qua).
-  return { id: o.id, total: o.total, code: (o.result as { order?: { code: string } }).order!.code };
+  return { id: o.id, total: o.total, code: o.result.order!.code };
 }
 
 export default defineConfig({
@@ -95,7 +96,7 @@ export default defineConfig({
           o.op.performed_at = new Date().toISOString();
           ok('tạo đơn ship', await push(sim.c, o.op));
           if (a.method) {
-            const payOp = op('pay_order', o.id, { order_id: o.id, paid_shift_id: s.id, method: a.method, cash_given: a.method === 'cash' ? total : null, total, customer: null }, new Date().toISOString());
+            const payOp = wire('pay_order', o.id, { order_id: o.id, paid_shift_id: s.id, method: a.method, cash_given: a.method === 'cash' ? total : null, total, customer: null }, new Date().toISOString());
             ok('thanh toán', await push(sim.c, payOp));
           }
           return o.id;
@@ -285,7 +286,7 @@ export default defineConfig({
           const ids: string[] = [];
           for (const s of sales) {
             const o = await sim.createOrder([item(s.product)]);
-            const r = await sim.pay(o.id, o.total, 'debt', { customer: { id: SEED.customers[s.customer], name: 'Dũng' } });
+            const r = await sim.pay(o.id, o.total, 'debt', { customer: debtCustomer(SEED.customers[s.customer], 'Dũng') });
             if (o.result.status !== 'ok' || r.status !== 'ok') throw new Error(`ghi nợ: ${JSON.stringify([o.result, r])}`);
             ids.push(o.id);
           }
@@ -320,7 +321,7 @@ export default defineConfig({
           if (!s) throw new Error('không có ca đang mở');
           const c = await tabletClient(SEED.tablets[a.tablet]);
           const id = a.kind === 'product' ? SEED.products[a.item as ProductKey] : SEED.toppings[a.item as ToppingKey];
-          const r = await push(c, op('set_sold_out', id, { shift_id: s.id, point_id: SEED.points[a.point], item_kind: a.kind, item_id: id, sold_out: a.soldOut }, new Date().toISOString()));
+          const r = await push(c, wire('set_sold_out', id, { shift_id: s.id, point_id: SEED.points[a.point], item_kind: a.kind, item_id: id, sold_out: a.soldOut }, new Date().toISOString()));
           ok('báo hết món', r);
           return r;
         },

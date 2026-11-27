@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { ownerClient, resetDb, sql, tabletClient } from '../support/db';
-import { TabletSim, item } from '../support/ops';
+import { TabletSim, item, debtCustomer } from '../support/ops';
 import { SEED } from '../support/seed-ids';
 
 // Ship hai kiểu (SPEC 4.2, 4.4, 4.7, 5): Quán ship / Shipper ngoài. Xôi gà = 25.000.
@@ -9,8 +9,8 @@ import { SEED } from '../support/seed-ids';
 let tab: SupabaseClient;
 let sim: TabletSim;
 
-const SHIP = { dine_type: 'delivery', address: '12 Lê Lợi' };
-const EXT = { ...SHIP, ship_mode: 'external', ship_fee: 5000, ship_payout: 10000, total: 30000 };
+const SHIP = { dine_type: 'delivery', address: '12 Lê Lợi' } as const;
+const EXT = { ...SHIP, ship_mode: 'external', ship_fee: 5000, ship_payout: 10000, total: 30000 } as const;
 
 const shipRow = async (id: string) =>
   (await sql('select dine_type, ship_mode, ship_fee, ship_payout, total from orders where id = $1', [id]))[0];
@@ -113,7 +113,7 @@ describe('đối soát: trả shipper là tiền mặt từ két', () => {
     const a = await sim.createOrder([item('xoiGa')], EXT);
     const b = await sim.createOrder([item('xoiGa')], { ...SHIP, ship_fee: 10000, total: 35000 });
     await sim.pay(a.id, 30000, 'cash');
-    expect(await sim.pay(b.id, 35000, 'debt', { customer: { id: SEED.customers.dungGv, name: 'Dũng' } })).toMatchObject({ status: 'ok' });
+    expect(await sim.pay(b.id, 35000, 'debt', { customer: debtCustomer(SEED.customers.dungGv, 'Dũng') })).toMatchObject({ status: 'ok' });
     const owner = await ownerClient();
     const day = (await sql('select private.business_date(now())::text d'))[0].d as string;
     const ship = { shop_orders: 1, external_orders: 1, shop_fee: 10000, external_fee: 5000, payout: 10000, external_profit: -5000 };
