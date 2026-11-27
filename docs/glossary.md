@@ -57,6 +57,8 @@ Thêm thuật ngữ mới vào đây ngay khi nó xuất hiện. Chi tiết nghi
 | Kích hoạt | `activate-tablet` | Chủ đăng nhập rồi chọn quầy ⇒ máy nhận phiên vai trò `tablet` |
 | Nhân viên | `staff` | Chọn tên khi mở ca, không PIN |
 | Thao tác | `sync_push`, `op_id` | Mọi ghi từ tablet đi qua RPC idempotent này; gửi lại cùng `op_id` không ghi hai lần |
+| Hợp đồng ghi đơn | `domain/orderWrite.ts` | Luật chung cho payload tạo / sửa đơn (ship, địa chỉ, khách, nhãn, bàn, tổng); client, fake và server cùng theo |
+| Lý do từ chối | `RejectReason` | Mã `sync_push` trả khi không ghi thao tác (vd. `bad_ship_payout`); mỗi mã một câu thông báo |
 | Nhịp realtime | `live_pulse` | Bộ đếm tăng khi có thay đổi; tablet nghe bảng này thay vì `orders` |
 | Nhật ký | `audit_log` | Mọi thao tác đều ghi lại, kèm trước / sau |
 | Chủ sửa đơn | `owner_edited` | Chủ sửa đơn đã thanh toán |

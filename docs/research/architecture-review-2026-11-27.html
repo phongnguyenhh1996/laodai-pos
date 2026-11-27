@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8" />
+<title>Architecture review — laodai-pos</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+  mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose" });
+</script>
+<style>
+  .seam { border-style: dashed !important; }
+  .deep { background: linear-gradient(135deg, #0f172a, #1e293b); color: #e2e8f0; }
+  .lbl { font-size: .68rem; text-transform: uppercase; letter-spacing: .08em; }
+  .diag { min-height: 300px; }
+</style>
+</head>
+<body class="bg-stone-50 text-slate-900 font-sans">
+<main class="max-w-5xl mx-auto px-6 py-12 space-y-12">
+
+<header class="space-y-4">
+  <h1 class="font-serif text-4xl">laodai-pos: deepening opportunities</h1>
+  <p class="text-sm text-slate-500">27/11/2026 · 58 commit · hot spots: màn tablet, màn chủ, <span class="font-mono">pos/ops.ts</span>, <span class="font-mono">fakeServer.ts</span>, đối soát</p>
+  <div class="flex flex-wrap gap-5 text-xs text-slate-600">
+    <span class="flex items-center gap-2"><span class="inline-block w-5 h-4 border-2 border-slate-500 bg-white"></span>module</span>
+    <span class="flex items-center gap-2"><span class="inline-block w-6 border-t-2 border-dashed border-slate-500"></span>seam</span>
+    <span class="flex items-center gap-2"><span class="inline-block w-6 border-t-2 border-red-600"></span>leak / bản sao</span>
+    <span class="flex items-center gap-2"><span class="inline-block w-5 h-4 deep"></span>deep module</span>
+  </div>
+</header>
+
+<section id="candidates" class="space-y-10">
+
+<!-- 1 -->
+<article id="c1" class="rounded-xl border border-slate-200 bg-white p-6 space-y-4 shadow-sm">
+  <h2 class="font-serif text-2xl">1. Gom hợp đồng ghi đơn (thao tác tạo / sửa đơn) vào một module</h2>
+  <div class="flex gap-2 text-xs"><span class="px-2 py-1 rounded bg-emerald-100 text-emerald-800 font-semibold">Strong</span><span class="px-2 py-1 rounded bg-slate-100">in-process</span><span class="px-2 py-1 rounded bg-slate-100">local-substitutable (contract suite)</span></div>
+  <ul class="font-mono text-sm text-slate-600 grid md:grid-cols-2 gap-x-6">
+    <li>src/pos/ops.ts (L84-98, L295-375)</li><li>src/test-utils/fakeServer.ts (L260-444)</li>
+    <li>src/domain/cart.ts (L166-190)</li><li>src/domain/ownerEdit.ts</li>
+    <li>tests/support/ops.ts (TabletSim)</li><li>src/pos/types.ts (WireOp.payload)</li>
+    <li>migrations: op_create_order, order_ship_*</li>
+  </ul>
+  <div class="grid md:grid-cols-2 gap-4">
+    <div class="rounded-lg border border-slate-200 p-3 diag"><div class="lbl text-slate-500 mb-1">Before</div>
+<pre class="mermaid">
+flowchart TB
+  C[cart.ts<br/>luật ship] --> O[ops.ts<br/>luật ship + payload]
+  E[ownerEdit.ts<br/>?? 'shop' ×7] --> SQL
+  O -->|Record&lt;string,unknown&gt;| SQL[(sync_push<br/>op_create_order)]
+  F[fakeServer<br/>luật ship + total riêng] -.thiếu point/price check.-> SQL
+  T[TabletSim<br/>payload cũ] -->|75 lần trong sync.test| SQL
+  classDef leak stroke:#dc2626,stroke-width:2px;
+  class C,E,F,T leak
+</pre></div>
+    <div class="rounded-lg border border-slate-200 p-3 diag"><div class="lbl text-slate-500 mb-1">After</div>
+<pre class="mermaid">
+flowchart TB
+  K[["Hợp đồng ghi đơn<br/>payload có kiểu · chuẩn hóa ship · lý do từ chối"]]
+  cart --> K
+  ops[Pos] --> K
+  ownerEdit --> K
+  fake[FakeServer] --> K
+  K -.seam: PosBackend.-> A1[(Supabase)]
+  K -.seam: PosBackend.-> A2[FakeServer]
+  S{{Một contract suite<br/>chạy trên 2 adapter}} --- A1
+  S --- A2
+  classDef deep fill:#0f172a,color:#e2e8f0,stroke:#0f172a;
+  class K deep
+</pre></div>
+  </div>
+  <p><b>Problem:</b> luật "không phải ship ⇒ shop/0; external ⇒ payout 1.000–50.000" nằm ở 4 chỗ TS + SQL; fake đã lệch SQL (không kiểm <span class="font-mono">point_not_allowed</span>, <span class="font-mono">price_mismatch</span>, độ dài nhãn…), còn test DB gửi payload mà <span class="font-mono">Pos</span> không bao giờ gửi.</p>
+  <p><b>Solution:</b> một module in-process sở hữu payload có kiểu cho từng loại thao tác, bộ chuẩn hóa ship và từ vựng lý do từ chối; Pos và fake đều đi qua nó; một contract suite chạy trên cả hai adapter của <span class="font-mono">PosBackend</span>.</p>
+  <ul class="list-disc pl-5 text-sm space-y-0.5">
+    <li>Locality: luật ship sống một chỗ</li>
+    <li>Fake lệch SQL ⇒ test đỏ</li>
+    <li>Xóa TabletSim payload cũ</li>
+    <li>Leverage: 4 caller, một interface</li>
+  </ul>
+</article>
+
+<!-- 2 -->
+<article id="c2" class="rounded-xl border border-slate-200 bg-white p-6 space-y-4 shadow-sm">
+  <h2 class="font-serif text-2xl">2. Đối soát: một implementation, một kiểu kết quả</h2>
+  <div class="flex gap-2 text-xs"><span class="px-2 py-1 rounded bg-emerald-100 text-emerald-800 font-semibold">Strong</span><span class="px-2 py-1 rounded bg-slate-100">local-substitutable</span></div>
+  <ul class="font-mono text-sm text-slate-600">
+    <li>src/domain/reconcile.ts (L113-184) · tests/fixtures/reconcile-cases.json</li>
+    <li>private.reconcile_shift (5 phiên bản trong migrations)</li>
+    <li>supabase/functions/_shared/format.ts (L71-121: kiểu Reconcile tự khai)</li>
+  </ul>
+  <div class="grid md:grid-cols-2 gap-4">
+    <div class="rounded-lg border border-slate-200 p-4 diag space-y-3"><div class="lbl text-slate-500">Before — 3 mô tả của cùng một kết quả</div>
+      <div class="border-2 border-red-500 rounded p-3"><div class="lbl">reconcile.ts</div><div class="text-xs text-slate-500">reconcileShift() — 0 caller trong production</div></div>
+      <div class="border-2 border-slate-500 rounded p-3"><div class="lbl">private.reconcile_shift</div><div class="text-xs text-slate-500">nguồn sự thật thật (ADR 0001)</div></div>
+      <div class="border-2 border-red-500 rounded p-3"><div class="lbl">format.ts</div><div class="text-xs text-slate-500">Reconcile / ShipStats / CountItem khai lại bằng tay</div></div>
+      <div class="text-xs text-red-600">Đổi công thức ⇒ sửa 3 chỗ + JSON</div>
+    </div>
+    <div class="rounded-lg border border-slate-200 p-4 diag space-y-3"><div class="lbl text-slate-500">After</div>
+      <div class="deep rounded p-4 border-4 border-slate-900"><div class="lbl">private.reconcile_shift</div><div class="text-xs opacity-70">implementation duy nhất, ghim bằng reconcile-cases.json</div></div>
+      <div class="border-t-2 border-dashed border-slate-500 pt-3 text-xs text-slate-500">seam: kiểu ReconcileResult dùng chung</div>
+      <div class="flex gap-2"><div class="flex-1 border-2 border-slate-400 rounded p-2 lbl">màn chủ</div><div class="flex-1 border-2 border-slate-400 rounded p-2 lbl">Edge Function</div></div>
+    </div>
+  </div>
+  <p><b>Problem:</b> <span class="font-mono">reconcileShift</span> trong TS không ai gọi ngoài test (deletion test: xóa đi, sản phẩm không đổi), nhưng vẫn phải giữ khớp với SQL; Edge Function có bản kiểu thứ ba.</p>
+  <p><b>Solution:</b> SQL + fixture là implementation duy nhất; app và Edge Function import một file kiểu chung. Hoặc giữ TS làm spec dễ đọc, nhưng ghi rõ trong ADR.</p>
+  <ul class="list-disc pl-5 text-sm space-y-0.5"><li>Locality: đổi công thức một chỗ</li><li>Xóa một implementation thừa</li><li>Kiểu kết quả không lệch nữa</li></ul>
+  <div class="rounded bg-amber-50 border border-amber-200 text-amber-900 text-sm px-3 py-2">⚠ Trái ADR 0006 ("reconcile-cases.json, src/domain/reconcile.ts và private.reconcile_shift đổi cùng nhau"), nhưng đáng mở lại: bản TS không còn chạy trong production nên quy tắc đó chỉ giữ một bản sao.</div>
+</article>
+
+<!-- 3 -->
+<article id="c3" class="rounded-xl border border-slate-200 bg-white p-6 space-y-4 shadow-sm">
+  <h2 class="font-serif text-2xl">3. Đặt một seam cho dữ liệu màn chủ</h2>
+  <div class="flex gap-2 text-xs"><span class="px-2 py-1 rounded bg-emerald-100 text-emerald-800 font-semibold">Strong</span><span class="px-2 py-1 rounded bg-slate-100">ports &amp; adapters</span></div>
+  <ul class="font-mono text-sm text-slate-600 grid md:grid-cols-2 gap-x-6">
+    <li>src/owner/{shifts,orders,debts,log,payroll,settings,dashboard,reports}/api.ts</li>
+    <li>src/owner/print/RemotePrint.tsx (L14-60)</li>
+    <li>src/owner/settings/SettingsPages.tsx (L355-364)</li>
+    <li>src/pos/backend.ts (L83, L131, L160)</li>
+  </ul>
+  <div class="grid md:grid-cols-2 gap-4">
+    <div class="rounded-lg border border-slate-200 p-3 diag"><div class="lbl text-slate-500 mb-1">Before</div>
+<pre class="mermaid">
+flowchart LR
+  P1[ShiftPages] --> A1[shifts/api<br/>20 query]
+  P2[OrderPages] --> A2[orders/api]
+  P3[DebtPages] --> A3[debts/api]
+  P4[LogPages] --> A4[log/api]
+  RP[RemotePrint.tsx] -->|query thẳng| DB[(SupabaseClient)]
+  A1 --> DB
+  A2 --> DB
+  A3 --> DB
+  A4 --> DB
+  A1 -.order_items không sort.-> X((bug))
+  classDef leak stroke:#dc2626,stroke-width:2px;
+  class RP,A1,X leak
+</pre></div>
+    <div class="rounded-lg border border-slate-200 p-3 diag"><div class="lbl text-slate-500 mb-1">After</div>
+<pre class="mermaid">
+flowchart LR
+  P1[ShiftPages] --> K
+  P2[OrderPages] --> K
+  P3[DebtPages] --> K
+  RP[RemotePrint] --> K
+  K[["Dữ liệu chủ<br/>cột · chuẩn hóa đơn/món · lỗi · lưu nhân viên"]]
+  K -.seam qua OwnerContext.-> S[(Supabase)]
+  K -.seam.-> F[Fake in-memory]
+  classDef deep fill:#0f172a,color:#e2e8f0,stroke:#0f172a;
+  class K deep
+</pre></div>
+  </div>
+  <p><b>Problem:</b> 8 module api.ts mỏng, mỗi cái một lớp lỗi riêng và tự biết hình dạng bảng; luật "bỏ <span class="font-mono">removed_at</span>, sort theo <span class="font-mono">sort</span>" viết 5 lần và chi tiết ca đã quên sort. Không có unit test nào cho màn chủ.</p>
+  <p><b>Solution:</b> một module dữ liệu chủ đưa qua <span class="font-mono">OwnerContext</span>, sở hữu danh sách cột, chuẩn hóa đơn (dùng chung với <span class="font-mono">pos/backend</span>), ánh xạ lỗi và lưu hai bước của cài đặt; adapter fake cho phép test màn chủ như <span class="font-mono">TabletFlow.test.tsx</span>.</p>
+  <ul class="list-disc pl-5 text-sm space-y-0.5"><li>Locality: hình dạng bảng một chỗ</li><li>Màn chủ test được không cần Cypress</li><li>Bug thứ tự món lộ ra</li><li>Hai adapter: Supabase + fake</li></ul>
+</article>
+
+<!-- 4 -->
+<article id="c4" class="rounded-xl border border-slate-200 bg-white p-6 space-y-4 shadow-sm">
+  <h2 class="font-serif text-2xl">4. Rút phiên sửa đơn ra khỏi OrderScreen; rút tự in "ĐÃ SỬA" ra khỏi biến global</h2>
+  <div class="flex gap-2 text-xs"><span class="px-2 py-1 rounded bg-emerald-100 text-emerald-800 font-semibold">Strong</span><span class="px-2 py-1 rounded bg-slate-100">in-process</span></div>
+  <ul class="font-mono text-sm text-slate-600"><li>src/tablet/OrderScreen.tsx (918 dòng; L100-157, L210-240)</li><li>src/lib/print.ts (L84-124)</li><li>src/tablet/{PayScreen,ExpenseScreen}.tsx (busyRef)</li></ul>
+  <div class="grid md:grid-cols-2 gap-4">
+    <div class="rounded-lg border border-slate-200 p-4 diag"><div class="lbl text-slate-500 mb-2">Before — cross-section của OrderScreen</div>
+      <div class="space-y-1">
+        <div class="h-9 border-l-4 border-slate-400 bg-slate-50 px-3 flex items-center text-xs">JSX render</div>
+        <div class="h-9 border-l-4 border-red-500 bg-red-50 px-3 flex items-center text-xs">queueRef: chuỗi promise ghi tuần tự</div>
+        <div class="h-9 border-l-4 border-red-500 bg-red-50 px-3 flex items-center text-xs">newIdRef: idempotent tạo đơn</div>
+        <div class="h-9 border-l-4 border-red-500 bg-red-50 px-3 flex items-center text-xs">autoPending: debounce + flush khi ẩn</div>
+        <div class="h-9 border-l-4 border-red-500 bg-red-50 px-3 flex items-center text-xs">gộp thay đổi từ xa (dirty / paid / deleted)</div>
+        <div class="h-9 border-l-4 border-red-500 bg-red-50 px-3 flex items-center text-xs">Order → CartDraft + mặc định cũ</div>
+        <div class="text-xs text-red-600 pt-1">4 × eslint-disable exhaustive-deps · chỉ test qua DOM</div>
+      </div>
+    </div>
+    <div class="rounded-lg border border-slate-200 p-4 diag"><div class="lbl text-slate-500 mb-2">After</div>
+      <div class="h-9 border-l-4 border-slate-400 bg-slate-50 px-3 flex items-center text-xs mb-2">JSX render snapshot</div>
+      <div class="border-t-2 border-dashed border-slate-500 my-2"></div>
+      <div class="deep rounded p-4 border-4 border-slate-900 space-y-1">
+        <div class="lbl">Phiên sửa đơn</div>
+        <div class="text-xs opacity-50">ghi tuần tự · id tạo · autosave · gộp từ xa · chuyển đổi</div>
+      </div>
+      <div class="deep rounded p-3 border-4 border-slate-900 mt-3"><div class="lbl">Tự in</div><div class="text-xs opacity-50">sự kiện Pos · công tắc · đồng hồ</div></div>
+      <div class="text-xs text-slate-500 pt-2">test thẳng với FakeServer + fake timers, không DOM</div>
+    </div>
+  </div>
+  <p><b>Problem:</b> các helper thuần trong <span class="font-mono">cart.ts</span> có test, nhưng bug thật nằm ở cách gọi: thứ tự ghi, lưu đồng thời, thay đổi từ xa giữa lúc lưu, gửi lại sau lỗi mạng — tất cả kẹt trong ref của component. Gộp phiếu "ĐÃ SỬA" dùng <span class="font-mono">Map</span> global và <span class="font-mono">setEditDelay</span>.</p>
+  <p><b>Solution:</b> một object phiên sửa đơn in-process trên <span class="font-mono">Pos</span> + <span class="font-mono">TabletStore</span>; một object tự in nhận sự kiện, công tắc và đồng hồ. Màn hình chỉ render.</p>
+  <ul class="list-disc pl-5 text-sm space-y-0.5"><li>Locality: bug lưu đơn một chỗ</li><li>Interface là test surface</li><li>Bỏ eslint-disable</li><li>Bỏ hook test toàn cục</li></ul>
+  <div class="rounded bg-slate-50 border border-slate-200 text-slate-700 text-sm px-3 py-2">Giữ đúng ADR 0001: chỉ coi là xong khi server trả lời; hàng ghi tuần tự không phải hàng đợi offline.</div>
+</article>
+
+<!-- 5 -->
+<article id="c5" class="rounded-xl border border-slate-200 bg-white p-6 space-y-4 shadow-sm">
+  <h2 class="font-serif text-2xl">5. Gộp Pos và TabletStore thành một phiên tablet</h2>
+  <div class="flex gap-2 text-xs"><span class="px-2 py-1 rounded bg-amber-100 text-amber-800 font-semibold">Worth exploring</span><span class="px-2 py-1 rounded bg-slate-100">in-process</span></div>
+  <ul class="font-mono text-sm text-slate-600"><li>src/pos/ops.ts · src/pos/store.ts (L200-260) · src/lib/pos.ts</li></ul>
+  <div class="grid md:grid-cols-2 gap-4">
+    <div class="rounded-lg border border-slate-200 p-4 diag flex flex-col justify-center gap-6"><div class="lbl text-slate-500">Before — mass diagram</div>
+      <div class="flex items-end gap-6">
+        <div><div class="w-24 h-28 border-2 border-red-500 bg-red-50 flex items-center justify-center text-xs">13 member public</div><div class="w-24 h-24 border-2 border-slate-400 mt-1 flex items-center justify-center text-xs">TabletStore</div></div>
+        <div><div class="w-24 h-16 border-2 border-slate-500 flex items-center justify-center text-xs">intent</div><div class="w-24 h-24 border-2 border-slate-400 mt-1 flex items-center justify-center text-xs">Pos</div></div>
+      </div>
+      <div class="text-xs text-red-600">Mọi màn đều gọi được applyOrder / removeOrder</div>
+    </div>
+    <div class="rounded-lg border border-slate-200 p-4 diag flex flex-col justify-center gap-4"><div class="lbl text-slate-500">After</div>
+      <div><div class="w-56 h-10 border-2 border-slate-700 flex items-center justify-center text-xs">snapshot + intent</div><div class="w-56 h-44 deep mt-1 flex items-center justify-center text-xs">Phiên tablet: một đường "áp PushResult"</div></div>
+    </div>
+  </div>
+  <p><b>Problem:</b> Pos gọi 13 member của store; mutator để public; <span class="font-mono">setSoldOut</span> chép luật ngày của server rồi vẫn refresh lại.</p>
+  <p><b>Solution:</b> một module phiên tablet: đọc snapshot + phương thức intent, giấu mutation, kết quả server luôn quay về một đường.</p>
+  <ul class="list-disc pl-5 text-sm space-y-0.5"><li>Interface co lại, implementation hút store</li><li>Hai bộ test thành một</li></ul>
+</article>
+
+<!-- 6 -->
+<article id="c6" class="rounded-xl border border-slate-200 bg-white p-6 space-y-4 shadow-sm">
+  <h2 class="font-serif text-2xl">6. Một danh mục cho từ vựng nhật ký / thông báo / lý do từ chối</h2>
+  <div class="flex gap-2 text-xs"><span class="px-2 py-1 rounded bg-amber-100 text-amber-800 font-semibold">Worth exploring</span><span class="px-2 py-1 rounded bg-slate-100">in-process + kiểm tĩnh SQL</span></div>
+  <ul class="font-mono text-sm text-slate-600"><li>src/domain/audit.ts · src/owner/log/visual.ts · supabase/functions/_shared/format.ts · src/pos/ops.ts REJECT_MESSAGES</li></ul>
+  <div class="grid md:grid-cols-2 gap-4">
+    <div class="rounded-lg border border-slate-200 p-3 diag"><div class="lbl text-slate-500 mb-1">Before</div>
+<pre class="mermaid">
+flowchart TB
+  M[(migration<br/>private.audit 'expense_create')] --> L[ACTION_LABELS]
+  M --> G[ACTION_GROUPS]
+  M --> D[describeAudit switch]
+  M --> V[visual.ts MAP]
+  M -.tên khác: expense_created.-> N[format.ts Notification]
+  R[(~19 lý do từ chối)] -.không có message.-> RM[REJECT_MESSAGES]
+  classDef leak stroke:#dc2626,stroke-width:2px;
+  class N,RM leak
+</pre></div>
+    <div class="rounded-lg border border-slate-200 p-3 diag"><div class="lbl text-slate-500 mb-1">After</div>
+<pre class="mermaid">
+flowchart TB
+  K[["Danh mục thao tác<br/>nhãn · nhóm · icon · mô tả · thông báo"]]
+  K --> Log[Nhật ký]
+  K --> Tg[Telegram]
+  K --> Tab[Tablet: lý do từ chối]
+  T{{Test: mọi action trong migration có trong danh mục}} -.-> K
+  classDef deep fill:#0f172a,color:#e2e8f0,stroke:#0f172a;
+  class K deep
+</pre></div>
+  </div>
+  <p><b>Problem:</b> mỗi tính năng thêm entry ở 3–4 chỗ TS + SQL; tên sự kiện Telegram khác tên action nhật ký; ~19 lý do từ chối hiện "Máy chủ từ chối thao tác (x)".</p>
+  <p><b>Solution:</b> một danh mục theo action, kèm test so với chuỗi action trong migrations (mở rộng <span class="font-mono">audit.test.ts</span> L14).</p>
+  <ul class="list-disc pl-5 text-sm space-y-0.5"><li>Locality: thêm action một chỗ</li><li>Thiếu nhãn ⇒ test đỏ</li></ul>
+</article>
+
+<!-- 7 -->
+<article id="c7" class="rounded-xl border border-slate-200 bg-white p-6 space-y-4 shadow-sm">
+  <h2 class="font-serif text-2xl">7. Một module "nghe realtime + poll"; chuẩn hóa dữ liệu cũ một lần ở cửa đọc</h2>
+  <div class="flex gap-2 text-xs"><span class="px-2 py-1 rounded bg-slate-200 text-slate-700 font-semibold">Speculative</span><span class="px-2 py-1 rounded bg-slate-100">in-process / local-substitutable</span></div>
+  <ul class="font-mono text-sm text-slate-600"><li>pos/backend.ts L204 · owner/live.ts · owner/print/RemotePrint.tsx · print/service.ts L102</li><li>~42 lần <span>?? 'shop'</span> / <span>?? 0</span> trong 10 file · src/pos/legacy.ts</li></ul>
+  <div class="grid md:grid-cols-2 gap-4">
+    <div class="rounded-lg border border-slate-200 p-4 diag"><div class="lbl text-slate-500 mb-2">Before — call-graph</div>
+      <div class="grid grid-cols-2 gap-2 text-xs">
+        <div class="border-2 border-red-500 rounded p-2">TabletStore<br/><span class="text-slate-500">debounce · poll 30s · visibility</span></div>
+        <div class="border-2 border-red-500 rounded p-2">useLiveReload<br/><span class="text-slate-500">250ms · poll 60s · visibility</span></div>
+        <div class="border-2 border-red-500 rounded p-2">RemotePrint useJob<br/><span class="text-slate-500">poll 5s</span></div>
+        <div class="border-2 border-red-500 rounded p-2">PrintService.onJob<br/><span class="text-slate-500">channel riêng</span></div>
+      </div>
+      <div class="text-xs text-red-600 pt-3">+ mặc định ship cũ lặp ~42 lần</div>
+    </div>
+    <div class="rounded-lg border border-slate-200 p-4 diag"><div class="lbl text-slate-500 mb-2">After</div>
+      <div class="deep rounded p-4 border-4 border-slate-900">
+        <div class="lbl">Nghe thay đổi</div>
+        <div class="grid grid-cols-2 gap-2 mt-2 text-xs opacity-50"><div class="border border-slate-500 rounded p-1">tablet</div><div class="border border-slate-500 rounded p-1">chủ</div><div class="border border-slate-500 rounded p-1">lệnh in</div><div class="border border-slate-500 rounded p-1">in từ xa</div></div>
+      </div>
+      <div class="deep rounded p-3 border-4 border-slate-900 mt-3"><div class="lbl">Chuẩn hóa ở cửa đọc</div><div class="text-xs opacity-50">bản ghi cũ trong audit_log / thông báo</div></div>
+    </div>
+  </div>
+  <p><b>Problem:</b> 4 cách tự viết subscribe/poll/visibility; dung thứ "server chưa migrate" khắp nơi dù ADR 0001 có một server duy nhất.</p>
+  <p><b>Solution:</b> một module nghe thay đổi; chuẩn hóa bản ghi cũ một lần lúc đọc; xóa <span class="font-mono">legacy.ts</span> khi không còn máy nào có outbox cũ.</p>
+  <ul class="list-disc pl-5 text-sm space-y-0.5"><li>Leverage: 4 caller, một interface</li><li>Xóa ~40 dòng mặc định</li></ul>
+</article>
+
+</section>
+
+<section id="seams" class="rounded-xl border border-slate-200 bg-white p-6 space-y-3">
+  <h2 class="font-serif text-xl">Seam đã có hai adapter thật</h2>
+  <table class="w-full text-sm"><tbody class="divide-y divide-slate-100">
+    <tr><td class="font-mono py-1.5">PosBackend</td><td>Supabase + FakeServer</td><td class="text-slate-500">tốt nhất repo; fake đã lệch (ứng viên 1)</td></tr>
+    <tr><td class="font-mono py-1.5">PrintApi</td><td>Supabase + fakeApi</td><td class="text-slate-500">tốt; RemotePrint đi vòng qua nó</td></tr>
+    <tr><td class="font-mono py-1.5">PrinterTransport</td><td>Bluetooth native + FakeTransport</td><td class="text-slate-500">tốt (ADR 0004)</td></tr>
+    <tr><td class="font-mono py-1.5">NetworkEnv / Scheduler</td><td>browser + test</td><td class="text-slate-500">tốt</td></tr>
+    <tr><td class="font-mono py-1.5">Telegram</td><td>thật + telegram-mock</td><td class="text-slate-500">tốt</td></tr>
+  </tbody></table>
+</section>
+
+<section id="top-recommendation" class="rounded-2xl deep p-8 space-y-3">
+  <div class="lbl opacity-60">Top recommendation</div>
+  <h2 class="font-serif text-3xl"><a href="#c1" class="underline decoration-emerald-400">1. Gom hợp đồng ghi đơn</a></h2>
+  <p class="opacity-80">Đơn là nơi mọi tính năng gần đây đi qua (ship hai kiểu chạm 48 file, khoản chi 41), và fake đã lệch SQL: một module + một contract suite trên hai adapter của PosBackend biến lệch thành test đỏ, ngay trên seam tốt nhất repo.</p>
+</section>
+
+</main>
+</body>
+</html>
