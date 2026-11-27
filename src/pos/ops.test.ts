@@ -18,7 +18,8 @@ const line = (id = 'l1', qty = 1): OrderItem => ({
   qty,
   toppings_snap: [TRUNG, CHA].map((t) => ({ id: t.id, name: t.name, price: t.price, extra_box: t.extra_box_takeaway })),
 });
-const draft = (over = {}) => ({ point_id: 'xoi-a', dine_type: 'takeaway' as const, items: [line()], ...over });
+// Mỗi đơn một id dòng (server từ chối id dòng của đơn khác: `item_id_conflict`).
+const draft = (over = {}) => ({ point_id: 'xoi-a', dine_type: 'takeaway' as const, items: [line(crypto.randomUUID())], ...over });
 
 let server: FakeServer;
 let backend: PosBackend;
@@ -269,8 +270,9 @@ describe('gửi lên server', () => {
   it('server đã ghi nhưng mất phản hồi ⇒ bấm lại đúng thao tác đó dùng lại op_id: không tạo đơn / thu nợ hai lần', async () => {
     await boot();
     let push = loseResponse();
-    await expect(pos.createOrder(draft({ id: 'o-1' }))).rejects.toThrow(OFFLINE_MESSAGE);
-    const o = await pos.createOrder(draft({ id: 'o-1' }));
+    const same = draft({ id: 'o-1' });
+    await expect(pos.createOrder(same)).rejects.toThrow(OFFLINE_MESSAGE);
+    const o = await pos.createOrder(same);
     expect(opIds(push, 'create_order').size).toBe(1);
     expect(o).toMatchObject({ id: 'o-1', device_seq: 1 });
     expect(server.openOrders()).toHaveLength(1);

@@ -161,16 +161,21 @@ export interface ShipFields {
 
 /**
  * Kiểu / phí / tiền trả shipper server sẽ lưu (chưa kiểm): không phải đơn ship ⇒ shop / 0 / 0;
- * thiếu kiểu ⇒ quán ship; quán ship ⇒ bỏ tiền trả shipper.
+ * thiếu / rỗng kiểu ⇒ quán ship; quán ship ⇒ bỏ tiền trả shipper.
  */
 export function shipFields(s: ShipInput): ShipFields {
   if (s.dine_type !== 'delivery') return { ship_mode: 'shop', ship_fee: 0, ship_payout: 0 };
-  const ship_mode = s.ship_mode ?? 'shop';
+  const ship_mode = s.ship_mode || 'shop'; // rỗng như thiếu (`nullif(..., '')`)
   return { ship_mode, ship_fee: s.ship_fee ?? 0, ship_payout: ship_mode === 'external' ? s.ship_payout ?? 0 : 0 };
 }
 
-/** Lý do server từ chối phần ship, hoặc null. Phí 0–50.000, shipper ngoài bắt buộc trả 1.000–50.000, bội 1.000. */
+/**
+ * Lý do server từ chối phần ship, hoặc null. Phí 0–50.000, shipper ngoài bắt buộc trả 1.000–50.000, bội 1.000.
+ * Phí gửi lên phải là số nguyên ≥ 0 cả khi không phải đơn ship (`as_int` của `order_ship_fee` chạy trước khi bỏ phí).
+ */
 export function shipProblem(s: ShipInput): ShipReason | null {
+  const rawFee = s.ship_fee ?? 0;
+  if (!Number.isInteger(rawFee) || rawFee < 0) return 'bad_ship_fee';
   const f = shipFields(s);
   if (!isThousands(f.ship_fee, 0, SHIP_FEE_MAX)) return 'bad_ship_fee';
   if (!SHIP_MODES.includes(f.ship_mode)) return 'bad_ship_mode';

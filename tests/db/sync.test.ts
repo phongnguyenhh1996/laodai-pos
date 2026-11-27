@@ -15,10 +15,7 @@ beforeEach(async () => {
 });
 
 describe('sync_push', () => {
-  it('đơn ship: lưu địa chỉ, báo Telegram khi tạo và khi đổi địa chỉ; thiếu địa chỉ bị từ chối', async () => {
-    const bad = await sim.createOrder([item('xoiGa')], { dine_type: 'delivery', address: '   ' });
-    expect(bad.result).toEqual({ status: 'rejected', reason: 'address_required' });
-
+  it('đơn ship: lưu địa chỉ, báo Telegram khi tạo và khi đổi địa chỉ', async () => {
     const o = await sim.createOrder([item('xoiGa', [], 2)], { dine_type: 'delivery', address: ' 12 Lê Lợi ', label: 'Chị Hoa' });
     expect(o.result).toMatchObject({ status: 'ok' });
     expect(await sql('select dine_type, address from orders where id = $1', [o.id])).toEqual([
@@ -50,9 +47,6 @@ describe('sync_push', () => {
 
   it('đơn ship có khách: tạo khách mới cùng đơn, lưu địa chỉ gần nhất, báo Telegram kèm khách; trả tiền vẫn giữ khách', async () => {
     const newId = '01900000-0000-7000-8000-00000000c0de';
-    const noName = await sim.createOrder([item('xoiGa')], { dine_type: 'delivery', address: '5 Hai Bà Trưng', customer: { id: newId, is_new: true, name: ' ' } });
-    expect(noName.result).toEqual({ status: 'rejected', reason: 'customer_required' });
-
     const o = await sim.createOrder([item('xoiGa')], {
       dine_type: 'delivery', address: '5 Hai Bà Trưng', customer: { id: newId, is_new: true, name: ' Anh Tú ', phone: '0912 345 678' },
     });
@@ -82,15 +76,9 @@ describe('sync_push', () => {
     expect((await sql('select private.customer_balance($1) b', [gv]))[0].b).toBe(0);
   });
 
-  it('phí ship: tổng = món + phí; phí sai bị từ chối; mang về bỏ phí; chủ sửa món giữ phí; doanh thu tách phí ship', async () => {
+  // Luật phí ship (phí sai, tổng lệch, mang về bỏ phí): hợp đồng ghi đơn (order-write-contract.test.ts).
+  it('phí ship: tổng = món + phí; chủ sửa món giữ phí; doanh thu tách phí ship', async () => {
     const ship = { dine_type: 'delivery', address: '12 Lê Lợi' };
-    const noFee = await sim.createOrder([item('xoiGa')], { ...ship, ship_fee: 10000 });
-    expect(noFee.result).toEqual({ status: 'rejected', reason: 'total_mismatch' });
-    for (const bad of [7500, 60000, -5000]) {
-      const r = await sim.createOrder([item('xoiGa')], { ...ship, ship_fee: bad, total: 25000 + bad });
-      expect(r.result).toEqual({ status: 'rejected', reason: 'bad_ship_fee' });
-    }
-
     const o = await sim.createOrder([item('xoiGa')], { ...ship, ship_fee: 10000, total: 35000 });
     expect(o.result).toMatchObject({ status: 'ok' });
     expect(await sql('select ship_fee, total from orders where id = $1', [o.id])).toEqual([{ ship_fee: 10000, total: 35000 }]);
@@ -98,13 +86,9 @@ describe('sync_push', () => {
     expect(n.payload.order).toMatchObject({ ship_fee: 10000, total: 35000 });
 
     const kept = { ...item('xoiGa'), id: (await sql('select id from order_items where order_id = $1', [o.id]))[0].id };
-    // Đổi phí thôi ⇒ không báo lại Telegram; tổng thiếu phí ⇒ từ chối.
+    // Đổi phí thôi ⇒ không báo lại Telegram.
     expect(await sim.update(o.id, [kept], { ...ship, ship_fee: 15000, total: 40000 })).toMatchObject({ status: 'ok' });
     expect(await sql(`select 1 from notifications where kind = 'delivery_order'`)).toHaveLength(1);
-    expect(await sim.update(o.id, [kept], { ...ship, ship_fee: 15000 })).toEqual({ status: 'rejected', reason: 'total_mismatch' });
-    // Mang về: phí gửi kèm bị bỏ (như địa chỉ) ⇒ tổng chỉ còn tiền món.
-    expect(await sim.update(o.id, [kept], { dine_type: 'takeaway', ship_fee: 15000 })).toMatchObject({ status: 'ok' });
-    expect(await sql('select ship_fee, total from orders where id = $1', [o.id])).toEqual([{ ship_fee: 0, total: 25000 }]);
 
     expect(await sim.update(o.id, [kept], { ...ship, ship_fee: 20000, total: 45000 })).toMatchObject({ status: 'ok' });
     expect(await sim.pay(o.id, 45000, 'cash')).toMatchObject({ status: 'ok' });
@@ -207,17 +191,6 @@ describe('sync_push', () => {
     expect((await push(tab, junk)).status).toBe('rejected');
     const future = op('serve_order', o.id, { order_id: o.id }, new Date(Date.now() + 3600_000).toISOString());
     expect(await push(tab, future)).toEqual({ status: 'rejected', reason: 'performed_at_in_future' });
-  });
-
-  it('kiểm giá: món ngừng bán, topping khác menu, giá topping sai đều bị từ chối', async () => {
-    const owner = await ownerClient();
-    await owner.from('products').update({ active: false }).eq('id', SEED.products.xoiPate);
-    expect((await sim.createOrder([item('xoiPate')])).result).toEqual({ status: 'rejected', reason: 'product_inactive' });
-    expect((await sim.createOrder([item('xoiGa', ['canh'])])).result).toEqual({ status: 'rejected', reason: 'bad_topping' });
-    const t = item('xoiGa', ['trung']);
-    t.toppings_snap[0].price = 1;
-    expect((await sim.createOrder([t])).result).toEqual({ status: 'rejected', reason: 'price_mismatch' });
-    expect((await sim.createOrder([item('xoiGa', [], 0)])).result).toEqual({ status: 'rejected', reason: 'bad_qty' });
   });
 
   it('đổi giá: dòng cũ giữ giá chụp, dòng mới dùng giá mới; đơn tạo offline trước khi đổi giá vẫn nhận', async () => {

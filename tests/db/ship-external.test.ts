@@ -42,42 +42,13 @@ describe('dữ liệu: kiểu ship + tiền trả shipper', () => {
     for (const q of bad) await expect(sql(q, [o.id]), q).rejects.toThrow(/check constraint/);
   });
 
-  it('shipper ngoài: lưu kiểu + payout, tổng không cộng payout; payout sai / thiếu ⇒ bad_ship_payout', async () => {
-    for (const bad of [0, 7500, 60000, null, -5000]) {
-      const r = await sim.createOrder([item('xoiGa')], { ...EXT, ship_payout: bad });
-      expect(r.result, String(bad)).toEqual({ status: 'rejected', reason: 'bad_ship_payout' });
-    }
-    const { ship_payout: _omit, ...missing } = EXT;
-    expect((await sim.createOrder([item('xoiGa')], missing)).result).toEqual({ status: 'rejected', reason: 'bad_ship_payout' });
-    expect((await sim.createOrder([item('xoiGa')], { ...EXT, ship_mode: 'grab' })).result).toEqual({ status: 'rejected', reason: 'bad_ship_mode' });
-    // Tổng có cộng payout ⇒ lệch.
-    expect((await sim.createOrder([item('xoiGa')], { ...EXT, total: 40000 })).result).toEqual({ status: 'rejected', reason: 'total_mismatch' });
-
+  // Luật kiểu ship / tiền trả shipper (từ chối, chuẩn hóa shop / 0): hợp đồng ghi đơn (order-write-contract.test.ts).
+  it('shipper ngoài: lưu kiểu + payout, báo Telegram kèm kiểu + payout', async () => {
     const o = await sim.createOrder([item('xoiGa')], EXT);
     expect(o.result).toMatchObject({ status: 'ok', order: { ship_mode: 'external', ship_payout: 10000, total: 30000 } });
     expect(await shipRow(o.id)).toEqual({ dine_type: 'delivery', ship_mode: 'external', ship_fee: 5000, ship_payout: 10000, total: 30000 });
     const [n] = await deliveryNotices();
     expect(n.payload.order).toMatchObject({ ship_mode: 'external', ship_fee: 5000, ship_payout: 10000, total: 30000 });
-
-    // Phụ thu 0 vẫn được (bấm lại = bỏ), payout vẫn bắt buộc.
-    const free = await sim.createOrder([item('xoiGa')], { ...EXT, ship_fee: 0, total: 25000 });
-    expect(free.result).toMatchObject({ status: 'ok' });
-  });
-
-  it('quán ship gửi kèm payout ⇒ bỏ (lưu 0); mang về gửi external ⇒ shop / 0; client cũ không gửi ⇒ shop / 0', async () => {
-    const shop = await sim.createOrder([item('xoiGa')], { ...SHIP, ship_mode: 'shop', ship_fee: 10000, ship_payout: 10000, total: 35000 });
-    expect(await shipRow(shop.id)).toMatchObject({ ship_mode: 'shop', ship_fee: 10000, ship_payout: 0 });
-
-    const take = await sim.createOrder([item('xoiGa')], { dine_type: 'takeaway', ship_mode: 'external', ship_payout: 10000 });
-    expect(take.result).toMatchObject({ status: 'ok' });
-    expect(await shipRow(take.id)).toEqual({ dine_type: 'takeaway', ship_mode: 'shop', ship_fee: 0, ship_payout: 0, total: 25000 });
-
-    const old = await sim.createOrder([item('xoiGa')], { ...SHIP, ship_fee: 10000, total: 35000 });
-    expect(old.result).toMatchObject({ status: 'ok' });
-    expect(await shipRow(old.id)).toMatchObject({ ship_mode: 'shop', ship_payout: 0, total: 35000 });
-    const kept = await keptItem(old.id);
-    expect(await sim.update(old.id, [kept], { ...SHIP, ship_fee: 15000, total: 40000 })).toMatchObject({ status: 'ok' });
-    expect(await shipRow(old.id)).toMatchObject({ ship_mode: 'shop', ship_fee: 15000, ship_payout: 0 });
   });
 
   it('đổi kiểu / payout ⇒ audit trước-sau + Telegram; đổi phí thôi ⇒ không báo; về mang về ⇒ shop / 0', async () => {

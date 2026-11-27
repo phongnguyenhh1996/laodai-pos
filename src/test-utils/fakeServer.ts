@@ -2,11 +2,11 @@
 // cấp mã đơn + số thứ tự, từ chối khi đơn / ca không còn mở, và báo thay đổi (live_pulse) cho mọi máy đang nghe.
 import type { SoldOut } from '@/domain/catalog';
 import { generateOrderCode } from '@/domain/orderCode';
-import type { RejectReason } from '@/domain/orderWrite';
+import { normalizeOrderWrite, type OrderCustomerPayload, type OrderWriteInput, type RejectReason } from '@/domain/orderWrite';
 import { CLOSE_KEY } from '@/pos/ops';
 import { businessDate } from '@/domain/time';
 import { cleanExpenseNote, normalizeExpenseNote, validateExpense } from '@/domain/expenses';
-import type { Customer, Order, OrderItem, ShiftExpense, ShipDefaults, ShipMode } from '@/domain/types';
+import type { Customer, Order, OrderItem, ShiftExpense, ShipDefaults, ToppingSnap } from '@/domain/types';
 import {
   PosNetworkError,
   type CatalogData,
@@ -53,6 +53,8 @@ export class FakeServer {
   /** Lời gọi push tiếp theo được server ghi nhưng phản hồi bị mất (ném lỗi mạng sau khi đã ghi). */
   dropNextResponse = false;
   private results = new Map<string, PushResult>();
+  /** Dòng đơn đã ghi (như bảng `order_items`, kể cả dòng đã bỏ khỏi đơn). */
+  private itemRows = new Map<string, { order_id: string; item: OrderItem; removed: boolean }>();
   private listeners = new Set<{ profileId: string; onPulse: (s: PulseScope) => void }>();
 
   constructor(catalog: CatalogData) {
@@ -162,25 +164,95 @@ export class FakeServer {
     return this.orders.filter((o) => o.tablet_profile_id === profileId && (o.status === 'open' || o.status === 'served'));
   }
 
-  /** Khách của đơn ship (như `private.order_customer`): tạo khách mới nếu chưa có, lưu địa chỉ giao gần nhất. */
-  private shipCustomer(dine_type: string, address: string | null, raw: unknown): string | null {
-    if (dine_type !== 'delivery' || !address || !raw) return null;
-    const c = raw as { id: string; name?: string; description?: string | null; phone?: string | null };
-    const found = this.catalog.customers.find((x) => x.id === c.id);
-    if (found) {
-      found.address = address;
-      return found.id;
+  // ---------------------------------------------------------------- ghi đơn (như SQL)
+
+  /** Menu của điểm bán; điểm không thuộc quầy ⇒ `point_not_allowed`. Điểm không tồn tại ⇒ không có menu (mọi món `bad_product`). */
+  private pointMenu(profileId: string, pointId: string): string | undefined {
+    const prof = this.catalog.profile;
+    if (prof.id !== profileId || !prof.point_ids.includes(pointId)) throw new Reject('point_not_allowed');
+    return this.catalog.points.find((x) => x.id === pointId)?.menu_id;
+  }
+
+  /**
+   * Phần chung của `op_create_order` / `op_update_order` sau khi kiểm ca / đơn / điểm bán:
+   * chuẩn hóa bằng `normalizeOrderWrite` (luật chung với máy), rồi phần chỉ server biết — khách có sẵn hay không,
+   * giá / món / topping theo danh mục (`write_items`), tổng. Chỉ ghi (khách, dòng) khi mọi bước đều qua.
+   * Khác SQL khi một op sai nhiều chỗ cùng lúc: lỗi món của máy (`empty_items`, `bad_qty`) có thể báo trước lỗi khách.
+   */
+  private writeOrder(orderId: string, menuId: string | undefined, input: OrderWriteInput, sentTotal: number) {
+    const n = normalizeOrderWrite(input);
+    if (!n.ok) throw new Reject(n.reason);
+    const customer = this.orderCustomer(n.order.customer);
+    const lines = this.writeItems(orderId, menuId, n.order.items);
+    if (lines.total + n.order.ship_fee !== sentTotal) throw new Reject('total_mismatch');
+
+    if (customer) {
+      const found = this.catalog.customers.find((c) => c.id === customer.id);
+      if (found) found.address = n.order.address;
+      else this.catalog.customers.push({ ...customer, address: n.order.address, merged_into_id: null });
     }
-    if (!c.name?.trim()) throw new Reject('customer_required');
-    this.catalog.customers.push({
-      id: c.id,
-      name: c.name.trim(),
-      description: c.description ?? null,
-      phone: c.phone ?? null,
-      address,
-      merged_into_id: null,
-    });
-    return c.id;
+    for (const [id, row] of this.itemRows) if (row.order_id === orderId && !lines.items.some((it) => it.id === id)) row.removed = true;
+    for (const it of lines.items) this.itemRows.set(it.id, { order_id: orderId, item: clone(it), removed: false });
+    return { order: n.order, customer_id: customer?.id ?? null, items: clone(lines.items) };
+  }
+
+  /** Như `private.order_customer`: khách gốc (theo `merged_into_id`), hoặc khách mới cần tên. Chưa ghi gì. */
+  private orderCustomer(c: OrderCustomerPayload | null): Omit<Customer, 'address' | 'merged_into_id'> | null {
+    if (!c) return null;
+    let found = this.catalog.customers.find((x) => x.id === c.id);
+    while (found?.merged_into_id) {
+      const root: string = found.merged_into_id;
+      found = this.catalog.customers.find((x) => x.id === root);
+    }
+    if (found) return { id: found.id, name: found.name, description: found.description, phone: found.phone };
+    if (!c.is_new) throw new Reject('customer_required');
+    return { id: c.id, name: c.name, description: c.description, phone: c.phone };
+  }
+
+  /**
+   * Như `private.write_items`: dòng giữ nguyên (cùng id, cùng món, cùng topping) phải đúng giá đã chụp;
+   * dòng mới phải đúng giá hiện hành của danh mục (bản giả không có lịch sử giá) và món / topping còn bán.
+   * Tên / topping chụp từ danh mục. Trả dòng sẽ ghi + tổng tính lại; chưa ghi gì.
+   */
+  private writeItems(orderId: string, menuId: string | undefined, items: readonly OrderItem[]): { items: OrderItem[]; total: number } {
+    const seen = new Set<string>();
+    const out: OrderItem[] = [];
+    let total = 0;
+    for (const it of items) {
+      if (seen.has(it.id)) throw new Reject('duplicate_item');
+      const prod = this.catalog.products.find((x) => x.id === it.product_id);
+      if (!prod || prod.menu_id !== menuId) throw new Reject('bad_product');
+      const old = this.itemRows.get(it.id);
+      if (old && old.order_id !== orderId) throw new Reject('item_id_conflict');
+      const ids = (xs: readonly { id: string }[]) => xs.map((x) => x.id).sort().join();
+      const keep = old && !old.removed && old.item.product_id === prod.id && ids(old.item.toppings_snap) === ids(it.toppings_snap) ? old.item : null;
+      if (keep) {
+        if (it.unit_price_snap !== keep.unit_price_snap) throw new Reject('price_mismatch');
+      } else {
+        if (old) throw new Reject('item_id_conflict');
+        if (!prod.active) throw new Reject('product_inactive');
+        if (it.unit_price_snap !== prod.price) throw new Reject('price_mismatch');
+      }
+      const toppings: ToppingSnap[] = it.toppings_snap.map((tp) => {
+        const top = this.catalog.toppings.find((x) => x.id === tp.id);
+        if (!top || top.menu_id !== menuId) throw new Reject('bad_topping');
+        if (keep) {
+          if (tp.price !== keep.toppings_snap.find((x) => x.id === tp.id)?.price) throw new Reject('price_mismatch');
+        } else {
+          if (!top.active) throw new Reject('topping_inactive');
+          if (tp.price !== top.price) throw new Reject('price_mismatch');
+        }
+        return { id: top.id, name: top.name, price: tp.price, extra_box: top.extra_box_takeaway };
+      });
+      out.push(
+        keep
+          ? { ...clone(keep), qty: it.qty }
+          : { id: it.id, product_id: prod.id, name_snap: prod.name, unit_price_snap: it.unit_price_snap, qty: it.qty, toppings_snap: toppings },
+      );
+      total += (it.unit_price_snap + toppings.reduce((t, x) => t + x.price, 0)) * it.qty;
+      seen.add(it.id);
+    }
+    return { items: out, total };
   }
 
   order(id: string): Order | undefined {
@@ -256,25 +328,6 @@ export class FakeServer {
       if (o.status !== 'open' && o.status !== 'served') throw new Reject('order_not_open');
       return o;
     };
-    const total = (items: OrderItem[]) => items.reduce((s, it) => s + (it.unit_price_snap + it.toppings_snap.reduce((t, x) => t + x.price, 0)) * it.qty, 0);
-    /** Như `private.order_ship_fee`. */
-    const shipFee = (x: Record<string, unknown>) => {
-      const v = (x.ship_fee as number | undefined) ?? 0;
-      if (!Number.isInteger(v) || v < 0) throw new Reject('bad_ship_fee');
-      if (x.dine_type !== 'delivery') return 0;
-      if (v > 50_000 || v % 1000 !== 0) throw new Reject('bad_ship_fee');
-      return v;
-    };
-    /** Như `private.order_ship_mode` / `private.order_ship_payout`. */
-    const ship = (x: Record<string, unknown>): { ship_mode: ShipMode; ship_payout: number } => {
-      if (x.dine_type !== 'delivery') return { ship_mode: 'shop', ship_payout: 0 };
-      const mode = (x.ship_mode as string | undefined) || 'shop';
-      if (mode !== 'shop' && mode !== 'external') throw new Reject('bad_ship_mode');
-      if (mode === 'shop') return { ship_mode: 'shop', ship_payout: 0 };
-      const v = x.ship_payout;
-      if (typeof v !== 'number' || !Number.isInteger(v) || v < 1000 || v > 50_000 || v % 1000 !== 0) throw new Reject('bad_ship_payout');
-      return { ship_mode: 'external', ship_payout: v };
-    };
 
     switch (op.kind) {
       case 'open_shift': {
@@ -313,28 +366,22 @@ export class FakeServer {
         return {};
       }
       case 'create_order': {
-        const s = shift();
-        const o = p.order as Record<string, unknown>;
-        const items = p.items as OrderItem[];
-        if (s.id !== o.opened_shift_id) throw new Reject('bad_shift');
-        if (!items?.length) throw new Reject('empty_items');
-        const ship_fee = shipFee(o);
-        const sm = ship(o);
-        if (total(items) + ship_fee !== o.total) throw new Reject('total_mismatch');
-        if (o.dine_type === 'delivery' && !o.address) throw new Reject('address_required');
-        if (this.order(o.id as string)) throw new Reject('order_exists');
-        const customer_id = this.shipCustomer(o.dine_type as string, (o.address as string | null) ?? null, p.customer);
+        const { order: o, customer, items } = op.payload;
+        const s = this.shifts.find((x) => x.id === o.opened_shift_id && x.tablet_profile_id === profileId);
+        if (!s) throw new Reject('bad_shift');
+        if (this.order(o.id)) throw new Reject('order_exists');
+        if (s.status !== 'open') throw new Reject('shift_not_open');
+        const menu = this.pointMenu(profileId, o.point_id);
+        if (!this.catalog.points.some((x) => x.id === o.point_id && x.active)) throw new Reject('point_inactive');
+        const w = this.writeOrder(o.id, menu, { ...o, customer, items }, o.total);
         const mine = this.orders.filter((x) => x.tablet_profile_id === profileId);
+        const { customer: _c, ...fields } = w.order;
         const order: Order = {
-          id: o.id as string,
+          ...fields,
+          id: o.id,
           device_seq: mine.reduce((m, x) => Math.max(m, x.device_seq), 0) + 1,
           tablet_profile_id: profileId,
-          point_id: o.point_id as string,
           code: generateOrderCode(new Set(mine.map((x) => x.code))),
-          label: (o.label as string | null) ?? null,
-          table_no: (o.table_no as string | null) ?? null,
-          dine_type: o.dine_type as Order['dine_type'],
-          address: (o.address as string | null) ?? null,
           status: 'open',
           opened_shift_id: s.id,
           paid_shift_id: null,
@@ -343,39 +390,25 @@ export class FakeServer {
           paid_at: null,
           deleted_at: null,
           delete_reason: null,
-          ship_fee,
-          ...sm,
-          total: o.total as number,
+          total: o.total,
           payment_method: null,
           cash_given: null,
-          customer_id,
+          customer_id: w.customer_id,
           owner_edited: false,
-          items: clone(items),
+          items: w.items,
         };
         this.orders.push(order);
-        return { data: { order: clone(order) }, catalog: !!customer_id };
+        return { data: { order: clone(order) }, catalog: !!w.customer_id };
       }
       case 'update_order': {
-        const o = open(p.order_id);
-        const items = p.items as OrderItem[];
-        const ship_fee = shipFee(p);
-        const sm = ship(p);
-        if (total(items) + ship_fee !== p.total) throw new Reject('total_mismatch');
-        if (p.dine_type === 'delivery' && !p.address) throw new Reject('address_required');
-        const customer_id = this.shipCustomer(p.dine_type as string, p.address as string | null, p.customer);
-        Object.assign(o, {
-          point_id: p.point_id,
-          dine_type: p.dine_type,
-          address: p.address ?? null,
-          customer_id,
-          label: p.label ?? null,
-          table_no: p.table_no ?? null,
-          items: clone(items),
-          ship_fee,
-          ...sm,
-          total: p.total,
-        });
-        return { data: { order: clone(o) }, catalog: !!customer_id };
+        const u = op.payload;
+        const o = open(u.order_id);
+        // Như `op_update_order`: điểm bán phải thuộc quầy, nhưng không kiểm điểm còn mở bán.
+        const menu = this.pointMenu(profileId, u.point_id);
+        const w = this.writeOrder(o.id, menu, u, u.total);
+        const { customer: _c, ...fields } = w.order;
+        Object.assign(o, { ...fields, customer_id: w.customer_id, items: w.items, total: u.total });
+        return { data: { order: clone(o) }, catalog: !!w.customer_id };
       }
       case 'serve_order': {
         const o = open(p.order_id);
