@@ -774,7 +774,7 @@ describe('hàng đợi', () => {
     expect(screen.queryByTestId('swap-banner')).not.toBeInTheDocument();
     let lines = within(tid('cart-lines')).getAllByRole('listitem');
     expect(lines).toHaveLength(2);
-    expect(lines[0]).toHaveTextContent('Xôi gà (Trứng)');
+    expect(lines[0]).toHaveTextContent('Xôi gà+ Trứng'); // topping là dòng phụ dưới tên
     expect(within(lines[0]).getByTestId(/-qty$/)).toHaveTextContent('2');
     expect(tid('order-total')).toHaveTextContent('77.000'); // 2 × 31.000 + 15.000
 

@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
-import { ArrowLeftRight, Banknote, Bike, ChefHat, ChevronRight, ChevronUp, Check, MapPin, Minus, Plus, Receipt, Save, ShoppingBag, Soup, Tag, Trash2, UtensilsCrossed, Wallet, X } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from 'react';
+import { ArrowLeftRight, Banknote, Bike, ChefHat, ChevronRight, ChevronUp, Check, MapPin, Minus, Plus, Receipt, Save, ShoppingBag, Tag, Trash2, UtensilsCrossed, Wallet, X } from 'lucide-react';
 import { v7 as uuidv7 } from 'uuid';
 import {
   addCombo,
@@ -37,6 +37,7 @@ import { DINE_LABELS, SHIP_MODE_LABELS, type Combo, type DeleteReason, type Dine
 import { pos } from '@/lib/pos';
 import { Splash, errorMessage } from '@/app/ui';
 import { useIsTablet } from '@/app/useMediaQuery';
+import { Badge, FIELD, FIELD_ICON, IconTile, ItemThumb, PayMethodTile, Segmented, SheetHandle, iconBtn, staffBtn } from '@/app/kit';
 import { MenuBoard } from './MenuBoard';
 import { Notice, Sheet, useTablet, type LeaveGuard } from './parts';
 import { useDebtBook } from './debt';
@@ -44,7 +45,7 @@ import { ShipCustomerPicker } from './ShipCustomer';
 import { ShipSheet } from './ShipSheet';
 import { ReprintKitchenButton } from './PrinterStatus';
 import type { ToastTone } from './Toast';
-import { CartPay, DebtSheet, PayMethodRow, type ConfirmPay, type PayMethod } from './CartPay';
+import { CartPay, DebtSheet, type ConfirmPay, type PayMethod } from './CartPay';
 import type { PaymentInput } from '@/pos';
 
 const DINE_TYPES: ReadonlyArray<{ id: DineType; Icon: typeof ShoppingBag }> = [
@@ -57,8 +58,10 @@ const SHIP_MODES: readonly ShipMode[] = ['shop', 'external'];
 
 const DELETE_REASONS = (['mistake', 'customer_left', 'customer_changed', 'other'] as const).map((id) => ({ id, label: DELETE_REASON_LABELS[id] }));
 
-/** Nút thao tác phụ: điện thoại ba nút một hàng 44px, biểu tượng cạnh chữ (Figma MS1). */
-const ACTION_BTN = 'min-h-[44px] gap-1.5 whitespace-nowrap px-1 text-[13px] md:min-h-[52px] md:gap-2 md:px-4 md:text-base';
+/** Nút −/+ của dòng món (Figma BH2): 36 nền xám bo 10. */
+const QTY_BTN = 'flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-[#f3f3f3] text-[#111] transition-colors duration-fast hover:bg-[#e9e9e9]';
+
+const PAY_METHOD_KEYS = ['cash', 'transfer', 'debt'] as const;
 
 /** Chờ ngần này sau lần sửa cuối mới tự lưu (gõ nhãn, bấm +/− liên tục chỉ ra một update_order). */
 const AUTOSAVE_MS = 800;
@@ -507,6 +510,201 @@ export function OrderEditor({
   const feeNoun = external ? 'Phụ thu' : 'Phí ship';
   const cartQty = (productId: string) => d.items.reduce((s, it) => s + (it.product_id === productId ? it.qty : 0), 0);
 
+  const chip = (on: boolean) =>
+    `flex h-9 min-w-0 flex-1 items-center justify-center rounded-xl px-2 text-sm font-semibold leading-[18px] transition-colors duration-fast ${
+      on ? 'border-[1.5px] border-brand bg-[#ffeee7] text-[#c2380a]' : 'border border-line bg-white text-[#111] hover:border-[#cfcfcf]'
+    }`;
+  /** Hàng chọn mức tiền (Figma BH6 / BH7): nhãn 84 bên trái, 4 chip chia đều. */
+  const amountRow = (title: string, titleTestId: string | undefined, extra: ReactNode, chips: ReactNode) => (
+    <div className="flex shrink-0 flex-col gap-1">
+      <div className="flex items-center gap-2">
+        <span className="w-[84px] shrink-0 text-[13px] font-semibold leading-[17px] text-[#6d6d6d]" data-testid={titleTestId}>
+          {title}
+        </span>
+        <div className="flex min-w-0 flex-1 gap-2" role="group" aria-label={title}>
+          {chips}
+        </div>
+      </div>
+      {extra}
+    </div>
+  );
+
+  const dineSegment = (
+    <Segmented
+      stretch
+      className="shrink-0"
+      label="Tại chỗ / Mang về / Ship"
+      value={d.dine_type}
+      onChange={(t) => edit((x) => setDineType(x, t))}
+      options={DINE_TYPES.map(({ id, Icon }) => ({ key: id, label: DINE_LABELS[id], icon: Icon, testId: `order-dine-${id}` }))}
+    />
+  );
+
+  const shipFields = isShip && (
+    <>
+      <Segmented
+        stretch
+        small
+        className="shrink-0"
+        label="Kiểu ship"
+        value={d.ship_mode}
+        onChange={(m) => edit((x) => setShipMode(x, m))}
+        options={SHIP_MODES.map((m) => ({ key: m, label: SHIP_MODE_LABELS[m], testId: `order-ship-mode-${m}` }))}
+      />
+      {/* Bấm lại mức đang chọn ⇒ bỏ phí. */}
+      {amountRow(
+        feeNoun,
+        'order-ship-fee-title',
+        null,
+        SHIP_FEES.map((fee) => (
+          <button
+            key={fee}
+            type="button"
+            aria-pressed={d.ship_fee === fee}
+            onClick={() => edit((x) => toggleShipFee(x, fee))}
+            className={chip(d.ship_fee === fee)}
+            data-testid={`order-ship-fee-${fee}`}
+          >
+            {shipFeeLabel(fee)}
+          </button>
+        )),
+      )}
+      {/* Bắt buộc chọn: bấm lại mức đang chọn không bỏ được. Không cộng vào tổng đơn. */}
+      {external &&
+        amountRow(
+          'Trả shipper (tiền két)',
+          undefined,
+          noPayout && (
+            <span className="pl-[92px] text-[13px] font-medium text-[#b91c1c]" data-testid="order-payout-missing">
+              Chưa chọn tiền trả shipper
+            </span>
+          ),
+          SHIP_PAYOUTS.map((v) => (
+            <button key={v} type="button" aria-pressed={payout === v} onClick={() => edit((x) => toggleShipPayout(x, v))} className={chip(payout === v)} data-testid={`order-ship-payout-${v}`}>
+              {shipFeeLabel(v)}
+            </button>
+          )),
+        )}
+    </>
+  );
+
+  const labelField = (
+    <span className="relative shrink-0">
+      <Tag aria-hidden className={FIELD_ICON} />
+      <input
+        className={`${FIELD} pl-[39px]`}
+        aria-label="Nhãn / số bàn"
+        placeholder="Nhãn / số bàn (tùy chọn)"
+        maxLength={40}
+        value={d.label}
+        onChange={(e) => edit((x) => ({ ...x, label: e.target.value }))}
+        data-testid="order-label"
+      />
+    </span>
+  );
+
+  /** Dòng món (Figma BH2): ô ảnh, tên, topping dòng phụ, thành tiền cam đậm, −/+ 36. Bấm tên ⇒ chọn dòng để đổi món. */
+  const cartLines = (
+    <ul className={`${cartOpen ? 'flex' : 'hidden'} min-h-0 flex-col overflow-y-auto md:flex md:min-h-fit md:flex-1 md:overflow-visible md:px-4`} data-testid="cart-lines">
+      {empty && (
+        <li className="flex flex-1 flex-col items-center justify-center gap-2 py-8 text-center">
+          <span aria-hidden className="flex h-16 w-16 items-center justify-center rounded-full bg-[#f4f4f4] text-[#b5b5b5]">
+            <ShoppingBag className="h-7 w-7" />
+          </span>
+          <span className="text-base font-semibold leading-5 text-[#111]">Chưa có món</span>
+          <span className="text-[13px] leading-4 text-[#888]">Bấm combo hoặc món để thêm</span>
+        </li>
+      )}
+      {d.items.map((it) => {
+        const picking = swapLine?.id === it.id;
+        return (
+          <li
+            key={it.id}
+            data-testid={`cart-line-${it.id}`}
+            data-product={it.product_id}
+            data-swapping={picking || undefined}
+            className={`flex items-center gap-3 border-b py-3 last:border-b-0 ${picking ? 'rounded-xl border-brand bg-[#ffeee7] px-2 ring-2 ring-brand/30' : 'border-line'}`}
+          >
+            <ItemThumb className="h-11 w-11 rounded-xl md:h-[52px] md:w-[52px]" />
+            <button
+              type="button"
+              className="flex min-w-0 flex-1 flex-col gap-[3px] rounded-lg text-left"
+              aria-pressed={picking}
+              aria-label={`Đổi món ${lineSummary(it)}`}
+              onClick={() => {
+                // Điện thoại: chọn dòng để đổi ⇒ thu gọn giỏ cho thấy thực đơn.
+                if (!picking) setCartOpen(false);
+                setSwapId((cur) => (cur === it.id ? null : it.id));
+              }}
+              data-testid={`cart-line-${it.id}-pick`}
+            >
+              <span className="truncate text-sm font-semibold leading-[18px] text-[#111]">{it.name_snap}</span>
+              {it.toppings_snap.length > 0 && <span className="truncate text-xs leading-[15px] text-[#888]">+ {it.toppings_snap.map((t) => t.name).join(', ')}</span>}
+              <span className="num text-[13px] font-semibold leading-4 text-[#c2380a]" data-testid={`cart-line-${it.id}-total`}>
+                {picking ? 'Chọn món mới…' : formatVnd(lineTotal(it))}
+              </span>
+            </button>
+            <span className="flex shrink-0 items-center gap-1">
+              <button type="button" className={QTY_BTN} onClick={() => edit((x) => ({ ...x, items: stepLineQty(x.items, it.id, -1) }))} aria-label="Bớt" data-testid={`cart-line-${it.id}-minus`}>
+                <Minus aria-hidden className="h-[18px] w-[18px]" />
+              </button>
+              <span className="num w-[26px] text-center text-[15px] font-bold leading-[19px] text-[#111]" data-testid={`cart-line-${it.id}-qty`}>
+                {it.qty}
+              </span>
+              <button type="button" className={QTY_BTN} onClick={() => edit((x) => ({ ...x, items: stepLineQty(x.items, it.id, 1) }))} aria-label="Thêm" data-testid={`cart-line-${it.id}-plus`}>
+                <Plus aria-hidden className="h-[18px] w-[18px]" />
+              </button>
+            </span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+
+  const errorNotice = (
+    <Notice testId="order-error" tone="error">
+      {error ?? (saved && empty ? 'Đơn không còn món nào: thêm món, hoặc bấm Xóa đơn.' : null)}
+    </Notice>
+  );
+
+  const payExactBtn = (
+    <button type="button" className={staffBtn('primary', 'lg', 'w-full shrink-0')} disabled={blocked} onClick={() => void payExact()} data-testid="order-pay-exact">
+      <Banknote aria-hidden />
+      <span>
+        Thu đủ<span className="hidden md:inline"> tiền mặt</span> · <span className="num">{formatVnd(total)}</span>
+      </span>
+    </button>
+  );
+
+  const actionRow = (
+    <div className="order-2 grid shrink-0 grid-cols-2 gap-2 md:order-none">
+      {saved?.status !== 'served' && (
+        <button type="button" className={staffBtn('secondary')} disabled={blocked} onClick={() => void serve()} data-testid="order-serve">
+          <ChefHat aria-hidden />
+          Đã ra món
+        </button>
+      )}
+      {!saved && (
+        <button type="button" className={staffBtn('secondary')} disabled={blocked} onClick={() => void save()} data-testid="order-save">
+          <Save aria-hidden />
+          Tạo đơn
+        </button>
+      )}
+      {saved && (
+        <button
+          type="button"
+          className={staffBtn('danger', 'md', saved.status === 'served' ? 'col-span-2' : '')}
+          disabled={busy}
+          onClick={() => setDialog({ kind: 'delete' })}
+          data-testid="order-delete"
+        >
+          <Trash2 aria-hidden />
+          Xóa đơn
+        </button>
+      )}
+    </div>
+  );
+
   // Điện thoại: hàng đợi ở trên, thực đơn cuộn ở giữa, giỏ (thu gọn còn một dòng) + nút thao tác luôn ở đáy:
   // bấm món là thấy ngay số món / tổng tiền, không phải cuộn xuống mới tạo đơn được.
   // Tablet (md+), theo Figma: hàng đợi + thực đơn ở cột giữa, cột giỏ trắng bên phải (đầu đơn ở đầu cột).
@@ -552,80 +750,68 @@ export function OrderEditor({
 
       <aside
         data-testid="cart"
-        className="relative row-start-3 flex max-h-[78vh] min-w-0 flex-col gap-2 rounded-t-3xl bg-surface px-4 pb-[max(16px,env(safe-area-inset-bottom))] pt-2 shadow-raised md:col-start-2 md:row-span-2 md:row-start-1 md:max-h-none md:min-h-0 md:gap-3 md:rounded-none md:border-l md:border-line md:px-5 md:pb-5 md:pt-4 md:shadow-none"
+        className="relative row-start-3 flex max-h-[78vh] min-w-0 flex-col gap-2 rounded-t-3xl bg-surface px-4 pb-[max(16px,env(safe-area-inset-bottom))] pt-2 shadow-raised md:col-start-2 md:row-span-2 md:row-start-1 md:max-h-none md:min-h-0 md:gap-0 md:rounded-none md:border-l md:border-line md:p-0 md:shadow-none"
       >
-        <span aria-hidden className="mx-auto h-1 w-10 shrink-0 rounded-full bg-line-strong md:hidden" />
-        {/* Đầu giỏ: mã đơn + trạng thái lưu, in lại phiếu bếp, ✕ bỏ chọn. Điện thoại chỉ hiện khi đang chọn đơn. */}
-        <div className={`${saved ? 'flex' : 'hidden md:flex'} shrink-0 items-center gap-3`}>
-          <span aria-hidden className={`icon-tile hidden h-11 w-11 rounded-xl md:flex ${saved ? 'bg-brand text-white' : 'bg-brand-soft text-brand-strong'}`}>
-            {saved ? <Receipt className="h-[22px] w-[22px]" /> : <Plus className="h-[22px] w-[22px]" />}
-          </span>
+        <SheetHandle className="md:hidden" />
+        {/* Đầu giỏ (Figma BH1 / BH3): ô icon, "Đơn mới" / "Đơn #mã" + trạng thái lưu, in lại phiếu bếp, ✕ bỏ chọn. Điện thoại chỉ hiện khi đang chọn đơn. */}
+        <div className={`${saved ? 'flex' : 'hidden md:flex'} shrink-0 items-center gap-3 md:border-b md:border-line md:px-4 md:py-3.5`}>
+          <IconTile icon={Receipt} className="hidden h-11 w-11 rounded-xl md:flex" iconClass="h-[22px] w-[22px]" tone="bg-[#ffeee7] text-brand" />
           {saved ? (
-            <span className="flex min-w-0 flex-1 flex-col">
-              <span className="truncate text-xl font-bold leading-tight">
+            <span className="flex min-w-0 flex-1 flex-col gap-1">
+              <span className="truncate text-lg font-bold leading-[23px] text-[#111]">
                 Đơn #
-                <span className="font-mono tracking-wider" data-testid="order-code">
+                <span className="font-mono leading-none tracking-wider" data-testid="order-code">
                   {saved.code}
                 </span>
               </span>
-              <span className="mt-0.5 flex flex-wrap items-center gap-1.5">
-                <span
-                  className={`badge rounded-md px-2 text-xs ${autoPending ? 'bg-warning-soft text-warning-strong' : empty ? 'bg-surface-sunken text-ink-muted' : 'bg-success-soft text-success-strong'}`}
-                  data-testid="order-autosave"
-                  data-state={autoPending ? 'saving' : 'saved'}
-                >
-                  <span aria-hidden className={`dot h-1.5 w-1.5 ${autoPending ? 'bg-warning' : empty ? 'bg-ink-subtle' : 'bg-success'}`} />
+              <span className="flex flex-wrap items-center gap-1.5">
+                <Badge tone={autoPending ? 'amber' : empty ? 'gray' : 'green'} icon={autoPending || empty ? undefined : Check} testId="order-autosave" data-state={autoPending ? 'saving' : 'saved'}>
                   {autoPending ? 'Đang lưu…' : empty ? 'Chưa lưu: đơn trống' : 'Đã lưu'}
-                </span>
+                </Badge>
                 {saved.status === 'open' ? (
-                  <span className="badge rounded-md bg-warning-soft text-xs text-warning-strong" data-testid="order-status">
-                    <ChefHat aria-hidden className="h-3.5 w-3.5" />
+                  <Badge tone="amber" icon={ChefHat} testId="order-status">
                     Chờ ra món
-                  </span>
+                  </Badge>
                 ) : (
-                  <span className="badge rounded-md bg-brand-soft text-xs text-brand-deep" data-testid="order-status">
-                    <Wallet aria-hidden className="h-3.5 w-3.5" />
+                  <Badge tone="blue" icon={Wallet} testId="order-status">
                     Chờ thanh toán
-                  </span>
+                  </Badge>
                 )}
               </span>
             </span>
           ) : (
-            <span className="flex min-w-0 flex-1 flex-col">
-              <span className="text-xl font-bold leading-tight" data-testid="order-code">
+            <span className="flex min-w-0 flex-1 flex-col gap-1">
+              <span className="text-lg font-bold leading-[23px] text-[#111]" data-testid="order-code">
                 Đơn mới
               </span>
-              <span className="text-[13px] text-ink-subtle">{empty ? 'Chưa có món' : 'Chưa lưu'}</span>
+              <span className="text-xs leading-[15px] text-[#888]">{empty ? 'Chưa có món' : 'Chưa lưu'}</span>
             </span>
           )}
-          {saved && <ReprintKitchenButton orderId={saved.id} code={saved.code} testId="order-reprint" />}
           {saved && (
-            <button
-              type="button"
-              className="btn btn-secondary h-11 min-h-0 w-11 min-w-0 shrink-0 px-0"
-              onClick={() => requestLeave(onClose)}
-              aria-label="Bỏ chọn, về đơn mới"
-              title="Bỏ chọn, về đơn mới"
-              data-testid="order-deselect"
-            >
-              <X aria-hidden className="h-5 w-5 text-ink-muted" />
-            </button>
+            <span className="flex shrink-0 items-center gap-2">
+              <ReprintKitchenButton orderId={saved.id} code={saved.code} testId="order-reprint" />
+              <button type="button" className={iconBtn()} onClick={() => requestLeave(onClose)} aria-label="Bỏ chọn, về đơn mới" title="Bỏ chọn, về đơn mới" data-testid="order-deselect">
+                <X aria-hidden className="h-[18px] w-[18px]" />
+              </button>
+            </span>
           )}
         </div>
         {paying && saved ? (
-          <CartPay
-            key={saved.id}
-            order={saved}
-            method={paying.method}
-            busy={busy}
-            error={paying.method === 'debt' ? null : error}
-            onMethod={pickPayMethod}
-            onBack={() => {
-              setError(null);
-              setPaying(null);
-            }}
-            onConfirm={confirmPay}
-          />
+          <div className="flex min-h-0 flex-1 flex-col md:px-5 md:pb-5 md:pt-4">
+            <CartPay
+              key={saved.id}
+              order={saved}
+              method={paying.method}
+              busy={busy}
+              error={paying.method === 'debt' ? null : error}
+              onMethod={pickPayMethod}
+              onBack={() => {
+                setError(null);
+                setPaying(null);
+              }}
+              onConfirm={confirmPay}
+            />
+          </div>
         ) : (
           <>
             {/* Chỉ trên điện thoại: một dòng tóm tắt giỏ, bấm để mở / thu gọn chi tiết (dòng món, nhãn). */}
@@ -661,278 +847,104 @@ export function OrderEditor({
               </span>
               <ChevronUp aria-hidden className={`h-5 w-5 shrink-0 text-ink-subtle transition-transform duration-fast ${cartOpen ? 'rotate-180' : ''}`} />
             </button>
-            <div className="segment-group shrink-0 grid-cols-3" role="group" aria-label="Tại chỗ / Mang về / Ship">
-              {DINE_TYPES.map(({ id: t, Icon }) => (
-                <button
-                  key={t}
-                  type="button"
-                  aria-pressed={d.dine_type === t}
-                  onClick={() => edit((x) => setDineType(x, t))}
-                  className="btn btn-segment min-h-[40px] gap-1.5 whitespace-nowrap rounded-[9px] px-1 text-[15px] font-medium md:min-h-[44px]"
-                  data-testid={`order-dine-${t}`}
-                >
-                  <Icon aria-hidden className="h-[18px] w-[18px] shrink-0" />
-                  {DINE_LABELS[t]}
-                </button>
-              ))}
+            {/* Tablet: loại đơn + nhãn + món cuộn chung, đơn ship (nhiều hàng chọn) không đẩy phần tóm tắt ra khỏi cột (Figma BH7).
+                Điện thoại: `contents`, các phần nằm thẳng trong sheet giỏ; nhãn + dòng món chỉ hiện khi mở rộng. */}
+            <div className="contents md:flex md:min-h-0 md:flex-1 md:flex-col md:overflow-y-auto">
+              <div className="contents md:flex md:shrink-0 md:flex-col md:gap-2.5 md:px-4 md:py-3.5">
+                {dineSegment}
+                {shipFields}
+                {/* Điện thoại: chỉ một dòng bấm để mở bảng nhập địa chỉ / khách (không bật bàn phím khi chọn Ship). */}
+                {isShip && !isTablet && (
+                  <button
+                    type="button"
+                    className="flex min-h-[44px] shrink-0 items-center gap-3 rounded-xl border border-line-strong bg-surface px-3 text-left"
+                    onClick={() => setShipOpen(true)}
+                    data-testid="order-ship-details"
+                  >
+                    <MapPin aria-hidden className={`h-5 w-5 shrink-0 ${noAddress ? 'text-danger-strong' : 'text-ink-subtle'}`} />
+                    {noAddress ? (
+                      <span className="min-w-0 flex-1 truncate text-sm font-medium text-danger-strong" data-testid="order-address-missing">
+                        Địa chỉ, khách — bấm để nhập
+                      </span>
+                    ) : (
+                      <span className="min-w-0 flex-1 truncate text-sm font-medium" data-testid="order-ship-summary">
+                        {d.address.trim()}
+                        {d.customer && <span className="text-ink-subtle"> · {customerLabel(d.customer)}</span>}
+                      </span>
+                    )}
+                    <ChevronRight aria-hidden className="h-5 w-5 shrink-0 text-ink-subtle" />
+                  </button>
+                )}
+                {isShip && isTablet && <ShipCustomerPicker book={book} customer={d.customer} autoFocus={!d.address} onChange={(c) => edit((x) => setCustomer(x, c))} />}
+                {isShip && isTablet && (
+                  <label className="flex shrink-0 flex-col gap-1">
+                    <span className="relative">
+                      <MapPin aria-hidden className={FIELD_ICON} />
+                      <input
+                        className={`${FIELD} pl-[39px]`}
+                        aria-label="Địa chỉ giao"
+                        aria-invalid={noAddress}
+                        placeholder={d.customer?.phone ? 'Địa chỉ giao (bắt buộc)' : 'Địa chỉ giao, SĐT (bắt buộc)'}
+                        maxLength={200}
+                        autoFocus={!d.address && !!d.customer}
+                        value={d.address}
+                        onChange={(e) => edit((x) => ({ ...x, address: e.target.value }))}
+                        onFocus={() => setTypingAddress(true)}
+                        onBlur={() => setTypingAddress(false)}
+                        data-testid="order-address"
+                      />
+                    </span>
+                    {noAddress && (
+                      <span className="text-[13px] font-medium text-[#b91c1c]" data-testid="order-address-missing">
+                        Nhập địa chỉ giao để lưu đơn ship
+                      </span>
+                    )}
+                  </label>
+                )}
+                <span className={`${cartOpen ? 'contents' : 'hidden'} md:contents`}>{labelField}</span>
+              </div>
+              {cartLines}
             </div>
-            {isShip && (
-              <div className="flex shrink-0 items-center gap-2">
-                <div className="segment-group flex-1 grid-cols-2" role="group" aria-label="Kiểu ship">
-                  {SHIP_MODES.map((m) => (
-                    <button
-                      key={m}
-                      type="button"
-                      aria-pressed={d.ship_mode === m}
-                      onClick={() => edit((x) => setShipMode(x, m))}
-                      className="btn btn-segment min-h-[36px] whitespace-nowrap rounded-[9px] px-1 text-[14px] font-medium md:min-h-[40px]"
-                      data-testid={`order-ship-mode-${m}`}
-                    >
-                      {SHIP_MODE_LABELS[m]}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-            {isShip && (
-              <div className="flex shrink-0 flex-col gap-1.5">
-                <span className="text-[13px] font-bold text-ink-subtle" data-testid="order-ship-fee-title">
-                  {feeNoun}
-                </span>
-                {/* Bấm lại mức đang chọn ⇒ bỏ phí. */}
-                <div className="grid grid-cols-4 gap-1.5" role="group" aria-label={feeNoun}>
-                  {SHIP_FEES.map((fee) => (
-                    <button
-                      key={fee}
-                      type="button"
-                      aria-pressed={d.ship_fee === fee}
-                      onClick={() => edit((x) => toggleShipFee(x, fee))}
-                      className="btn btn-choice min-h-[52px] min-w-0 px-1 text-base md:min-h-[48px]"
-                      data-testid={`order-ship-fee-${fee}`}
-                    >
-                      {shipFeeLabel(fee)}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-            {isShip && external && (
-              <div className="flex shrink-0 flex-col gap-1.5">
-                <span className="flex items-baseline justify-between gap-2 text-[13px] font-bold text-ink-subtle">
-                  Trả shipper (tiền két)
-                  {noPayout && (
-                    <span className="font-semibold text-danger-strong" data-testid="order-payout-missing">
-                      Chưa chọn tiền trả shipper
-                    </span>
-                  )}
-                </span>
-                {/* Bắt buộc chọn: bấm lại mức đang chọn không bỏ được. Không cộng vào tổng đơn. */}
-                <div className="grid grid-cols-4 gap-1.5" role="group" aria-label="Trả shipper">
-                  {SHIP_PAYOUTS.map((v) => (
-                    <button
-                      key={v}
-                      type="button"
-                      aria-pressed={payout === v}
-                      onClick={() => edit((x) => toggleShipPayout(x, v))}
-                      className="btn btn-choice min-h-[52px] min-w-0 px-1 text-base md:min-h-[48px]"
-                      data-testid={`order-ship-payout-${v}`}
-                    >
-                      {shipFeeLabel(v)}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-            {/* Điện thoại: chỉ một dòng bấm để mở bảng nhập địa chỉ / khách (không bật bàn phím khi chọn Ship). */}
-            {isShip && !isTablet && (
-              <button
-                type="button"
-                className="flex min-h-[44px] shrink-0 items-center gap-3 rounded-xl border border-line-strong bg-surface px-3 text-left"
-                onClick={() => setShipOpen(true)}
-                data-testid="order-ship-details"
-              >
-                <MapPin aria-hidden className={`h-5 w-5 shrink-0 ${noAddress ? 'text-danger-strong' : 'text-ink-subtle'}`} />
-                {noAddress ? (
-                  <span className="min-w-0 flex-1 truncate text-sm font-medium text-danger-strong" data-testid="order-address-missing">
-                    Địa chỉ, khách — bấm để nhập
-                  </span>
-                ) : (
-                  <span className="min-w-0 flex-1 truncate text-sm font-medium" data-testid="order-ship-summary">
-                    {d.address.trim()}
-                    {d.customer && <span className="text-ink-subtle"> · {customerLabel(d.customer)}</span>}
-                  </span>
-                )}
-                <ChevronRight aria-hidden className="h-5 w-5 shrink-0 text-ink-subtle" />
-              </button>
-            )}
-            {isShip && isTablet && <ShipCustomerPicker book={book} customer={d.customer} autoFocus={!d.address} onChange={(c) => edit((x) => setCustomer(x, c))} />}
-            {isShip && isTablet && (
-              <label className="flex shrink-0 flex-col gap-1">
-                <span className="relative">
-                  <MapPin aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-ink-subtle" />
-                  <input
-                    className="input min-h-[48px] pl-11 text-base"
-                    aria-label="Địa chỉ giao"
-                    aria-invalid={noAddress}
-                    placeholder={d.customer?.phone ? 'Địa chỉ giao (bắt buộc)' : 'Địa chỉ giao, SĐT (bắt buộc)'}
-                    maxLength={200}
-                    autoFocus={!d.address && !!d.customer}
-                    value={d.address}
-                    onChange={(e) => edit((x) => ({ ...x, address: e.target.value }))}
-                    onFocus={() => setTypingAddress(true)}
-                    onBlur={() => setTypingAddress(false)}
-                    data-testid="order-address"
-                  />
-                </span>
-                {noAddress && (
-                  <span className="text-sm text-danger-strong" data-testid="order-address-missing">
-                    Nhập địa chỉ giao để lưu đơn ship
-                  </span>
-                )}
-              </label>
-            )}
-            <div className={`${cartOpen ? 'flex' : 'hidden'} min-h-0 flex-col gap-3 overflow-y-auto md:flex md:flex-1 md:overflow-visible`}>
-              <span className="relative shrink-0">
-                <Tag aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-ink-subtle" />
-                <input
-                  className="input min-h-[48px] pl-11 text-base"
-                  aria-label="Nhãn / số bàn"
-                  placeholder="Nhãn / số bàn (tùy chọn)"
-                  maxLength={40}
-                  value={d.label}
-                  onChange={(e) => edit((x) => ({ ...x, label: e.target.value }))}
-                  data-testid="order-label"
-                />
-              </span>
-              <ul className="flex flex-col md:min-h-0 md:flex-1 md:overflow-y-auto" data-testid="cart-lines">
-                {empty && (
-                  <li className="flex flex-col items-center gap-2 py-8 text-center">
-                    <span aria-hidden className="icon-tile h-14 w-14 rounded-full bg-surface-muted text-ink-subtle">
-                      <ShoppingBag className="h-[26px] w-[26px]" />
-                    </span>
-                    <span className="text-base font-semibold">Chưa có món</span>
-                    <span className="text-sm text-ink-subtle">Bấm combo hoặc món để thêm</span>
-                  </li>
-                )}
-                {d.items.map((it) => {
-                  const picking = swapLine?.id === it.id;
-                  return (
-                    <li
-                      key={it.id}
-                      data-testid={`cart-line-${it.id}`}
-                      data-product={it.product_id}
-                      data-swapping={picking || undefined}
-                      className={`flex items-center gap-3 border-b py-2.5 last:border-b-0 ${picking ? 'rounded-xl border-brand bg-brand-soft px-2 ring-2 ring-brand/30' : 'border-line'}`}
-                    >
-                      <span aria-hidden className="icon-tile h-12 w-12 bg-surface-muted text-brand-light md:h-14 md:w-14">
-                        <Soup className="h-6 w-6" />
-                      </span>
-                      <button
-                        type="button"
-                        className="min-w-0 flex-1 rounded-lg py-1 text-left"
-                        aria-pressed={picking}
-                        aria-label={`Đổi món ${lineSummary(it)}`}
-                        onClick={() => {
-                          // Điện thoại: chọn dòng để đổi ⇒ thu gọn giỏ cho thấy thực đơn.
-                          if (!picking) setCartOpen(false);
-                          setSwapId((cur) => (cur === it.id ? null : it.id));
-                        }}
-                        data-testid={`cart-line-${it.id}-pick`}
-                      >
-                        <span className="block text-base font-semibold leading-snug">{lineSummary({ ...it, qty: 1 }).replace(/^1× /, '')}</span>
-                        <span className="num text-[15px] font-semibold text-brand-deep" data-testid={`cart-line-${it.id}-total`}>
-                          {picking ? 'Chọn món mới…' : formatVnd(lineTotal(it))}
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-secondary h-11 min-h-0 w-11 min-w-0 shrink-0 px-0"
-                        onClick={() => edit((x) => ({ ...x, items: stepLineQty(x.items, it.id, -1) }))}
-                        aria-label="Bớt"
-                        data-testid={`cart-line-${it.id}-minus`}
-                      >
-                        <Minus aria-hidden className="h-5 w-5" />
-                      </button>
-                      <span className="num w-7 text-center text-lg font-semibold" data-testid={`cart-line-${it.id}-qty`}>
-                        {it.qty}
-                      </span>
-                      <button
-                        type="button"
-                        className="btn btn-secondary h-11 min-h-0 w-11 min-w-0 shrink-0 px-0"
-                        onClick={() => edit((x) => ({ ...x, items: stepLineQty(x.items, it.id, 1) }))}
-                        aria-label="Thêm"
-                        data-testid={`cart-line-${it.id}-plus`}
-                      >
-                        <Plus aria-hidden className="h-5 w-5" />
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-
-              {/* Điện thoại đã có tổng ở dòng tóm tắt. */}
-              <div className="hidden shrink-0 flex-col gap-2 border-t border-line pt-3.5 md:flex">
-                <span className="flex items-center justify-between text-[15px] text-ink-subtle">
-                  Số món <span className="num text-ink">{itemCount}</span>
+            {/* Tablet: tóm tắt dạng sheet (Figma BH2): số món, phí, tổng, trả shipper, hình thức thanh toán, nút.
+                Điện thoại: `contents`, chỉ còn nút (tổng ở dòng tóm tắt); thứ tự Thu đủ → TM / CK / Ghi nợ → nút phụ bằng `order`. */}
+            <div className="contents md:relative md:flex md:shrink-0 md:flex-col md:gap-3 md:rounded-t-[20px] md:bg-white md:px-4 md:pb-4 md:pt-2.5 md:shadow-[0_-6px_24px_rgba(0,0,0,0.08)]">
+              <SheetHandle className="hidden md:block" />
+              <div className="hidden flex-col gap-1.5 text-sm leading-[18px] md:flex">
+                <span className="flex items-center justify-between text-[#6d6d6d]">
+                  Số món <span className="num font-semibold text-[#111]">{itemCount}</span>
                 </span>
                 {shipFee > 0 && (
-                  <span className="flex items-center justify-between text-[15px] text-ink-subtle">
-                    {feeNoun}{' '}
-                    <span className="num text-ink" data-testid="order-ship-fee">
+                  <span className="flex items-center justify-between text-[#6d6d6d]">
+                    {feeNoun}
+                    <span className="num font-semibold text-[#111]" data-testid="order-ship-fee">
                       {formatVnd(shipFee)}
                     </span>
                   </span>
                 )}
-                <span className="flex items-baseline justify-between">
-                  <span className="text-lg font-semibold">Tổng</span>
-                  <span className="num text-[28px] font-bold text-ink" data-testid="order-total">
-                    {formatVnd(total)}
-                  </span>
-                </span>
               </div>
-            </div>
-
-            <Notice testId="order-error" tone="error">
-              {error ?? (saved && empty ? 'Đơn không còn món nào: thêm món, hoặc bấm Xóa đơn.' : null)}
-            </Notice>
-
-            <button
-              type="button"
-              className="btn btn-success min-h-[52px] shrink-0 text-[17px] md:min-h-[56px] md:text-xl"
-              disabled={blocked}
-              onClick={() => void payExact()}
-              data-testid="order-pay-exact"
-            >
-              <Banknote aria-hidden className="h-6 w-6" />
-              Thu đủ<span className="hidden md:inline"> tiền mặt</span> {formatVnd(total)}
-            </button>
-            {/* Thanh toán hình thức khác: mở ngay trong giỏ. */}
-            <PayMethodRow active={null} disabled={blocked} onPick={(m) => void openPay(m)} testIdPrefix="order-pay" />
-            <div className="grid shrink-0 grid-cols-2 gap-2 md:gap-2.5">
-              {saved?.status !== 'served' && (
-                <button type="button" className={`btn btn-dark ${ACTION_BTN}`} disabled={blocked} onClick={() => void serve()} data-testid="order-serve">
-                  <ChefHat aria-hidden className="h-[18px] w-[18px] shrink-0 md:h-5 md:w-5" />
-                  Đã ra món
-                </button>
+              <span className="hidden items-center justify-between md:flex">
+                <span className="text-base font-bold leading-5 text-[#111]">Tổng</span>
+                <span className="num text-2xl font-bold leading-[30px] text-[#111]" data-testid="order-total">
+                  {formatVnd(total)}
+                </span>
+              </span>
+              {payout > 0 && (
+                <span className="hidden items-center justify-between text-sm font-semibold leading-[18px] text-[#b91c1c] md:flex" data-testid="order-ship-payout-line">
+                  Trả shipper (lấy từ két)
+                  <span className="num">{formatVnd(-payout)}</span>
+                </span>
               )}
-              {!saved && (
-                <button type="button" className={`btn btn-secondary ${ACTION_BTN}`} disabled={blocked} onClick={() => void save()} data-testid="order-save">
-                  <Save aria-hidden className="h-[18px] w-[18px] shrink-0 md:h-5 md:w-5" />
-                  Tạo đơn
-                </button>
-              )}
-              {saved && (
-                <button
-                  type="button"
-                  className={`btn btn-danger-outline ${ACTION_BTN} ${saved.status === 'served' ? 'col-span-2' : ''}`}
-                  disabled={busy}
-                  onClick={() => setDialog({ kind: 'delete' })}
-                  data-testid="order-delete"
-                >
-                  <Trash2 aria-hidden className="h-[18px] w-[18px] shrink-0 md:h-5 md:w-5" />
-                  Xóa đơn
-                </button>
-              )}
+              <span aria-hidden className="hidden h-px shrink-0 bg-line md:block" />
+              <span className="hidden text-[13px] font-semibold leading-4 text-[#6d6d6d] md:block">Hình thức thanh toán</span>
+              {/* Thanh toán hình thức khác: mở ngay trong giỏ. */}
+              <div className="order-1 grid shrink-0 grid-cols-3 gap-2 md:order-none md:gap-2.5" role="group" aria-label="Hình thức thanh toán">
+                {PAY_METHOD_KEYS.map((m) => (
+                  <PayMethodTile key={m} method={m} inline={!isTablet} disabled={blocked} onClick={() => void openPay(m)} data-testid={`order-pay-${m}`} />
+                ))}
+              </div>
+              {errorNotice}
+              {payExactBtn}
+              {actionRow}
             </div>
           </>
         )}

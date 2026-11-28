@@ -104,13 +104,25 @@ chiều tương đối; vị trí dọc lệch 3–5px do dải đơn ở trên 
 
 Khung: BH1, BH2, BH3, BH6, BH7, BH8.
 
-- [ ] Đầu giỏ: ô icon 44, "Đơn mới" / "Đơn #mã", dòng phụ "Chưa lưu" hoặc badge "Đã lưu" + trạng thái; nút in lại + ✕ khi đang chọn đơn.
-- [ ] Segmented Tại chỗ / Mang về / Ship; khi Ship: segmented Quán giao / Shipper ngoài, hàng chip "Phí ship" / "Phụ thu" / "Trả shipper (tiền két)" có nhãn bên trái, ô địa chỉ, ô nhãn.
-- [ ] Dòng món: ô ảnh 52, tên, topping là dòng phụ xám, thành tiền cam đậm, nút −/+ 36 nền xám.
-- [ ] Giỏ trống: vòng tròn icon túi + "Chưa có món".
-- [ ] Tóm tắt dạng sheet bo góc trên + tay nắm + đổ bóng lên: Số món, phí / phụ thu, Tổng 24, dòng đỏ "Trả shipper (lấy từ két)", kẻ,
+- [x] Đầu giỏ: ô icon 44, "Đơn mới" / "Đơn #mã", dòng phụ "Chưa lưu" hoặc badge "Đã lưu" + trạng thái; nút in lại + ✕ khi đang chọn đơn.
+- [x] Segmented Tại chỗ / Mang về / Ship; khi Ship: segmented Quán giao / Shipper ngoài, hàng chip "Phí ship" / "Phụ thu" / "Trả shipper (tiền két)" có nhãn bên trái, ô địa chỉ, ô nhãn.
+- [x] Dòng món: ô ảnh 52, tên, topping là dòng phụ xám, thành tiền cam đậm, nút −/+ 36 nền xám.
+- [x] Giỏ trống: vòng tròn icon túi + "Chưa có món".
+- [x] Tóm tắt dạng sheet bo góc trên + tay nắm + đổ bóng lên: Số món, phí / phụ thu, Tổng 24, dòng đỏ "Trả shipper (lấy từ két)", kẻ,
       "Hình thức thanh toán" + 3 ô dọc, nút cam "Thu đủ tiền mặt · X", hàng nút phụ (Đã ra món / Tạo đơn hoặc Xóa đơn).
-- [ ] Vùng loại đơn + món cuộn chung khi Ship làm cột chật (BH7).
+- [x] Vùng loại đơn + món cuộn chung khi Ship làm cột chật (BH7).
+
+Đã làm (so số đo ở 1280×800: BH1, BH2, BH7, BH8 (BH3 cùng bố cục BH8) đúng từng px — đầu giỏ 73 / 77, segmented, ô nhãn 45, dòng món 80, sheet tóm tắt,
+ô hình thức 109×70, nút 50 / 45). Ghi chú:
+- Một cây DOM cho cả hai cỡ (không rẽ theo `useIsTablet`, unit test chạy jsdom = điện thoại vẫn thấy `order-total`): vùng cuộn và sheet
+  tóm tắt là `contents` trên điện thoại; thứ tự Thu đủ → TM / CK / Ghi nợ → nút phụ của điện thoại giữ bằng `order-*`.
+- Kéo theo trên điện thoại (ticket 8 làm nốt): segmented, hàng chip phí, dòng món (ô ảnh 44), nút cam / viền trắng / đỏ nhạt,
+  3 ô TM / CK / Ghi nợ ngang (`PayMethodTile inline`). `PayMethodRow` giờ chỉ còn trong `CartPay` (ticket 6).
+- Giữ nhãn "Quán ship" (SPEC 4.2, báo cáo, tin Telegram) thay vì "Quán giao" như Figma BH6.
+- BH6 không vẽ ô chọn khách: vẫn giữ `ShipCustomerPicker` (chỉ đổi ô tìm sang kiểu ô nhập mới, `FIELD` trong kit).
+- Combo trong giỏ là món + topping (không phân biệt được với món tự chọn topping) ⇒ dòng phụ luôn "+ Trứng, Chả" (Figma BH2 ghi combo không có "+").
+- Trả shipper ở tóm tắt: dòng đỏ "Trả shipper (lấy từ két) −10.000" (test id mới `order-ship-payout-line`). Chưa chọn ⇒ chữ đỏ dưới hàng chip.
+- Nút in lại phiếu bếp (`ReprintKitchenButton`) thành nút icon 40 (`iconBtn`).
 
 ## Ticket 6 — Thanh toán trong giỏ
 

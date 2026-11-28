@@ -4,6 +4,7 @@ import { v7 as uuidv7 } from 'uuid';
 import { toDraftCustomer, type DraftCustomer } from '@/domain/cart';
 import { customerLabel } from '@/domain/debt';
 import type { DebtBook } from '@/pos';
+import { FIELD, FIELD_ICON } from '@/app/kit';
 import { CustomerSuggestions } from './debt';
 
 /**
@@ -111,9 +112,9 @@ export function ShipCustomerPicker({
   return (
     <div className="flex shrink-0 flex-col gap-2">
       <span className="relative">
-        <UserRound aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-ink-subtle" />
+        <UserRound aria-hidden className={FIELD_ICON} />
         <input
-          className="input min-h-[48px] pl-11 pr-10 text-base"
+          className={`${FIELD} pl-[39px] pr-10`}
           aria-label="Khách ship"
           placeholder="Khách: tên / SĐT (tùy chọn)"
           maxLength={60}
@@ -126,7 +127,7 @@ export function ShipCustomerPicker({
           <button
             type="button"
             aria-label="Xóa ô tìm khách"
-            className="absolute right-1 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-lg text-ink-subtle hover:bg-surface-muted"
+            className="absolute right-0.5 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-lg text-ink-subtle hover:bg-surface-muted"
             onClick={() => setQuery('')}
           >
             <X aria-hidden className="h-5 w-5" />

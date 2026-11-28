@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, MouseEvent, ReactNode } from 'react';
+import type { ButtonHTMLAttributes, HTMLAttributes, MouseEvent, ReactNode } from 'react';
 import { Banknote, Landmark, NotebookPen, Package, Soup, type LucideIcon } from 'lucide-react';
 import type { PaymentMethod } from '@/domain/types';
 
@@ -41,9 +41,18 @@ export function IconTile({
 }
 
 /** Huy hiệu nhỏ bo 6, chữ 12 đậm (Figma BH: "Chờ ra món", "12′", "Combo", "Đã lưu"); `small` = chữ 11 ("+10k ship"). */
-export function Badge({ tone, icon: Icon, small, className = '', testId, children }: { tone: Tone; icon?: LucideIcon; small?: boolean; className?: string; testId?: string; children: ReactNode }) {
+export function Badge({
+  tone,
+  icon: Icon,
+  small,
+  className = '',
+  testId,
+  children,
+  ...rest
+}: { tone: Tone; icon?: LucideIcon; small?: boolean; className?: string; testId?: string; children: ReactNode } & Omit<HTMLAttributes<HTMLSpanElement>, 'children' | 'className'>) {
   return (
     <span
+      {...rest}
       data-testid={testId}
       className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-2 py-[3px] font-semibold ${small ? 'text-[11px] leading-[14px]' : 'text-xs leading-[15px]'} ${TONE[tone]} ${className}`}
     >
@@ -218,3 +227,12 @@ export const staffBtn = (kind: StaffBtnKind, size: 'md' | 'lg' = 'md', extra = '
 /** Nút vuông chỉ có icon, viền xám bo 12 (máy in, in lại, ✕, ☰): 40 mặc định, 36 ở đầu sheet điện thoại. Icon do màn dùng chọn cỡ. */
 export const iconBtn = (extra = 'h-10 w-10') =>
   `inline-flex shrink-0 items-center justify-center rounded-xl border border-line bg-white text-[#111] transition-colors duration-fast hover:bg-[#f8f8f8] disabled:cursor-not-allowed disabled:opacity-40 ${extra}`;
+
+/**
+ * Ô nhập kiểu Makaryo (Figma BH: nhãn / số bàn, địa chỉ giao): cao 45, viền xám bo 12, chữ 15. Có icon 16 bên trái ⇒ thêm `pl-[39px]`
+ * và đặt icon bằng {@link FIELD_ICON}. Lỗi (`aria-invalid`) ⇒ viền đỏ.
+ */
+export const FIELD =
+  'h-[45px] w-full rounded-xl border border-line bg-white px-3.5 text-[15px] font-medium leading-[19px] text-[#111] outline-none transition-[border-color,box-shadow] duration-fast placeholder:font-normal placeholder:text-[#a3a3a3] focus:border-brand focus:ring-1 focus:ring-inset focus:ring-brand aria-[invalid=true]:border-[#dc2626]';
+/** Icon 16 xám đặt trong {@link FIELD} (cha `relative`). */
+export const FIELD_ICON = 'pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#888]';

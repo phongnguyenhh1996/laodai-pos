@@ -124,15 +124,8 @@ export function ReprintKitchenButton({ orderId, code, testId }: { orderId: strin
   const { service } = usePrint();
   if (!service.enabled) return null;
   return (
-    <button
-      type="button"
-      data-testid={testId}
-      className="btn btn-secondary h-12 min-h-[48px] w-12 min-w-[48px] shrink-0 px-0"
-      aria-label="In lại phiếu bếp"
-      title="In lại phiếu bếp"
-      onClick={() => void service.printKitchen(orderId, code, 'staff')}
-    >
-      <PrinterIcon aria-hidden className="h-5 w-5" />
+    <button type="button" data-testid={testId} className={iconBtn()} aria-label="In lại phiếu bếp" title="In lại phiếu bếp" onClick={() => void service.printKitchen(orderId, code, 'staff')}>
+      <PrinterIcon aria-hidden className="h-[18px] w-[18px]" />
     </button>
   );
 }
