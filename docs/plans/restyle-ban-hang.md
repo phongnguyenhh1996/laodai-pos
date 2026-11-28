@@ -88,9 +88,17 @@ Khung: BH1, BH5, BH9 (tablet); BHP1, BHP3, BHP5 (điện thoại).
 
 Khung: BH1 (có món hết), BH2; BHP1.
 
-- [ ] `MenuBoard.tsx`: tablet có tiêu đề "Thực đơn (N món)" + nút "Báo hết món" bên phải; điện thoại nút này ở dòng "Combo".
-- [ ] Ô điểm bán kiểu danh mục Makaryo (tròn icon, đang chọn nền cam nhạt + viền cam). Tiêu đề nhóm "Combo (2)", "Món (4)".
-- [ ] Thẻ món: ô ảnh 64 (combo nền cam nhạt + icon cam, món nền xám), tên 14, badge (Combo / điểm bán) + giá. Hết món: mờ, badge "Hết", giá gạch.
+- [x] `MenuBoard.tsx`: tablet có tiêu đề "Thực đơn (N món)" + nút "Báo hết món" bên phải; điện thoại nút này ở dòng "Combo".
+- [x] Ô điểm bán kiểu danh mục Makaryo (tròn icon, đang chọn nền cam nhạt + viền cam). Tiêu đề nhóm "Combo (2)", "Món (4)".
+- [x] Thẻ món: ô ảnh 64 (combo nền cam nhạt + icon cam, món nền xám), tên 14, badge (Combo / điểm bán) + giá. Hết món: mờ, badge "Hết", giá gạch.
+
+Đã làm (so số đo ở 1280×800 và 390×844: tiêu đề, chip điểm bán 109×54, thẻ món 198/174×139, ô ảnh, chữ đúng từng px theo
+chiều tương đối; vị trí dọc lệch 3–5px do dải đơn ở trên đang trống). Ghi chú:
+- Điện thoại: nút "Báo hết món" nằm ở tiêu đề nhóm đầu tiên (Combo; không có combo hoặc đang đánh dấu thì ở "Món"). Đang đánh dấu: nút cam "Xong".
+- Chế độ đánh dấu chưa có khung: dải nhắc vàng nằm dưới hàng điểm bán, nhóm Topping dùng cùng thẻ món.
+- Thẻ món điện thoại giờ có ô ảnh như BHP1 (trước không có). Chấm số phần trong giỏ (không có trong Figma) giữ lại, đổi sang cam 24 ở góc ô ảnh.
+- Cypress `c-sales` C19 chập chờn (hỏng 2 / 4 lần chạy với thay đổi này, 2 lần sau qua; trên `main` chạy 1 lần qua): mặc định ship của đơn mới
+  đến từ RPC bất đồng bộ, đua với cú bấm "Ship" của test. Không thuộc ticket này.
 
 ## Ticket 5 — Giỏ tablet + phần tóm tắt
 

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
-import { Ban, Check, Package, Soup, Store } from 'lucide-react';
+import { Ban, Check, Store } from 'lucide-react';
+import { AreaTitle, Badge, ItemThumb } from '@/app/kit';
 import { useIsTablet } from '@/app/useMediaQuery';
 import { menuBoard, tabletPoints, type SoldOutSet } from '@/domain/catalog';
 import { formatVnd } from '@/domain/money';
@@ -66,23 +67,30 @@ export function MenuBoard({
     return b.products.length + b.combos.length;
   };
 
-  const markingToggle = (compact: boolean) =>
-    marking && (
-      <button
-        type="button"
-        onClick={marking.onToggleActive}
-        aria-pressed={marking.active}
-        data-testid="soldout-toggle"
-        className={`btn shrink-0 ${compact ? 'min-h-[36px] gap-1.5 px-3 text-sm' : 'min-h-[48px]'} ${marking.active ? 'btn-primary' : 'btn-secondary'}`}
-      >
-        {marking.active ? <Check aria-hidden className="h-5 w-5" /> : <Ban aria-hidden className={compact ? 'h-4 w-4' : 'h-5 w-5'} />}
-        {marking.active ? 'Xong' : 'Báo hết món'}
-      </button>
-    );
+  /** Nút "Báo hết món" (Figma BH1: chip trắng viền xám cao 34); đang đánh dấu ⇒ nút cam "Xong". */
+  const markingToggle = marking && (
+    <button
+      type="button"
+      onClick={marking.onToggleActive}
+      aria-pressed={marking.active}
+      data-testid="soldout-toggle"
+      className={`inline-flex h-[34px] shrink-0 items-center gap-1.5 rounded-xl px-[13px] text-[13px] font-semibold leading-4 transition-colors duration-fast ${
+        marking.active ? 'bg-brand text-white hover:bg-brand-strong' : 'border border-line bg-white text-[#111] hover:bg-[#f8f8f8]'
+      }`}
+    >
+      {marking.active ? <Check aria-hidden className="h-4 w-4" /> : <Ban aria-hidden className="h-4 w-4" />}
+      {marking.active ? 'Xong' : 'Báo hết món'}
+    </button>
+  );
+  /** Điện thoại: nút nằm ở tiêu đề nhóm đầu tiên (Combo, hoặc Món khi không có combo / đang đánh dấu). */
+  const showCombos = !!board && board.combos.length > 0 && !marking?.active;
+  const phoneAction = (first: boolean) => (isPhone && first ? markingToggle : null);
 
   return (
-    <section data-testid="menu-board" className="flex flex-col gap-3 md:gap-4">
-      <div role="tablist" className="flex gap-2 md:gap-3">
+    <section data-testid="menu-board" className="flex flex-col gap-3">
+      {!isPhone && <AreaTitle title="Thực đơn" count={`${point ? count(point) : 0} món`} right={board && point ? markingToggle : null} />}
+
+      <div role="tablist" className="flex gap-2.5 overflow-x-auto">
         {points.map((p) => {
           const on = p.id === pointId;
           return (
@@ -94,61 +102,39 @@ export function MenuBoard({
               disabled={!on && !canSelectPoint(p)}
               onClick={() => onSelectPoint(p)}
               data-testid={`point-tab-${p.id}`}
-              className="flex min-h-[52px] min-w-0 flex-1 items-center gap-2.5 rounded-2xl border border-line bg-surface py-2 pl-2 pr-3 text-left transition-colors duration-fast hover:border-line-strong disabled:cursor-not-allowed disabled:opacity-40 aria-selected:border-brand aria-selected:bg-brand-soft md:min-h-[64px] md:max-w-[200px] md:gap-3 md:pl-2.5 md:pr-4"
+              className="flex min-w-0 shrink-0 items-center gap-2.5 rounded-xl border border-line bg-white py-2 pl-2 pr-4 text-left transition-colors duration-fast hover:border-line-strong disabled:cursor-not-allowed disabled:opacity-40 aria-selected:border-brand aria-selected:bg-[#ffeee7]"
             >
-              <span aria-hidden className={`icon-tile h-9 w-9 rounded-full md:h-10 md:w-10 ${on ? 'bg-brand text-white' : 'bg-surface-muted text-ink-muted'}`}>
-                <Store className="h-[18px] w-[18px] md:h-5 md:w-5" />
+              <span aria-hidden className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${on ? 'bg-brand text-white' : 'bg-[#f1f1f1] text-[#6d6d6d]'}`}>
+                <Store className="h-[18px] w-[18px]" />
               </span>
-              <span className="flex min-w-0 flex-col">
-                <span className={`truncate text-[15px] md:text-base ${on ? 'font-semibold text-brand-deep' : 'font-medium text-ink'}`}>{p.name}</span>
-                <span className={`num text-xs md:text-[13px] ${on ? 'text-brand-deep' : 'text-ink-subtle'}`}>{count(p)} món</span>
+              <span className="flex min-w-0 flex-col gap-px">
+                <span className={`truncate text-sm font-semibold leading-[18px] ${on ? 'text-[#c2380a]' : 'text-[#111]'}`}>{p.name}</span>
+                <span className={`num text-xs leading-[15px] ${on ? 'text-[#c2380a]' : 'text-[#888]'}`}>{count(p)} món</span>
               </span>
             </button>
           );
         })}
       </div>
 
-      {/* Điện thoại: chưa đánh dấu thì nút "Báo hết món" nằm nhỏ cạnh tiêu đề "Món" (không đẩy lưới món xuống). */}
-      {board && point && marking && (
-        <div className={`${isPhone && !marking.active ? 'hidden' : 'flex'} flex-wrap items-center gap-3`}>
-          {marking.active ? (
-            <p data-testid="soldout-banner" role="status" className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-warning-line bg-warning-soft px-3 py-2.5 text-base font-medium text-warning-strong">
-              <Ban aria-hidden className="h-5 w-5 shrink-0" />
-              <span>
-                Bấm món / topping để báo <b>hết</b> hoặc <b>bán lại</b> ở {point.name} (hôm nay)
-              </span>
-            </p>
-          ) : (
-            <span className="flex-1" />
-          )}
-          {(!isPhone || marking.active) && markingToggle(false)}
-        </div>
+      {board && point && marking?.active && (
+        <p data-testid="soldout-banner" role="status" className="flex items-center gap-2 rounded-xl border border-warning-line bg-warning-soft px-3 py-2.5 text-sm font-medium text-warning-strong">
+          <Ban aria-hidden className="h-[18px] w-[18px] shrink-0" />
+          <span>
+            Bấm món / topping để báo <b>hết</b> hoặc <b>bán lại</b> ở {point.name} (hôm nay)
+          </span>
+        </p>
       )}
 
       {board && point && (
-        <div role="tabpanel" data-testid="menu-panel" data-point={point.id} className="flex flex-col gap-4">
-          {board.combos.length > 0 && !marking?.active && (
-            <Grid title="Combo" count={board.combos.length} cols="grid-cols-2 lg:grid-cols-3">
+        <div role="tabpanel" data-testid="menu-panel" data-point={point.id} className="flex flex-col gap-3">
+          {showCombos && (
+            <Grid title="Combo" count={board.combos.length} action={phoneAction(true)}>
               {board.combos.map(({ combo, price }) => (
-                <Tile
-                  key={combo.id}
-                  testId={`menu-combo-${combo.id}`}
-                  name={combo.name}
-                  tag="Combo"
-                  price={price}
-                  onClick={() => onCombo(combo)}
-                  combo
-                  soldOut={soldOut.combo(combo)}
-                />
+                <Tile key={combo.id} testId={`menu-combo-${combo.id}`} name={combo.name} tag="Combo" price={price} onClick={() => onCombo(combo)} combo soldOut={soldOut.combo(combo)} />
               ))}
             </Grid>
           )}
-          <Grid
-            title="Món"
-            count={board.products.length}
-            cols="grid-cols-2 lg:grid-cols-3"
-            action={isPhone && marking && !marking.active ? markingToggle(true) : null}
-          >
+          <Grid title="Món" count={board.products.length} action={phoneAction(!showCombos)}>
             {board.products.map((p) => (
               <Tile
                 key={p.id}
@@ -165,7 +151,7 @@ export function MenuBoard({
             ))}
           </Grid>
           {marking?.active && board.toppings.length > 0 && (
-            <Grid title="Topping" count={board.toppings.length} cols="grid-cols-2 lg:grid-cols-3">
+            <Grid title="Topping" count={board.toppings.length}>
               {board.toppings.map((t: Topping) => (
                 <Tile
                   key={t.id}
@@ -187,25 +173,19 @@ export function MenuBoard({
   );
 }
 
-function Grid({ title, count, cols, action, children }: { title: string; count: number; cols: string; action?: ReactNode; children: ReactNode }) {
+/** Nhóm món: tiêu đề "Combo (2)" (+ nút bên phải), lưới 2 cột (điện thoại, khe 10 × 12) / 3 cột (tablet lg, khe 12). */
+function Grid({ title, count, action, children }: { title: string; count: number; action?: ReactNode; children: ReactNode }) {
   return (
-    <div className="flex flex-col gap-2 md:gap-3">
-      <div className="flex items-center gap-2">
-        <h3 className="flex flex-1 items-baseline gap-2 text-[17px] font-bold md:text-xl">
-          {title}
-          <span className="num text-base font-normal text-ink-subtle">({count})</span>
-        </h3>
-        {action}
-      </div>
-      <div className={`grid gap-2 md:gap-3 ${cols}`}>{children}</div>
+    <div className="flex flex-col gap-3">
+      <AreaTitle small title={title} count={count} right={action} />
+      <div className="grid grid-cols-2 gap-x-2.5 gap-y-3 md:gap-3 lg:grid-cols-3">{children}</div>
     </div>
   );
 }
 
 /**
- * Thẻ món kiểu Makaryo: ô minh họa ở trên, tên, nhãn + giá ở dưới. Combo nền cam nhạt.
- * Điện thoại (Figma MS1): thẻ cao 140px không có ô minh họa, tên to, nhãn + giá ở đáy thẻ.
- * Đang hết ⇒ mờ + nhãn "Hết"; ngoài chế độ đánh dấu thì không bấm được.
+ * Thẻ món kiểu Makaryo (Figma BH1 / BHP1): thẻ trắng bo 14, ô ảnh 64 (combo nền cam nhạt), tên 14, badge (Combo / điểm bán) + giá.
+ * Đang hết ⇒ cả thẻ mờ, badge "Hết" đỏ thay nhãn, giá xám gạch; ngoài chế độ đánh dấu thì không bấm được.
  */
 function Tile({
   testId,
@@ -231,7 +211,6 @@ function Tile({
   marking?: boolean;
   pending?: boolean;
 }) {
-  const Icon = combo ? Package : Soup;
   const disabled = pending || (soldOut && !marking);
   return (
     <button
@@ -241,40 +220,34 @@ function Tile({
       data-testid={testId}
       data-sold-out={soldOut || undefined}
       aria-label={soldOut ? `${name} (hết)` : qty > 0 ? `${name} (${qty} trong giỏ)` : undefined}
-      className={`relative flex h-[140px] min-w-0 flex-col gap-2 rounded-2xl border p-3.5 text-left transition-colors duration-fast disabled:cursor-not-allowed md:h-auto md:p-2 ${
-        soldOut
-          ? `border-dashed border-line-strong bg-surface-sunken ${marking ? 'hover:border-brand' : ''}`
-          : combo
-            ? 'border-brand-line bg-brand-soft hover:border-brand active:bg-brand-tint'
-            : 'border-line bg-surface hover:border-line-strong active:bg-surface-muted'
+      className={`relative flex min-w-0 flex-col gap-2 rounded-[14px] border border-line bg-white p-2 text-left transition-colors duration-fast disabled:cursor-not-allowed ${
+        soldOut ? `opacity-60 ${marking ? 'hover:border-brand' : ''}` : 'hover:border-line-strong active:bg-[#f8f8f8]'
       } ${pending ? 'opacity-60' : ''}`}
     >
-      {soldOut && (
-        <span className="badge absolute right-2.5 top-2.5 z-[1] rounded-md bg-danger px-2 text-xs font-bold text-white" data-testid={`${testId}-soldout`}>
-          Hết
-        </span>
-      )}
       {qty > 0 && !soldOut && (
         <span
           aria-hidden
-          className="num absolute right-2.5 top-2.5 z-[1] flex h-7 min-w-7 items-center justify-center rounded-full bg-brand-strong px-1.5 text-sm font-bold text-white"
+          className="num absolute right-3 top-3 z-[1] flex h-6 min-w-6 items-center justify-center rounded-full bg-brand px-1.5 text-xs font-bold text-white"
           data-testid={`${testId}-qty`}
         >
           {qty}
         </span>
       )}
-      <span
-        aria-hidden
-        className={`hidden w-full items-center justify-center rounded-[10px] md:flex ${soldOut ? 'opacity-40 grayscale' : ''} ${combo ? 'h-[72px] bg-brand-tint text-brand' : 'h-[92px] bg-surface-muted text-brand-light'}`}
-      >
-        <Icon className="h-[34px] w-[34px]" />
-      </span>
-      <span className={`flex w-full flex-1 flex-col justify-end gap-2 md:flex-none md:gap-1.5 md:px-1 md:pb-1 ${soldOut ? 'opacity-55' : ''}`}>
-        <span className={`line-clamp-2 text-lg font-bold leading-snug md:text-base md:font-semibold ${soldOut ? 'line-through' : ''}`}>{name}</span>
-        <span className="flex items-center gap-1.5">
-          <span className={`badge min-w-0 truncate rounded-md px-2 text-xs ${combo ? 'bg-brand-tint text-brand-deep' : 'bg-warning-soft text-warning-strong'}`}>{tag}</span>
+      <ItemThumb combo={combo} tint className="h-16 w-full rounded-[10px]" iconClass="h-[26px] w-[26px]" />
+      <span className="flex w-full flex-col gap-1.5 px-1 pb-1">
+        <span className="line-clamp-2 text-sm font-medium leading-[18px] text-[#111]">{name}</span>
+        <span className="flex min-w-0 items-center gap-1.5">
+          {soldOut ? (
+            <Badge tone="red" testId={`${testId}-soldout`}>
+              Hết
+            </Badge>
+          ) : (
+            <Badge tone={combo ? 'orange' : 'gray'} className={`min-w-0 truncate ${combo ? '' : '!bg-[#f1f1f1]'}`}>
+              {tag}
+            </Badge>
+          )}
           <span className="flex-1" />
-          <span className="num shrink-0 text-base font-bold text-ink" data-testid={`${testId}-price`}>
+          <span className={`num shrink-0 text-sm font-bold leading-[18px] ${soldOut ? 'text-[#888] line-through' : 'text-[#111]'}`} data-testid={`${testId}-price`}>
             {formatVnd(price)}
           </span>
         </span>
