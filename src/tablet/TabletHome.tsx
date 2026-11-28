@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type MouseEvent, type ReactNode } from 'react';
 import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { CloudOff, HandCoins, KeyRound, Menu as MenuIcon, Power, RefreshCw, ShoppingBag, Store, UserRound, Wallet, WifiOff, X, type LucideIcon } from 'lucide-react';
+import { ChevronRight, CloudOff, HandCoins, KeyRound, Menu as MenuIcon, Power, RefreshCw, ShoppingBag, Store, UserRound, Wallet, WifiOff, X, type LucideIcon } from 'lucide-react';
 import { startTablet, tabletStore } from '@/lib/pos';
 import { startPrinting } from '@/lib/print';
 import { ConnectionBadge } from '@/app/ConnectionBadge';
@@ -8,6 +8,7 @@ import { APP_VERSION } from '@/app/version';
 import { useTabletName } from '@/app/useActivation';
 import { Splash } from '@/app/ui';
 import { useIsTablet } from '@/app/useMediaQuery';
+import { SheetHandle, iconBtn } from '@/app/kit';
 import { hhmm } from '@/domain/time';
 import type { Activation, TabletShift } from '@/pos';
 import { CloseShiftScreen } from './CloseShiftScreen';
@@ -66,13 +67,13 @@ export function TabletHome({ activation }: { activation: Activation }) {
       <ToastHost extra={<PrintErrorToast canReprint={(id) => !!orders?.some((o) => o.id === id)} />}>
         <div data-testid="tablet-home" className="flex h-full flex-col bg-canvas md:flex-row">
           <aside
-            className={`${onQueue || !ctx ? 'flex' : 'hidden'} ${fullScreen ? 'md:hidden' : 'md:flex'} shrink-0 items-center gap-2 border-b border-line bg-surface px-3 py-2 md:w-60 md:flex-col md:items-stretch md:gap-5 md:overflow-y-auto md:border-b-0 md:border-r md:px-4 md:pb-4 md:pt-5`}
+            className={`${onQueue || !ctx ? 'flex' : 'hidden'} ${fullScreen ? 'md:hidden' : 'md:flex'} shrink-0 items-center gap-2 border-b border-line bg-white px-4 py-2.5 md:w-60 md:flex-col md:items-stretch md:gap-5 md:overflow-y-auto md:border-b-0 md:border-r md:px-4 md:pb-4 md:pt-5`}
           >
-            <div className="order-1 flex min-w-0 items-center gap-2 md:order-none md:gap-2.5">
+            <div className="order-1 flex min-w-0 items-center gap-2.5 md:order-none">
               <span aria-hidden className="icon-tile h-9 w-9 bg-brand text-white md:h-10 md:w-10 md:rounded-xl">
-                <Store className="h-5 w-5 md:h-[22px] md:w-[22px]" />
+                <Store className="h-[18px] w-[18px] md:h-[22px] md:w-[22px]" />
               </span>
-              <h1 className="min-w-0 truncate text-lg font-bold md:text-[19px] md:leading-6 md:text-[#111]" data-testid="tablet-name">
+              <h1 className="min-w-0 truncate text-[17px] font-bold leading-[22px] text-[#111] md:text-[19px] md:leading-6" data-testid="tablet-name">
                 {tabletName}
               </h1>
             </div>
@@ -80,13 +81,12 @@ export function TabletHome({ activation }: { activation: Activation }) {
             {shift && (
               <div
                 data-testid="shift-staff"
-                className="order-2 flex min-w-0 shrink items-center gap-1.5 rounded-full bg-brand-soft px-2.5 py-1 text-sm font-medium text-brand-deep md:order-none md:flex-col md:items-stretch md:gap-2 md:rounded-[14px] md:border md:border-line md:bg-white md:p-3 md:text-[#111]"
+                className="order-2 flex min-w-0 shrink items-center rounded-md bg-[#ffeee7] px-2 py-[3px] text-xs font-semibold leading-[15px] text-[#c2380a] md:order-none md:flex-col md:items-stretch md:gap-2 md:rounded-[14px] md:border md:border-line md:bg-white md:p-3 md:text-sm md:font-medium md:text-[#111]"
               >
                 <span className="hidden text-xs font-normal leading-[15px] text-[#888] md:block">Ca đang mở</span>
-                <span className="flex min-w-0 items-center gap-1.5 md:gap-2.5">
-                  <span aria-hidden className="icon-tile rounded-full md:hidden">
-                    <UserRound className="h-4 w-4" />
-                  </span>
+                {/* Điện thoại (Figma BHP1): huy hiệu tên nhân viên bo 6 cạnh tên quầy. */}
+                <span className="flex min-w-0 items-center gap-1 md:gap-2.5">
+                  <UserRound aria-hidden className="h-3 w-3 shrink-0 md:hidden" />
                   {/* Tablet: avatar chữ cái đầu tên (Figma BH1). */}
                   <span aria-hidden className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#ffeee7] text-[15px] font-bold text-[#c2380a] md:flex">
                     {initial(shift.staff_name)}
@@ -222,23 +222,22 @@ function NavItem({ to, end, icon: Icon, testId, label, onNavigate }: (typeof NAV
       data-testid={testId}
       onClick={onClick}
       className={({ isActive }) =>
-        `flex min-h-[56px] items-center gap-3 rounded-xl px-3 text-[17px] md:min-h-[44px] md:px-3.5 md:text-[15px] md:leading-[19px] ${
-          isActive
-            ? 'bg-brand-strong font-semibold text-white shadow-xs hover:bg-brand-deep md:bg-brand md:shadow-none md:hover:bg-brand-strong'
-            : 'border border-line font-medium text-ink-muted hover:bg-surface-muted md:border-0 md:text-[#6d6d6d] md:hover:bg-[#f8f8f8]'
+        `flex min-h-[62px] items-center gap-3 rounded-[14px] border border-line bg-white px-[15px] text-[15px] font-semibold leading-[19px] text-[#111] hover:bg-[#f8f8f8] md:min-h-[44px] md:rounded-xl md:border-0 md:px-3.5 ${
+          isActive ? 'md:bg-brand md:text-white md:hover:bg-brand-strong' : 'md:bg-transparent md:font-medium md:text-[#6d6d6d] md:hover:bg-[#f8f8f8]'
         }`
       }
     >
       {({ isActive }) => (
         <>
-          {/* Điện thoại (menu ☰): icon trong vòng tròn; tablet (sidebar, Figma BH1): icon trần 20. */}
+          {/* Điện thoại (menu ☰, Figma BHP9): ô icon 36 xám + mũi tên; tablet (sidebar, Figma BH1): icon trần 20. */}
           <span
             aria-hidden
-            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full md:h-5 md:w-5 md:bg-transparent ${isActive ? 'bg-brand text-white' : 'bg-surface-muted text-ink-muted md:text-[#9a9a9a]'}`}
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-[#f1f1f1] text-[#6d6d6d] md:h-5 md:w-5 md:rounded-none md:bg-transparent ${isActive ? 'md:text-white' : 'md:text-[#9a9a9a]'}`}
           >
-            <Icon className="h-5 w-5 md:stroke-2" strokeWidth={2.25} />
+            <Icon className="h-[18px] w-[18px] md:h-5 md:w-5" />
           </span>
-          {label}
+          <span className="min-w-0 flex-1 truncate">{label}</span>
+          <ChevronRight aria-hidden className="h-[18px] w-[18px] shrink-0 text-[#9a9a9a] md:hidden" />
         </>
       )}
     </NavLink>
@@ -254,39 +253,33 @@ function PhoneMenu({ shift, tabletName }: { shift: TabletShift; tabletName: stri
   const close = () => setOpen(false);
   return (
     <>
-      <button
-        type="button"
-        className={`btn order-5 h-11 min-h-0 w-11 min-w-0 shrink-0 px-0 ${open ? 'btn-dark' : 'btn-secondary'}`}
-        aria-label="Menu"
-        aria-expanded={open}
-        onClick={() => setOpen(true)}
-        data-testid="open-menu"
-      >
-        <MenuIcon aria-hidden className="h-5 w-5" />
+      <button type="button" className={iconBtn('order-5 h-10 w-10')} aria-label="Menu" aria-expanded={open} onClick={() => setOpen(true)} data-testid="open-menu">
+        <MenuIcon aria-hidden className="h-[18px] w-[18px]" />
       </button>
       {open && (
         <div className="fixed inset-0 z-20 flex items-end bg-black/45" role="dialog" aria-modal aria-label="Menu" onClick={close}>
           <div
             data-testid="menu-sheet"
             onClick={(e) => e.stopPropagation()}
-            className="flex w-full flex-col gap-2 rounded-t-3xl bg-surface px-4 pb-[max(24px,env(safe-area-inset-bottom))] pt-3 shadow-raised"
+            className="flex w-full flex-col gap-2.5 rounded-t-3xl bg-white px-4 pb-[max(24px,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_32px_rgba(0,0,0,0.16)]"
           >
-            <span aria-hidden className="mx-auto mb-1 h-1 w-10 shrink-0 rounded-full bg-line-strong" />
-            <div className="mb-1 flex items-center gap-3 px-1">
-              <span aria-hidden className="icon-tile h-10 w-10 rounded-full bg-brand-tint text-brand-deep">
-                <UserRound className="h-5 w-5" />
+            <SheetHandle />
+            {/* Đầu bảng (Figma BHP9): avatar chữ cái, "Ca của …", giờ mở · quầy · phiên bản, ✕ 36. */}
+            <div className="flex items-center gap-3 py-[5px]">
+              <span aria-hidden className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#ffeee7] text-lg font-bold text-[#c2380a]">
+                {initial(shift.staff_name)}
               </span>
-              <span className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate text-base font-semibold">Ca của {shift.staff_name}</span>
-                <span className="truncate text-[13px] text-ink-subtle">
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="truncate text-[17px] font-bold leading-[22px] text-[#111]">Ca của {shift.staff_name}</span>
+                <span className="truncate text-xs leading-[15px] text-[#888]">
                   từ {hhmm(shift.opened_at)} · {tabletName} · v{APP_VERSION.split('-')[0]}
                 </span>
               </span>
-              <button type="button" className="btn btn-secondary h-11 min-h-0 w-11 min-w-0 shrink-0 px-0" onClick={close} aria-label="Đóng">
-                <X aria-hidden className="h-5 w-5 text-ink-muted" />
+              <button type="button" className={iconBtn('h-9 w-9')} onClick={close} aria-label="Đóng">
+                <X aria-hidden className="h-4 w-4" />
               </button>
             </div>
-            <nav aria-label="Menu bán hàng" className="flex flex-col gap-2">
+            <nav aria-label="Menu bán hàng" className="flex flex-col gap-2.5">
               {NAV.filter((n) => n.to !== '/').map((n) => (
                 <NavItem key={n.to} {...n} onNavigate={close} />
               ))}

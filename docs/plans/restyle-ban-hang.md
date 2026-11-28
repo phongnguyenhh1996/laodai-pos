@@ -167,11 +167,21 @@ Badge DONE đã gắn cho BH13–BH19 (263:2…263:20); BHP10–BHP13 để tick
 
 Khung: BHP1, BHP2, BHP4, BHP9.
 
-- [ ] Header trắng: logo 36, tên quầy, badge tên nhân viên, nút kết nối / máy in / ☰ 40.
-- [ ] Giỏ là sheet bo 24: hàng tóm tắt (ô túi + số món, tiêu đề, tổng, mũi tên hoặc in lại + ✕ khi đang chọn đơn), segmented loại đơn,
+- [x] Header trắng: logo 36, tên quầy, badge tên nhân viên, nút kết nối / máy in / ☰ 40.
+- [x] Giỏ là sheet bo 24: hàng tóm tắt (ô túi + số món, tiêu đề, tổng, mũi tên hoặc in lại + ✕ khi đang chọn đơn), segmented loại đơn,
       nút cam "Thu đủ tiền mặt", 3 ô ngang TM / CK / Ghi nợ, hàng nút phụ. Mở rộng: ô nhãn + danh sách món (ô ảnh 44).
-- [ ] Bỏ nút "In lại phiếu bếp" riêng trong giỏ mở rộng (đã lên đầu sheet); giữ test id trên nút mới.
-- [ ] Menu ☰: sheet có đầu "Ca của …" (avatar, giờ mở · quầy · phiên bản) + 4 dòng có ô icon và mũi tên.
+- [x] Bỏ nút "In lại phiếu bếp" riêng trong giỏ mở rộng (đã lên đầu sheet); giữ test id trên nút mới.
+- [x] Menu ☰: sheet có đầu "Ca của …" (avatar, giờ mở · quầy · phiên bản) + 4 dòng có ô icon và mũi tên.
+
+Đã làm (so số đo ở 390×844: header, sheet giỏ thu gọn / mở rộng / đang chọn đơn, menu ☰ đúng từng px; segmented loại đơn cao hơn 2px
+như ở ticket 5, hàng nút phụ 45 thay vì 47). Badge DONE cho BHP1 / BHP2 / BHP4 / BHP9 (268:2…268:11). Ghi chú:
+- Đầu giỏ là một hàng cho cả hai cỡ: điện thoại là nút `cart-toggle` (ô túi, "#mã · nhãn" / "Đơn mới · N món", tổng), tablet là ô icon +
+  "Đơn #mã" + badge (`order-code`, `order-autosave`, `order-status` vẫn trong DOM nhưng ẩn trên điện thoại). In lại + ✕ dùng chung, 36 / 40.
+- Giỏ mở rộng hoặc đang thanh toán ⇒ sheet phủ hết phần thực đơn (thực đơn ẩn), dải đơn vẫn bấm được; nút chân sheet nằm sát đáy như BHP2.
+- Tiêu đề đơn đã lưu không có nhãn: "#mã · N món". Đang thanh toán vẫn hiện hàng tóm tắt (như BHP6).
+- Nút "Thu đủ tiền mặt" điện thoại cao 48, hiện đủ chữ "tiền mặt" (trước rút gọn "Thu đủ").
+- Nút kết nối điện thoại: ô 40 nền xanh lá nhạt / vàng nhạt / đỏ nhạt theo trạng thái, không viền (`ConnectionBadge`).
+- `NavItem` dùng chung sidebar tablet và menu ☰: điện thoại thành thẻ 62 viền mảnh + mũi tên; tablet giữ nguyên số đo (44).
 
 ## Ticket 9 — Rà soát cuối
 

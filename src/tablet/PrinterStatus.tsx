@@ -123,12 +123,12 @@ export function PrintErrorToast({ canReprint }: { canReprint: (orderId: string) 
 }
 
 /** Nút "In lại phiếu bếp" trong giỏ: luôn hiện (bất kể công tắc) khi máy in được trực tiếp. */
-export function ReprintKitchenButton({ orderId, code, testId }: { orderId: string; code: string; testId?: string }) {
+export function ReprintKitchenButton({ orderId, code, testId, className }: { orderId: string; code: string; testId?: string; className?: string }) {
   const { service } = usePrint();
   if (!service.enabled) return null;
   return (
-    <button type="button" data-testid={testId} className={iconBtn()} aria-label="In lại phiếu bếp" title="In lại phiếu bếp" onClick={() => void service.printKitchen(orderId, code, 'staff')}>
-      <PrinterIcon aria-hidden className="h-[18px] w-[18px]" />
+    <button type="button" data-testid={testId} className={iconBtn(className)} aria-label="In lại phiếu bếp" title="In lại phiếu bếp" onClick={() => void service.printKitchen(orderId, code, 'staff')}>
+      <PrinterIcon aria-hidden className="h-4 w-4 md:h-[18px] md:w-[18px]" />
     </button>
   );
 }

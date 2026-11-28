@@ -9,7 +9,6 @@ import {
   draftProblem,
   draftShip,
   draftTotal,
-  itemsSummary,
   lineSummary,
   newDraft,
   replaceWithCombo,
@@ -58,8 +57,8 @@ const SHIP_MODES: readonly ShipMode[] = ['shop', 'external'];
 
 const DELETE_REASONS = (['mistake', 'customer_left', 'customer_changed', 'other'] as const).map((id) => ({ id, label: DELETE_REASON_LABELS[id] }));
 
-/** Nút −/+ của dòng món (Figma BH2): 36 nền xám bo 10. */
-const QTY_BTN = 'flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-[#f3f3f3] text-[#111] transition-colors duration-fast hover:bg-[#e9e9e9]';
+/** Nút −/+ của dòng món (Figma BH2 / BHP2): 36 (điện thoại 34) nền xám bo 10. */
+const QTY_BTN = 'flex h-[34px] w-[34px] shrink-0 md:h-9 md:w-9 items-center justify-center rounded-[10px] bg-[#f3f3f3] text-[#111] transition-colors duration-fast hover:bg-[#e9e9e9]';
 
 const PAY_METHOD_KEYS = ['cash', 'transfer', 'debt'] as const;
 
@@ -503,6 +502,10 @@ export function OrderEditor({
   latestLeave.current = requestLeave;
 
   const itemCount = d.items.reduce((s, it) => s + it.qty, 0);
+  /** Điện thoại: tiêu đề hàng tóm tắt giỏ (Figma BHP1 / BHP2): "Đơn mới · 5 món", "#K7Q · Bàn 3". */
+  const phoneTitle = `${saved ? `#${saved.code}` : 'Đơn mới'} · ${empty ? 'chưa có món' : saved && d.label.trim() ? d.label.trim() : `${itemCount} món`}`;
+  /** Điện thoại: sheet giỏ phủ cả phần thực đơn (giỏ mở rộng, đang thanh toán; Figma BHP2 / BHP4 / BHP6). */
+  const sheetFull = !isTablet && (cartOpen || !!paying);
   const isShip = d.dine_type === 'delivery';
   const { ship_fee: shipFee, ship_mode: shipMode, ship_payout: payout } = draftShip(d);
   const external = shipMode === 'external';
@@ -605,7 +608,7 @@ export function OrderEditor({
 
   /** Dòng món (Figma BH2): ô ảnh, tên, topping dòng phụ, thành tiền cam đậm, −/+ 36. Bấm tên ⇒ chọn dòng để đổi món. */
   const cartLines = (
-    <ul className={`${cartOpen ? 'flex' : 'hidden'} min-h-0 flex-col overflow-y-auto md:flex md:min-h-fit md:flex-1 md:overflow-visible md:px-4`} data-testid="cart-lines">
+    <ul className={`${cartOpen ? 'flex' : 'hidden'} min-h-0 flex-1 flex-col overflow-y-auto md:flex md:min-h-fit md:overflow-visible md:px-4`} data-testid="cart-lines">
       {empty && (
         <li className="flex flex-1 flex-col items-center justify-center gap-2 py-8 text-center">
           <span aria-hidden className="flex h-16 w-16 items-center justify-center rounded-full bg-[#f4f4f4] text-[#b5b5b5]">
@@ -623,9 +626,9 @@ export function OrderEditor({
             data-testid={`cart-line-${it.id}`}
             data-product={it.product_id}
             data-swapping={picking || undefined}
-            className={`flex items-center gap-3 border-b py-3 last:border-b-0 ${picking ? 'rounded-xl border-brand bg-[#ffeee7] px-2 ring-2 ring-brand/30' : 'border-line'}`}
+            className={`flex items-center gap-3 border-b py-2 last:border-b-0 md:py-3 ${picking ? 'rounded-xl border-brand bg-[#ffeee7] px-2 ring-2 ring-brand/30' : 'border-line'}`}
           >
-            <ItemThumb className="h-11 w-11 rounded-xl md:h-[52px] md:w-[52px]" />
+            <ItemThumb className="h-11 w-11 rounded-xl md:h-[52px] md:w-[52px]" iconClass="h-5 w-5 md:h-6 md:w-6" />
             <button
               type="button"
               className="flex min-w-0 flex-1 flex-col gap-[3px] rounded-lg text-left"
@@ -668,10 +671,10 @@ export function OrderEditor({
   );
 
   const payExactBtn = (
-    <button type="button" className={staffBtn('primary', 'lg', 'w-full shrink-0')} disabled={blocked} onClick={() => void payExact()} data-testid="order-pay-exact">
+    <button type="button" className={staffBtn('primary', 'lg', 'w-full shrink-0 max-md:min-h-12')} disabled={blocked} onClick={() => void payExact()} data-testid="order-pay-exact">
       <Banknote aria-hidden />
       <span>
-        Thu đủ<span className="hidden md:inline"> tiền mặt</span> · <span className="num">{formatVnd(total)}</span>
+        Thu đủ tiền mặt · <span className="num">{formatVnd(total)}</span>
       </span>
     </button>
   );
@@ -710,7 +713,7 @@ export function OrderEditor({
   // Tablet (md+), theo Figma: hàng đợi + thực đơn ở cột giữa, cột giỏ trắng bên phải (đầu đơn ở đầu cột).
   return (
     <div data-testid="order-screen" data-point={d.point_id} data-order={saved?.id} className="contents">
-      <div className="row-start-2 flex min-h-0 flex-col gap-3 overflow-y-auto px-4 py-3 md:col-start-1 md:p-5">
+      <div className={`${sheetFull ? 'hidden' : 'flex'} row-start-2 min-h-0 flex-col gap-3 overflow-y-auto px-4 py-3 md:col-start-1 md:flex md:p-5`}>
         {swapLine && (
           <div
             data-testid="swap-banner"
@@ -750,14 +753,41 @@ export function OrderEditor({
 
       <aside
         data-testid="cart"
-        className="relative row-start-3 flex max-h-[78vh] min-w-0 flex-col gap-2 rounded-t-3xl bg-surface px-4 pb-[max(16px,env(safe-area-inset-bottom))] pt-2 shadow-raised md:col-start-2 md:row-span-2 md:row-start-1 md:max-h-none md:min-h-0 md:gap-0 md:rounded-none md:border-l md:border-line md:p-0 md:shadow-none"
+        className={`${sheetFull ? 'row-span-2 row-start-2' : 'row-start-3 max-h-[78vh]'} relative flex min-w-0 flex-col gap-2.5 rounded-t-3xl bg-white px-4 pb-[max(20px,env(safe-area-inset-bottom))] pt-2 shadow-raised md:col-start-2 md:row-span-2 md:row-start-1 md:max-h-none md:min-h-0 md:gap-0 md:rounded-none md:border-l md:border-line md:p-0 md:shadow-none`}
       >
         <SheetHandle className="md:hidden" />
-        {/* Đầu giỏ (Figma BH1 / BH3): ô icon, "Đơn mới" / "Đơn #mã" + trạng thái lưu, in lại phiếu bếp, ✕ bỏ chọn. Điện thoại chỉ hiện khi đang chọn đơn. */}
-        <div className={`${saved ? 'flex' : 'hidden md:flex'} shrink-0 items-center gap-3 md:border-b md:border-line md:px-4 md:py-3.5`}>
+        {/* Đầu giỏ. Tablet (Figma BH1 / BH3): ô icon, "Đơn mới" / "Đơn #mã" + trạng thái lưu, in lại phiếu bếp, ✕ bỏ chọn.
+            Điện thoại (Figma BHP1 / BHP2): một hàng tóm tắt (ô túi + số món, tiêu đề, tổng), bấm để mở / thu gọn giỏ; đang chọn đơn ⇒ in lại + ✕ thay mũi tên. */}
+        <div className="flex shrink-0 items-center gap-3 md:border-b md:border-line md:px-4 md:py-3.5">
+          <button type="button" className="flex min-w-0 flex-1 items-center gap-3 text-left md:hidden" aria-expanded={cartOpen} onClick={() => setCartOpen((v) => !v)} data-testid="cart-toggle">
+            <span className="icon-tile relative h-11 w-11 rounded-xl bg-[#ffeee7] text-brand">
+              <ShoppingBag aria-hidden className="h-[22px] w-[22px]" />
+              {itemCount > 0 && (
+                <span className="num absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-white bg-brand px-1 text-[11px] font-bold leading-[14px] text-white">
+                  {itemCount}
+                </span>
+              )}
+            </span>
+            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+              <span className="truncate text-[15px] font-bold leading-[19px] text-[#111]">{phoneTitle}</span>
+              {shipFee > 0 || payout > 0 ? (
+                <span className="num truncate text-xs leading-[15px] text-[#888]" data-testid="cart-ship-breakdown">
+                  {formatVnd(orderTotal(d.items))}
+                  {shipFee > 0 && ` + ${external ? 'phụ thu' : 'phí'} ${formatVnd(shipFee)}`}
+                  {payout > 0 && ` · trả ship ${formatVnd(payout)}`}
+                </span>
+              ) : (
+                <span className="truncate text-xs leading-[15px] text-[#888]">{cartOpen ? 'Bấm để thu gọn' : 'Bấm để xem giỏ'}</span>
+              )}
+            </span>
+            <span className="num shrink-0 text-lg font-bold leading-[23px] text-[#111]" data-testid="cart-total">
+              {formatVnd(total)}
+            </span>
+            {!saved && <ChevronUp aria-hidden className={`h-5 w-5 shrink-0 text-[#6d6d6d] transition-transform duration-fast ${cartOpen ? 'rotate-180' : ''}`} />}
+          </button>
           <IconTile icon={Receipt} className="hidden h-11 w-11 rounded-xl md:flex" iconClass="h-[22px] w-[22px]" tone="bg-[#ffeee7] text-brand" />
           {saved ? (
-            <span className="flex min-w-0 flex-1 flex-col gap-1">
+            <span className="hidden min-w-0 flex-1 flex-col gap-1 md:flex">
               <span className="truncate text-lg font-bold leading-[23px] text-[#111]">
                 Đơn #
                 <span className="font-mono leading-none tracking-wider" data-testid="order-code">
@@ -780,7 +810,7 @@ export function OrderEditor({
               </span>
             </span>
           ) : (
-            <span className="flex min-w-0 flex-1 flex-col gap-1">
+            <span className="hidden min-w-0 flex-1 flex-col gap-1 md:flex">
               <span className="text-lg font-bold leading-[23px] text-[#111]" data-testid="order-code">
                 Đơn mới
               </span>
@@ -789,9 +819,16 @@ export function OrderEditor({
           )}
           {saved && (
             <span className="flex shrink-0 items-center gap-2">
-              <ReprintKitchenButton orderId={saved.id} code={saved.code} testId="order-reprint" />
-              <button type="button" className={iconBtn()} onClick={() => requestLeave(onClose)} aria-label="Bỏ chọn, về đơn mới" title="Bỏ chọn, về đơn mới" data-testid="order-deselect">
-                <X aria-hidden className="h-[18px] w-[18px]" />
+              <ReprintKitchenButton orderId={saved.id} code={saved.code} testId="order-reprint" className="h-9 w-9 md:h-10 md:w-10" />
+              <button
+                type="button"
+                className={iconBtn('h-9 w-9 md:h-10 md:w-10')}
+                onClick={() => requestLeave(onClose)}
+                aria-label="Bỏ chọn, về đơn mới"
+                title="Bỏ chọn, về đơn mới"
+                data-testid="order-deselect"
+              >
+                <X aria-hidden className="h-4 w-4 md:h-[18px] md:w-[18px]" />
               </button>
             </span>
           )}
@@ -814,39 +851,6 @@ export function OrderEditor({
           </div>
         ) : (
           <>
-            {/* Chỉ trên điện thoại: một dòng tóm tắt giỏ, bấm để mở / thu gọn chi tiết (dòng món, nhãn). */}
-            <button
-              type="button"
-              className="flex min-h-[56px] shrink-0 items-center gap-3 rounded-2xl border border-line bg-surface-muted px-2 py-1.5 text-left md:hidden"
-              aria-expanded={cartOpen}
-              onClick={() => setCartOpen((v) => !v)}
-              data-testid="cart-toggle"
-            >
-              <span className="icon-tile relative h-10 w-10 rounded-xl bg-brand-soft text-brand-strong">
-                <ShoppingBag aria-hidden className="h-5 w-5" />
-                {itemCount > 0 && (
-                  <span className="num absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-brand-strong px-1 text-xs font-bold text-white">{itemCount}</span>
-                )}
-              </span>
-              <span className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate text-[15px] font-semibold leading-tight">
-                  {empty ? (saved ? 'Chưa có món' : 'Đơn mới · chưa có món') : `${DINE_LABELS[d.dine_type]}${d.label.trim() ? ` · ${d.label.trim()}` : ''} · ${itemsSummary(d.items)}`}
-                </span>
-                {shipFee > 0 || payout > 0 ? (
-                  <span className="num truncate text-xs font-medium text-ink-subtle" data-testid="cart-ship-breakdown">
-                    {formatVnd(orderTotal(d.items))}
-                    {shipFee > 0 && ` + ${external ? 'phụ thu' : 'phí'} ${formatVnd(shipFee)}`}
-                    {payout > 0 && ` · trả ship ${formatVnd(payout)}`}
-                  </span>
-                ) : (
-                  <span className="text-xs text-ink-subtle">{cartOpen ? 'Bấm để thu gọn' : 'Bấm để xem giỏ'}</span>
-                )}
-              </span>
-              <span className="num shrink-0 text-xl font-bold" data-testid="cart-total">
-                {formatVnd(total)}
-              </span>
-              <ChevronUp aria-hidden className={`h-5 w-5 shrink-0 text-ink-subtle transition-transform duration-fast ${cartOpen ? 'rotate-180' : ''}`} />
-            </button>
             {/* Tablet: loại đơn + nhãn + món cuộn chung, đơn ship (nhiều hàng chọn) không đẩy phần tóm tắt ra khỏi cột (Figma BH7).
                 Điện thoại: `contents`, các phần nằm thẳng trong sheet giỏ; nhãn + dòng món chỉ hiện khi mở rộng. */}
             <div className="contents md:flex md:min-h-0 md:flex-1 md:flex-col md:overflow-y-auto">
