@@ -31,8 +31,10 @@ declare global {
       ownerReload(): Chainable<null>;
       /** Token phiên chính đang lưu trên máy (tablet: phiên vai trò `tablet`). */
       storedAccessToken(): Chainable<string>;
-      /** Trên màn mở ca của tablet: chọn tên → Mở ca ⇒ hàng đợi. */
+      /** Trên màn mở ca của tablet: chọn tên → Mở ca ⇒ màn Bán hàng. */
       openShift(staff: StaffKey): Chainable<null>;
+      /** Giỏ đang là đơn mới trống (không chọn thẻ nào; sau Tạo đơn / Ra món / Thanh toán / Xóa giỏ tự về đây). */
+      newOrder(): Chainable<null>;
       /** Tablet đang kết nối realtime với server (chỉ báo "Đã kết nối"). Mọi thao tác đã hiện trên màn đều đã nằm trên server. */
       waitLive(): Chainable<null>;
     }
@@ -125,3 +127,9 @@ Cypress.Commands.add('waitLive', () => {
 });
 
 export {};
+
+Cypress.Commands.add('newOrder', () => {
+  cy.get('[data-testid=order-code]').should('have.text', 'Đơn mới');
+  cy.get('[data-testid^=cart-line-]').should('not.exist');
+  return cy.wrap(null, { log: false });
+});

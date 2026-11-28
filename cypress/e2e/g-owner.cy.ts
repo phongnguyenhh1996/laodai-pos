@@ -66,7 +66,7 @@ describe('G. Chủ', () => {
     cy.activateTablet('A');
     cy.get(tid('shift-staff')).should('contain.text', 'Lan');
     cy.get('[data-testid^=queue-total-]').then(($t) => expect([...$t].map((t) => t.textContent)).to.deep.eq(['50.000', '28.000']));
-    cy.get(tid('new-order')).click();
+    cy.newOrder();
     cy.get(tid(`menu-product-${SEED.products.xoiGa}-price`)).should('contain.text', '28.000');
     cy.get(tid(`menu-combo-${SEED.combos.xoiGaTrung}-price`)).should('contain.text', '34.000');
     cy.get(tid(`menu-product-${SEED.products.xoiXeo}-price`)).should('contain.text', '15.000');
@@ -75,14 +75,13 @@ describe('G. Chủ', () => {
   it('G37: bỏ "Cơm gà" khỏi tablet A ⇒ tab Cơm gà biến mất trên tablet A sau khi đồng bộ', () => {
     cy.activateTablet('A');
     cy.openShift('Lan');
-    cy.get(tid('new-order')).click();
+    cy.newOrder();
     cy.get(tid(`point-tab-${SEED.points.xoiA}`)).should('be.visible');
     cy.get(tid(`point-tab-${SEED.points.com}`)).should('be.visible').click();
     cy.get(tid(`menu-product-${SEED.products.comGa}`)).should('be.visible');
     cy.get(tid(`point-tab-${SEED.points.xoiB}`)).should('not.exist');
 
     // Chủ sửa hồ sơ tablet (ngay trên tablet, chế độ chủ)
-    cy.get(tid('order-back')).click();
     enterOwnerModeOnTablet();
     openSettings('profiles', SEED.tablets.A);
     cy.get(tid(`field-point_ids-${SEED.points.com}`)).should('be.checked').uncheck();
@@ -94,14 +93,14 @@ describe('G. Chủ', () => {
     // Về màn bán hàng ⇒ tablet đồng bộ danh mục, tab Cơm gà biến mất
     cy.get(tid('owner-exit')).click();
     cy.get(tid('tablet-home')).should('be.visible');
-    cy.get(tid('new-order')).click();
+    cy.newOrder();
     cy.get(tid(`point-tab-${SEED.points.com}`)).should('not.exist');
     cy.get(tid(`point-tab-${SEED.points.xoiA}`)).should('be.visible').and('have.attr', 'aria-selected', 'true');
     cy.get(tid(`menu-product-${SEED.products.comGa}`)).should('not.exist');
 
     // Tải lại app vẫn đúng (danh mục đã lưu trên máy)
     cy.reload();
-    cy.get(tid('order-screen')).should('be.visible');
+    cy.get(tid('sales-screen')).should('be.visible');
     cy.get(tid(`point-tab-${SEED.points.xoiA}`)).should('be.visible');
     cy.get(tid(`point-tab-${SEED.points.com}`)).should('not.exist');
   });
@@ -121,7 +120,7 @@ describe('G. Chủ', () => {
 
     cy.activateTablet('A');
     cy.openShift('Lan');
-    cy.get(tid('new-order')).click();
+    cy.newOrder();
     cy.get(tid(`point-tab-${SEED.points.xoiA}`)).should('be.visible');
     cy.get(tid(`point-tab-${SEED.points.com}`)).should('not.exist');
   });

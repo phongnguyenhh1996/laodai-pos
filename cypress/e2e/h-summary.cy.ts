@@ -17,19 +17,19 @@ describe('H. Tổng kết ngày', () => {
     // Tablet A: Lan bán Xôi A (TM 31.000), Cơm gà (CK 40.000), xóa 1 đơn đã ra món, đóng ca đếm thiếu 10.000
     cy.activateTablet('A');
     cy.openShift('Lan');
-    cy.get(tid('new-order')).click();
+    cy.newOrder();
     cy.get(tid(`menu-combo-${SEED.combos.xoiGaTrung}`)).click();
     cy.get(tid('order-pay-exact')).click();
-    cy.get(tid('new-order')).click();
+    cy.newOrder();
     cy.get(tid(`point-tab-${SEED.points.com}`)).click();
     cy.get(tid(`menu-combo-${SEED.combos.comGaCanh}`)).click();
     cy.get(tid('order-pay-transfer')).click();
     cy.get(tid('pay-transfer-confirm')).click();
-    cy.get(tid('new-order')).click();
+    cy.newOrder();
     cy.get(tid(`point-tab-${SEED.points.xoiA}`)).click();
     cy.get(tid(`menu-combo-${SEED.combos.xoiXeoChaRuoc}`)).click();
     cy.get(tid('order-serve')).click();
-    cy.get('[data-testid^=queue-open-]').click();
+    cy.get('[data-testid^=queue-card-]').click();
     cy.get(tid('order-delete')).click();
     cy.get(tid('delete-reason-mistake')).click();
     cy.get(tid('open-close-shift')).click();

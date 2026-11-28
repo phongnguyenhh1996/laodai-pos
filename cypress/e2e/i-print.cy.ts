@@ -40,7 +40,7 @@ function tabletWithPrinter() {
 }
 
 function comboOrder() {
-  cy.get(tid('new-order')).click();
+  cy.newOrder();
   cy.get(tid(`menu-combo-${SEED.combos.xoiGaTrung}`)).click();
   cy.get(tid('order-save')).click();
   cy.get(tid('queue-screen')).should('be.visible');
@@ -57,22 +57,20 @@ describe('I. In phiếu', () => {
     waitJobs(['kitchen:auto:printed']);
     cy.window().its('__laodaiFakePrinter.writes.length').should('be.greaterThan', 0);
 
-    cy.get('[data-testid^=queue-open-]').first().click();
+    cy.get('[data-testid^=queue-card-]').first().click();
     cy.get(tid(`menu-product-${SEED.products.xoiXeo}`)).click();
     cy.get(tid('topping-add')).click();
-    cy.get(tid('order-back')).click();
-    cy.get(tid('queue-screen')).should('be.visible');
-    // Các lần tự lưu được gom thành MỘT phiếu "ĐÃ SỬA" (chờ yên vài giây).
+    // Đơn đang chọn tự lưu; các lần tự lưu được gom thành MỘT phiếu "ĐÃ SỬA" (chờ yên vài giây).
     waitJobs(['kitchen:auto:printed', 'kitchen:auto:printed']).then((js) => {
       expect(js[1].detail?.edit?.added).to.deep.eq([{ name: 'Xôi xéo', qty: 1, toppings: [] }]);
     });
 
-    cy.get('[data-testid^=queue-reprint-]').first().click();
+    // Nút in lại phiếu bếp nằm ở đầu giỏ của đơn đang chọn.
+    cy.get(tid('order-reprint')).click();
     waitJobs(['kitchen:auto:printed', 'kitchen:auto:printed', 'kitchen:staff:printed']);
 
-    cy.get('[data-testid^=queue-open-]').first().click();
     cy.get(tid('order-pay-exact')).click();
-    cy.get(tid('queue-screen')).should('be.visible');
+    cy.newOrder();
     waitJobs(['kitchen:auto:printed', 'kitchen:auto:printed', 'kitchen:staff:printed', 'bill:auto:printed']);
     cy.get('[data-testid*=bill]').should('not.exist');
   });
@@ -83,16 +81,16 @@ describe('I. In phiếu', () => {
     comboOrder();
     cy.wait(1000);
     waitJobs([]);
-    cy.get('[data-testid^=queue-reprint-]').first().click();
+    cy.get('[data-testid^=queue-card-]').first().click();
+    cy.get(tid('order-reprint')).click();
     waitJobs(['kitchen:staff:printed']);
 
     // Hết giấy: thanh toán vẫn xong, tablet báo đỏ, server ghi lỗi.
     cy.window().then((w) => {
       (w as unknown as { __laodaiFakePrinter: { fail: string | null } }).__laodaiFakePrinter.fail = 'Hết giấy';
     });
-    cy.get('[data-testid^=queue-open-]').first().click();
     cy.get(tid('order-pay-exact')).click();
-    cy.get(tid('queue-screen')).should('be.visible');
+    cy.newOrder();
     cy.get(tid('print-error')).should('contain.text', 'Hết giấy');
     cy.get(tid('print-error-retry')).should('not.exist'); // bill: tablet không in lại được
     waitJobs(['kitchen:staff:printed', 'bill:auto:failed']).then((js) => {
@@ -105,7 +103,7 @@ describe('I. In phiếu', () => {
   it('chủ in lại bill từ xa: tablet có máy in nhận lệnh; không có máy nào ⇒ hết hạn sau 2 phút', () => {
     tabletWithPrinter();
     comboOrder();
-    cy.get('[data-testid^=queue-open-]').first().click();
+    cy.get('[data-testid^=queue-card-]').first().click();
     cy.get(tid('order-pay-exact')).click();
     waitJobs(['kitchen:auto:printed', 'bill:auto:printed']).then((js) => {
       // Chủ vào chế độ chủ ngay trên tablet (phiên tạm); dịch vụ in của máy vẫn nghe lệnh của quầy.

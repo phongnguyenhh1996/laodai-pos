@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useLocation } from 'react-router-dom';
 import { CircleAlert, CircleCheck, TriangleAlert } from 'lucide-react';
 
 /** Toast còn hiện bao lâu. */
@@ -30,10 +31,13 @@ const TONE: Record<ToastTone, { cls: string; icon: ReactNode }> = {
 /**
  * Chỗ hiện toast của màn bán hàng: tablet giữa cột thực đơn (không che giỏ), điện thoại ngay dưới header.
  * Không chặn thao tác bên dưới. `extra` là toast do nơi khác quản lý (in lỗi), vẽ cùng chồng.
+ * Sang màn khác ⇒ bỏ các toast đang hiện (vd. "Đã thu 31.000" không được theo sang màn Đóng ca đếm mù).
  */
 export function ToastHost({ extra, children }: { extra?: ReactNode; children: ReactNode }) {
   const [items, setItems] = useState<ToastItem[]>([]);
   const seq = useRef(0);
+  const { pathname } = useLocation();
+  useEffect(() => setItems([]), [pathname]);
   const show = useCallback((text: ReactNode, tone: ToastTone = 'ok') => {
     const id = ++seq.current;
     // Tối đa 3 toast; cái mới nằm trên cùng.

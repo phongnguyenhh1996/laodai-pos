@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// Luồng bán hàng trên tablet (bước 5): mở ca → tạo / sửa / xóa đơn → hàng đợi → ra món → thanh toán → đóng ca.
+// Luồng bán hàng trên tablet: mở ca → màn Bán hàng (dải đơn + thực đơn + giỏ): tạo / sửa / xóa đơn → ra món → thanh toán trong giỏ → đóng ca.
 // Chạy với server giả trong bộ nhớ (FakeServer): kiểm tra những thao tác server nhận, những gì hiện ra,
 // và nhiều máy cùng hồ sơ tablet thấy cùng một ca + hàng đợi (realtime).
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
@@ -591,7 +591,7 @@ describe('tạo đơn & thanh toán', () => {
 });
 
 describe('hàng đợi', () => {
-  it('C14/C15: 3 đơn, cũ nhất ở trên; vàng ≥ 5 phút, đỏ ≥ 10 phút; Đã ra món ⇒ xuống nhóm Chờ thanh toán; số thứ tự đánh lại', async () => {
+  it('C14/C15: 3 đơn, cũ nhất ở trên; vàng ≥ 5 phút, đỏ ≥ 10 phút; Đã ra món ⇒ xuống nhóm Chờ thanh toán; chip lọc', async () => {
     const t0 = Date.parse('2026-11-18T00:00:00.000Z');
     vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] });
     vi.setSystemTime(t0);
@@ -647,7 +647,7 @@ describe('hàng đợi', () => {
     expect(screen.queryByTestId(`queue-card-${secondId}`)).toBeNull();
   });
 
-  it('bỏ chọn đơn: bấm lại thẻ, bấm vùng trống của hàng đợi; bấm thực đơn không bỏ chọn', async () => {
+  it('bỏ chọn đơn: bấm lại thẻ, bấm vùng trống của hàng đợi, nút ✕ đầu giỏ; bấm chip / thực đơn không bỏ chọn', async () => {
     await startShift();
     addProduct(XOI_GA.id);
     click('order-save');
@@ -673,6 +673,12 @@ describe('hàng đợi', () => {
     expect(selected()).toBe(false);
     await waitFor(() => expect(server.order(o.id)?.items).toHaveLength(2));
     expect(window.location.search).toBe('');
+
+    click(`queue-card-${o.id}`);
+    await waitFor(() => expect(selected()).toBe(true));
+    click('order-deselect'); // nút ✕ đầu giỏ
+    await cartIsNew();
+    expect(selected()).toBe(false);
   });
 
   it('sửa đơn đang mở: tăng / bớt số lượng, đổi nhãn ⇒ update_order với tổng mới; không đổi gì thì không ghi', async () => {
@@ -844,9 +850,14 @@ describe('đóng ca', () => {
     click('order-save');
     await cartIsNew();
     const [o] = server.openOrders();
+    // Toast "Đã thu …" của màn Bán hàng không theo sang màn đếm mù
+    fireEvent.click(screen.getByTestId(`menu-combo-${COMBO_XOI_FULL.id}`));
+    click('order-pay-exact');
+    expect(await screen.findByTestId('toast')).toHaveTextContent('Đã thu 39.000');
 
     nav('open-close-shift');
     await screen.findByTestId('close-shift-screen');
+    expect(screen.queryByTestId('toast')).toBeNull();
     click('close-review');
     expect(tid('close-error')).toBeInTheDocument(); // chưa nhập
     fireEvent.change(tid('close-boxes'), { target: { value: '190' } });
@@ -1108,7 +1119,7 @@ describe('nhiều máy cùng hồ sơ tablet (realtime)', () => {
     }),
   });
 
-  it('máy khác mở ca ⇒ máy này tự chuyển sang hàng đợi của ca đó; không mở được ca thứ hai', async () => {
+  it('máy khác mở ca ⇒ máy này tự chuyển sang màn Bán hàng của ca đó; không mở được ca thứ hai', async () => {
     activateDevice();
     go('/');
     await screen.findByTestId('open-shift-screen');
@@ -1121,7 +1132,7 @@ describe('nhiều máy cùng hồ sơ tablet (realtime)', () => {
     b.store.stop();
   });
 
-  it('máy khác tạo đơn ⇒ hiện ngay trong hàng đợi máy này; mã đơn + số thứ tự do server cấp, không trùng', async () => {
+  it('máy khác tạo đơn ⇒ hiện ngay trong hàng đợi máy này; mã đơn + số thứ tự máy (device_seq) do server cấp, không trùng', async () => {
     await startShift();
     await newOrder();
     fireEvent.click(screen.getByTestId(`menu-combo-${COMBO_XOI_FULL.id}`));
@@ -1138,7 +1149,7 @@ describe('nhiều máy cùng hồ sơ tablet (realtime)', () => {
     b.store.stop();
   });
 
-  it('máy khác thanh toán đơn đang thanh toán trong giỏ ⇒ về hàng đợi, báo đã thanh toán ở máy khác; không thu lần hai', async () => {
+  it('máy khác thanh toán đơn đang thanh toán trong giỏ ⇒ giỏ về đơn mới, báo đã thanh toán ở máy khác; không thu lần hai', async () => {
     await startShift();
     await newOrder();
     fireEvent.click(screen.getByTestId(`menu-combo-${COMBO_XOI_FULL.id}`));

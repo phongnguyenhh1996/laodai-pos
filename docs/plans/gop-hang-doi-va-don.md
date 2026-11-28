@@ -142,11 +142,19 @@ Cypress C14 / C15 (`c-sales.cy.ts`) còn đọc `data-position` (thẻ đã bỏ
 
 ## Ticket 6 — Test
 
-- [ ] Sửa `TabletFlow.test.tsx`, `TabletPrint.test.tsx`, `SoldOut.test.tsx` theo màn mới.
-- [ ] Unit: thứ tự thẻ ở ba chip; luật bỏ chọn (vùng trống, ✕, bấm lại thẻ; bấm thực đơn không bỏ chọn).
-- [ ] Cypress (SPEC 10.4): sửa B/C theo màn mới (14, 15, 29); thêm: chọn thẻ ⇒ sửa đơn, đổi thẻ khi đơn mới chưa lưu ⇒ "Bỏ thay đổi?",
+- [x] Sửa `TabletFlow.test.tsx`, `TabletPrint.test.tsx`, `SoldOut.test.tsx` theo màn mới.
+- [x] Unit: thứ tự thẻ ở ba chip; luật bỏ chọn (vùng trống, ✕, bấm lại thẻ; bấm thực đơn không bỏ chọn).
+- [x] Cypress (SPEC 10.4): sửa B/C theo màn mới (14, 15, 29); thêm: chọn thẻ ⇒ sửa đơn, đổi thẻ khi đơn mới chưa lưu ⇒ "Bỏ thay đổi?",
       thanh toán TM / CK / Ghi nợ trong giỏ, combo + "Thu đủ" ≤ 3 chạm từ màn Bán hàng. Chạy cả 1280 và 390.
-- [ ] `npm run check` + `npm run test:e2e`.
+- [x] `npm run check` + `npm run test:e2e`.
+
+Ghi chú khi làm: phần lớn unit đã sửa dần ở T2–T4; ticket này đổi tên test cũ, thêm bước ✕ vào test bỏ chọn.
+Cypress: lệnh `cy.newOrder()` (giỏ là đơn mới trống) thay nút `new-order` cũ ở mọi spec; `queue-open-` → bấm thẻ; nút trên thẻ
+(ra món, thu tiền, in lại) → bấm thẻ rồi dùng nút trong giỏ; `order-back` → `order-deselect` (đơn đã lưu) hoặc bỏ (đơn mới trống).
+Test mới C21 (chọn thẻ / bỏ chọn), C22 ("Bỏ thay đổi?" / tự lưu khi đổi thẻ), C23 (TM · CK · Ghi nợ trong giỏ); C10, C21–C23 chạy ở 1280 và 390.
+C18 kiểm tra hàng TM · CK · Ghi nợ và hàng Đã ra món + Tạo đơn trên điện thoại. C20 (360): hàng chip rộng ~406px nên tự cuộn ngang
+(theo `overflow-x-auto`); test chỉ còn đòi trang không cuộn ngang và dải thẻ vừa màn.
+B9 bắt được lỗi từ T4: toast "Đã thu …" theo sang màn Đóng ca (lộ số tiền khi đếm mù) ⇒ `ToastHost` bỏ toast khi đổi màn (pathname).
 
 ## Tiêu chí xong
 

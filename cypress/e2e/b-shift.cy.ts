@@ -29,7 +29,7 @@ interface DbOrder {
 
 /** Bán một combo và thu đủ tiền mặt (3 chạm). */
 function sellCombo(combo: keyof typeof SEED.combos) {
-  cy.get(tid('new-order')).click();
+  cy.newOrder();
   cy.get(tid(`menu-combo-${SEED.combos[combo]}`)).click();
   cy.get(tid('order-pay-exact')).click();
   cy.get(tid('toast')).should('be.visible');
@@ -125,7 +125,7 @@ describe('B. Ca', () => {
   it('B8: đóng ca còn 1 đơn mở: không bị chặn; ca sau trên cùng tablet thấy và thu được đơn đó; báo cáo ghi người mở và người thu', () => {
     cy.activateTablet('A');
     cy.openShift('Lan');
-    cy.get(tid('new-order')).click();
+    cy.newOrder();
     cy.get(tid('order-label')).type('chuyển ca');
     cy.get(tid(`menu-combo-${SEED.combos.xoiGaTrung}`)).click();
     cy.get(tid('order-save')).click();
@@ -144,7 +144,7 @@ describe('B. Ca', () => {
     // Mai mở ca: đơn của Lan vẫn ở hàng đợi, thu được
     cy.openShift('Mai');
     cy.get('[data-testid^=queue-card-]').should('have.length', 1).first().should('contain.text', 'chuyển ca');
-    cy.get('[data-testid^=queue-open-]').first().click();
+    cy.get('[data-testid^=queue-card-]').first().click();
     cy.get(tid('order-pay-cash')).click();
     cy.get(tid('cash-quick-50000')).click();
     cy.get(tid('pay-confirm')).click();
@@ -205,7 +205,7 @@ describe('B. Ca', () => {
   it('kích hoạt lại tablet khi ca còn mở (máy mới / dữ liệu bị xóa) ⇒ lấy lại ca + đơn đang mở, đóng được ca', () => {
     cy.activateTablet('A');
     cy.openShift('Lan');
-    cy.get(tid('new-order')).click();
+    cy.newOrder();
     cy.get(tid('order-label')).type('còn mở');
     cy.get(tid(`menu-combo-${SEED.combos.xoiGaTrung}`)).click();
     cy.get(tid('order-serve')).click();
@@ -215,9 +215,8 @@ describe('B. Ca', () => {
     cy.activateTablet('A');
     cy.get(tid('queue-screen')).should('be.visible');
     cy.get(tid('shift-staff')).should('contain.text', 'Lan');
-    cy.get(`${tid('queue-pay')} [data-testid^=queue-card-]`).should('have.length', 1).and('contain.text', 'còn mở');
-
-    cy.get('[data-testid^=queue-pay-btn-]').click();
+    cy.get('[data-testid^=queue-card-][data-group=pay]').should('have.length', 1).and('contain.text', 'còn mở').click();
+    cy.get(tid('order-pay-cash')).click();
     cy.get(tid('cash-exact')).click();
     cy.get(tid('pay-confirm')).click();
     cy.get(tid('open-close-shift')).click();
@@ -277,7 +276,7 @@ describe('B. Ca', () => {
 
     // Ca sau (Mai): bán 2 lon nước ngọt
     cy.openShift('Mai');
-    cy.get(tid('new-order')).click();
+    cy.newOrder();
     for (let i = 0; i < 2; i++) {
       cy.contains('[data-testid^=menu-product-]', 'Nước ngọt').click();
       cy.get(tid('topping-add')).click();

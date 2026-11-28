@@ -15,7 +15,7 @@ interface DbOrder {
 
 /** Bán 1 combo Xôi gà + trứng (31.000) rồi mở tab Ghi nợ. */
 function sellOnDebt() {
-  cy.get(tid('new-order')).click();
+  cy.newOrder();
   cy.get(tid(`menu-combo-${SEED.combos.xoiGaTrung}`)).click();
   cy.get(tid('order-pay-debt')).click();
 }

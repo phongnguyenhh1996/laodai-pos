@@ -83,7 +83,7 @@ describe('M. Cài đặt', () => {
     cy.get<string>('@staff').then((s) => cy.get(tid(`staff-${s}`)).should('contain.text', 'Tuấn').click());
     cy.get(tid('open-shift')).click();
     cy.get(tid('shift-staff')).should('contain.text', 'Tuấn');
-    cy.get(tid('new-order')).click();
+    cy.newOrder();
     cy.get(tid(`menu-product-${SEED.products.xoiPate}`)).should('not.exist');
     cy.get<string>('@combo').then((cb) => {
       cy.get(tid(`menu-combo-${cb}-price`)).should('contain.text', '22.000');

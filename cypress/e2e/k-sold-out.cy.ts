@@ -18,7 +18,7 @@ describe('K. Hết món', () => {
     cy.activateTablet('A');
     cy.openShift('Lan');
     cy.waitLive();
-    cy.get(tid('new-order')).click();
+    cy.newOrder();
     cy.get(tid(`point-tab-${xoiA}`)).should('have.attr', 'aria-selected', 'true');
 
     // Chế độ đánh dấu: bấm món / topping = báo hết, không thêm vào giỏ
@@ -67,7 +67,7 @@ describe('K. Hết món', () => {
 
     // Tải lại app: vẫn đúng (đọc lại từ server)
     cy.reload();
-    cy.get(tid('order-screen')).should('be.visible');
+    cy.get(tid('sales-screen')).should('be.visible');
     cy.get(tid(`menu-product-${P.xoiXeo}`)).should('be.disabled');
     cy.get(tid(`menu-product-${P.xoiGa}`)).should('be.enabled');
 

@@ -6,7 +6,7 @@ const tid = (id: string) => `[data-testid=${id}]`;
 
 /** Bán một combo / món trên tablet và thu đủ tiền mặt. */
 function sell(opts: { combo?: keyof typeof SEED.combos; product?: keyof typeof SEED.products; point?: keyof typeof SEED.points }) {
-  cy.get(tid('new-order')).click();
+  cy.newOrder();
   if (opts.point) cy.get(tid(`point-tab-${SEED.points[opts.point]}`)).click();
   if (opts.combo) cy.get(tid(`menu-combo-${SEED.combos[opts.combo]}`)).click();
   if (opts.product) {
@@ -19,7 +19,7 @@ function sell(opts: { combo?: keyof typeof SEED.combos; product?: keyof typeof S
 
 /** Bán một combo nhưng bấm "Chuyển khoản" (E24: thực ra khách trả tiền mặt). */
 function sellAsTransfer(combo: keyof typeof SEED.combos, point?: keyof typeof SEED.points) {
-  cy.get(tid('new-order')).click();
+  cy.newOrder();
   if (point) cy.get(tid(`point-tab-${SEED.points[point]}`)).click();
   cy.get(tid(`menu-combo-${SEED.combos[combo]}`)).click();
   cy.get(tid('order-pay-transfer')).click();
@@ -62,11 +62,11 @@ describe('E. Kịch bản gian lận', () => {
   it('E21: ra món, thu tiền rồi xóa đơn ⇒ Telegram có trạng thái "đã ra món"; báo cáo ca liệt kê bao bì của đơn bị xóa sau khi ra món', () => {
     cy.activateTablet('A');
     cy.openShift('Lan');
-    cy.get(tid('new-order')).click();
+    cy.newOrder();
     cy.get(tid(`menu-combo-${SEED.combos.xoiGaTrung}`)).click();
     cy.get(tid('order-serve')).click();
     cy.get('[data-testid^=queue-code-]').invoke('text').then((code) => {
-      cy.get('[data-testid^=queue-open-]').click();
+      cy.get('[data-testid^=queue-card-]').click();
       cy.get(tid('order-delete')).click();
       cy.get(tid('delete-reason-customer_left')).click();
       cy.get(tid('queue-empty')).should('be.visible');
@@ -105,16 +105,17 @@ describe('E. Kịch bản gian lận', () => {
   it('E22: bớt món sau khi ra món (2 phần → 1) ⇒ nhật ký có bản trước / sau, báo cáo đếm số lần sửa của nhân viên đó', () => {
     cy.activateTablet('A');
     cy.openShift('Lan');
-    cy.get(tid('new-order')).click();
+    cy.newOrder();
     cy.get(tid(`menu-combo-${SEED.combos.xoiGaTrung}`)).click();
     cy.get(tid(`menu-combo-${SEED.combos.xoiGaTrung}`)).click(); // 2 phần
     cy.get(tid('order-total')).should('have.text', '62.000');
     cy.get(tid('order-serve')).click();
-    cy.get('[data-testid^=queue-open-]').click();
+    cy.get('[data-testid^=queue-card-]').click();
     cy.get('[data-testid$=-minus]').click();
     cy.get(tid('order-total')).should('have.text', '31.000');
-    cy.get(tid('order-back')).click(); // đơn đã lưu tự lưu khi rời màn
-    cy.get(tid('queue-screen')).should('be.visible');
+    cy.get(tid('order-autosave')).should('have.attr', 'data-state', 'saved');
+    cy.get(tid('order-deselect')).click(); // đơn đã lưu tự lưu khi bỏ chọn
+    cy.newOrder();
     cy.waitLive();
     // Sửa món chỉ ghi nhật ký, không báo Telegram
     cy.telegramMessages().then((ms) => expect(ms.map((m) => m.text).join('\n')).not.to.contain('Sửa'));

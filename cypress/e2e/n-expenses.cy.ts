@@ -104,11 +104,11 @@ describe('N. Khoản chi giữa ca', () => {
     ]);
   });
 
-  it('N4: điện thoại: thanh đáy có Chi tiền; nhân viên không thấy doanh thu / kỳ vọng trên màn Chi tiền', () => {
+  it('N4: điện thoại: menu ☰ có Chi tiền; nhân viên không thấy doanh thu / kỳ vọng trên màn Chi tiền', () => {
     cy.viewport(390, 844);
     cy.activateTablet('A');
     cy.openShift('Lan');
-    cy.get(tid('new-order')).should('contain.text', 'Đơn');
+    cy.get(tid('open-menu')).click();
     cy.get(tid('open-expenses')).should('be.visible').click();
     cy.get(tid('expense-screen')).should('be.visible');
     cy.get('body').invoke('text').should('not.match', /kỳ vọng|doanh thu|chênh/i);
