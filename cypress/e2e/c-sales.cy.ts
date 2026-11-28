@@ -399,7 +399,7 @@ describe('C. Bán hàng', () => {
     cy.get(tid('order-total')).should('have.text', '36.000'); // không cộng 10.000 trả shipper
     cy.get(tid('order-pay-cash')).should('not.be.disabled').click();
     cy.get(tid('pay-total')).should('have.text', '36.000');
-    cy.get(tid('pay-ship-payout')).should('have.text', 'Trả shipper −10.000 (lấy từ két)');
+    cy.get(tid('pay-ship-payout')).should('have.text', 'Trả shipper (lấy từ két)−10.000');
     cy.get(tid('pay-method-transfer')).click();
     cy.get(tid('pay-transfer-confirm')).click();
     cy.get(tid('toast')).should('contain.text', 'chuyển khoản');

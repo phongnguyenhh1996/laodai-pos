@@ -797,7 +797,7 @@ export function OrderEditor({
           )}
         </div>
         {paying && saved ? (
-          <div className="flex min-h-0 flex-1 flex-col md:px-5 md:pb-5 md:pt-4">
+          <div className="flex min-h-0 flex-1 flex-col">
             <CartPay
               key={saved.id}
               order={saved}

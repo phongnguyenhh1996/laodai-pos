@@ -363,7 +363,7 @@ describe('tạo đơn & thanh toán', () => {
     expect(create.payload).toMatchObject({ order: { ship_mode: 'external', ship_payout: 10_000, ship_fee: 5_000, total: 20_000 } });
     expect(tid('pay-total')).toHaveTextContent('20.000');
     expect(tid('pay-ship-fee')).toHaveTextContent('Phụ thu');
-    expect(tid('pay-ship-payout')).toHaveTextContent('Trả shipper −10.000 (lấy từ két)');
+    expect(tid('pay-ship-payout')).toHaveTextContent('Trả shipper (lấy từ két)−10.000');
 
     click('pay-back');
     expect(await screen.findByTestId('order-deselect')).toBeInTheDocument(); // về giỏ, sửa tiếp đơn vừa lưu

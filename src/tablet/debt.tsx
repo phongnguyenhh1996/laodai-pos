@@ -22,6 +22,7 @@ export function CustomerSuggestions({
   onPick,
   showAllWithDebt = false,
   ship = false,
+  compact = false,
   limit,
 }: {
   book: DebtBook;
@@ -31,6 +32,8 @@ export function CustomerSuggestions({
   showAllWithDebt?: boolean;
   /** Chọn khách cho đơn ship: dòng phụ SĐT · địa chỉ, chỉ hiện dư nợ khi còn nợ. */
   ship?: boolean;
+  /** Danh sách gọn trong bảng Ghi nợ (Figma BH12): dòng 42, icon người, "Nợ X đ" xám bên phải. */
+  compact?: boolean;
   limit?: number;
 }) {
   const list = query.trim()
@@ -39,6 +42,25 @@ export function CustomerSuggestions({
       ? book.customers.filter((c) => book.balance(c.id) > 0).sort((a, b) => a.name.localeCompare(b.name, 'vi'))
       : [];
   if (list.length === 0) return null;
+  if (compact)
+    return (
+      <ul className="flex shrink-0 flex-col overflow-hidden rounded-[14px] border border-line bg-white" data-testid="customer-suggestions">
+        {list.map((c) => (
+          <li key={c.id} className="border-t border-line first:border-t-0">
+            <button
+              type="button"
+              onClick={() => onPick(c)}
+              className="flex min-h-[42px] w-full items-center gap-2.5 px-3.5 py-2 text-left transition-colors duration-fast hover:bg-[#f8f8f8]"
+              data-testid={`customer-suggest-${c.id}`}
+            >
+              <UserRound aria-hidden className="h-4 w-4 shrink-0 text-[#6d6d6d]" />
+              <span className="min-w-0 flex-1 truncate text-sm font-medium leading-[18px] text-[#111]">{customerLabel(c)}</span>
+              <span className="num shrink-0 text-[13px] leading-4 text-[#888]">Nợ {formatVnd(book.balance(c.id))}đ</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    );
   return (
     <ul className="card flex flex-col overflow-hidden" data-testid="customer-suggestions">
       {list.map((c) => (

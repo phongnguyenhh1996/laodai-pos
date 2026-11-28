@@ -128,10 +128,21 @@ Khung: BH1, BH2, BH3, BH6, BH7, BH8.
 
 Khung: BH4, BH10, BH11, BH12; BHP6, BHP7, BHP8.
 
-- [ ] `CartPay.tsx`: nền xám, nút "‹ Giỏ" + "Đơn #mã · N món"; thẻ "Cần thu" (Tiền món, phụ thu, kẻ, Cần thu 26 cam, dòng trả shipper);
+- [x] `CartPay.tsx`: nền xám, nút "‹ Giỏ" + "Đơn #mã · N món"; thẻ "Cần thu" (Tiền món, phụ thu, kẻ, Cần thu 26 cam, dòng trả shipper);
       thẻ "Hình thức thanh toán" (tablet ô dọc trong thẻ, điện thoại ô ngang không thẻ).
-- [ ] TM: thẻ "Khách đưa" lưới 3 cột, `MoneyInput` là ô cuối của lưới; "Tiền thối" xanh lá khi đủ, xám "—" khi chưa; nút cam "Đã thu tiền" (tắt khi chưa đủ).
-- [ ] CK: ghi chú xanh dương + nút "Đã nhận chuyển khoản". Ghi nợ: `DebtSheet` kiểu sheet (ô icon vàng, gợi ý khách trong thẻ, khối "khách mới" nền xám), nút cam "Ghi nợ X".
+- [x] TM: thẻ "Khách đưa" lưới 3 cột, `MoneyInput` là ô cuối của lưới; "Tiền thối" xanh lá khi đủ, xám "—" khi chưa; nút cam "Đã thu tiền" (tắt khi chưa đủ).
+- [x] CK: ghi chú xanh dương + nút "Đã nhận chuyển khoản". Ghi nợ: `DebtSheet` kiểu sheet (ô icon vàng, gợi ý khách trong thẻ, khối "khách mới" nền xám), nút cam "Ghi nợ X".
+
+Đã làm (so số đo ở 1280×800: BH4 / BH10 / BH11 đúng từng px — thẻ Cần thu 102, Hình thức 126, Khách đưa 158, Tiền thối 58, ghi chú CK 62,
+nút chân 50 ở y=734; 390×844 khớp BHP6 phần dưới đầu sheet). Ghi chú:
+- Nút xác nhận nằm ở chân cột giỏ (nền trắng, kẻ trên) như Figma, không cuộn theo nội dung. Ghi nợ: chân vẫn là nút "Đã thu tiền" nằm dưới lớp tối (BH12).
+- "Số khác" lấp phần còn lại của hàng cuối: 3 nút mệnh giá ⇒ hàng riêng (BH4), 5 nút ⇒ ô thứ 6 (BH10). Dùng `MoneyInput size="owner"` (cao 45);
+  chữ "đ" đứng ngay sau "Số khác", không dạt phải như Figma (không đổi `MoneyInput` dùng chung).
+- Rẽ tablet / điện thoại bằng `useIsTablet` (cùng test id `pay-method-*` ở cả hai). `PayMethodRow` / `PAY_METHODS` cũ đã bỏ.
+- Dòng trả shipper đổi chữ theo Figma: "Trả shipper (lấy từ két) −10.000" (sửa câu chờ trong unit test + Cypress `c-sales`). "Chưa đủ" vẫn hiện xám khi khách đưa thiếu.
+- `CustomerSuggestions` thêm `compact` (dòng 42, "Nợ Xđ") chỉ cho sheet Ghi nợ; Thu nợ / chọn khách ship giữ nguyên. `ChosenCustomer` (chưa có khung) giữ nguyên.
+- Sheet Ghi nợ điện thoại vẫn chỉ phủ giỏ, chưa phủ cả màn như BHP8 (để ticket 8 cùng sheet giỏ).
+- Cypress `c-sales` + `d-debt` qua (23/23).
 
 ## Ticket 7 — Hộp thoại, toast, máy in, mất kết nối
 
