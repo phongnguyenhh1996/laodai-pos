@@ -481,7 +481,7 @@ describe('C. Bán hàng', () => {
           cy.get(tid('order-total')).should('have.text', '62.000');
           card().should('have.attr', 'aria-pressed', 'true');
           cy.get(tid('order-autosave')).should('have.attr', 'data-state', 'saved');
-          card().find('[data-testid^=queue-total-]').should('have.text', '62.000');
+          card().find('[data-testid^=queue-total-]').should('have.text', '62k');
 
           // Bấm lại thẻ ⇒ bỏ chọn
           card().click().should('have.attr', 'aria-pressed', 'false');

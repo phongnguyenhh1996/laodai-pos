@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assertMoney, formatSigned, formatVnd, thousandsFromInput, thousandsText, toVnd } from './money';
+import { assertMoney, formatK, formatSigned, formatVnd, thousandsFromInput, thousandsText, toVnd } from './money';
 import { businessDate, hhmm, minutesBetween } from './time';
 
 describe('money & time', () => {
@@ -8,6 +8,13 @@ describe('money & time', () => {
     expect(formatVnd(0)).toBe('0');
     expect(formatVnd(999)).toBe('999');
     expect(formatVnd(-20_000)).toBe('−20.000');
+  });
+
+  it('định dạng gọn theo nghìn kiểu 35k', () => {
+    expect(formatK(35_000)).toBe('35k');
+    expect(formatK(1_250_000)).toBe('1.250k');
+    expect(formatK(25_500)).toBe('25,5k');
+    expect(formatK(0)).toBe('0k');
   });
 
   it('chênh lệch có dấu', () => {

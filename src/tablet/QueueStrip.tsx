@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent } from 'react';
 import { Bike, Check, ChefHat, Clock, Inbox, ShoppingBag, UtensilsCrossed, Wallet, type LucideIcon } from 'lucide-react';
-import { formatVnd } from '@/domain/money';
+import { formatK } from '@/domain/money';
 import { externalShipBadge, shipFeeLabel } from '@/domain/pricing';
 import { buildQueue, queueCounts, queueStrip, type QueueCard, type QueueFilter, type WaitColor } from '@/domain/queue';
 import { DINE_LABELS, type DineType, type Order } from '@/domain/types';
@@ -12,14 +12,14 @@ import { ENTER_MS, EXIT_MS, canAnimate, playEnter, playExit, useFlip } from './u
 
 const DEFAULT_WAIT = { wait_yellow_min: 5, wait_red_min: 10 };
 
-/** Thẻ đơn: đơn chờ lâu viền vàng / đỏ; thẻ đang chọn viền cam nổi bật. */
+/** Thẻ đơn: đơn chờ lâu viền vàng / đỏ; thẻ đang chọn chỉ đổi màu viền sang cam (không thêm outline). */
 const CARD_STYLE: Record<WaitColor, string> = {
   none: 'border-line',
   normal: 'border-line',
   yellow: 'border-warning-line ring-1 ring-inset ring-warning-line',
   red: 'border-danger-line ring-1 ring-inset ring-danger-line',
 };
-const SELECTED_STYLE = 'border-brand bg-brand-soft ring-2 ring-brand';
+const SELECTED_STYLE = 'border-brand bg-brand-soft';
 
 const WAIT_STYLE: Record<WaitColor, string> = {
   none: 'bg-surface-sunken text-ink-muted',
@@ -321,7 +321,7 @@ function Card({
         <StatusBadge group={card.group} />
         <span className="flex-1" />
         <b className="num text-sm font-bold md:text-[17px]" data-testid={tid('total')}>
-          {formatVnd(o.total)}
+          {formatK(o.total)}
         </b>
       </span>
     </button>

@@ -9,6 +9,14 @@ export function formatVnd(amount: Money): string {
   return amount < 0 ? MINUS + s : s;
 }
 
+/** Gọn theo nghìn cho chỗ chật (thẻ đơn): 35000 → "35k", 1250000 → "1.250k", 25500 → "25,5k". */
+export function formatK(amount: Money): string {
+  const k = Math.round(Math.abs(amount) / 100) / 10;
+  const [int, dec] = String(k).split('.');
+  const s = formatVnd(Number(int)) + (dec ? ',' + dec : '') + 'k';
+  return amount < 0 ? MINUS + s : s;
+}
+
 /** Chênh lệch có dấu: −20.000, +6, 0 */
 export function formatSigned(n: number, money = true): string {
   const body = money ? formatVnd(Math.abs(n)) : String(Math.abs(n));
