@@ -2,22 +2,11 @@ import type { InputHTMLAttributes, ReactNode, Ref, SelectHTMLAttributes } from '
 import { Check, ChevronDown, Info, Search, type LucideIcon } from 'lucide-react';
 import type { ShipStats } from '@/domain/reconcile';
 import { shipStatLines } from '@/domain/report';
+import { card } from '@/app/kit';
 
-/** Mảnh giao diện dùng chung cho các màn chế độ chủ kiểu Makaryo (Figma R2x–R3x / T21–T35). */
+/** Mảnh giao diện dùng chung cho các màn chế độ chủ kiểu Makaryo (Figma R2x–R3x / T21–T35). Phần dùng chung với màn nhân viên nằm ở `@/app/kit`. */
 
-/** Thẻ trắng viền xám bo 16. */
-export const card = 'flex flex-col rounded-2xl border border-line bg-white';
-
-/** Màu chip theo sắc thái. */
-export const TONE = {
-  green: 'bg-[#e8f7ee] text-[#15803d]',
-  amber: 'bg-[#fef5e1] text-[#a16207]',
-  blue: 'bg-[#eaf1fe] text-[#1d4ed8]',
-  red: 'bg-[#fdecec] text-[#b91c1c]',
-  gray: 'bg-[#f8f8f8] text-[#6d6d6d]',
-  orange: 'bg-[#ffeee7] text-[#c2380a]',
-} as const;
-export type Tone = keyof typeof TONE;
+export { card, IconTile, TONE, type Tone } from '@/app/kit';
 
 /** Tiêu đề trang trong phần nội dung (điện thoại): chữ 22 đậm + dòng phụ xám. */
 export function PageHead({ title, subtitle, children }: { title: string; subtitle?: ReactNode; children?: ReactNode }) {
@@ -29,25 +18,6 @@ export function PageHead({ title, subtitle, children }: { title: string; subtitl
       </div>
       {children}
     </div>
-  );
-}
-
-/** Ô vuông xám chứa icon (34 / 36 / 40). */
-export function IconTile({
-  icon: Icon,
-  className = 'h-[34px] w-[34px] rounded-[10px]',
-  iconClass = 'h-[17px] w-[17px]',
-  tone = 'bg-[#f8f8f8] text-[#6d6d6d]',
-}: {
-  icon: LucideIcon;
-  className?: string;
-  iconClass?: string;
-  tone?: string;
-}) {
-  return (
-    <span aria-hidden className={`flex shrink-0 items-center justify-center ${tone} ${className}`}>
-      <Icon className={iconClass} />
-    </span>
   );
 }
 

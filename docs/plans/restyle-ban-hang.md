@@ -55,11 +55,15 @@ File laodai UI, trang Tablet: tiêu đề y=38400. Tablet BH1–BH19 (1280×800)
 
 ## Ticket 2 — Thành phần dùng chung
 
-- [ ] Gom primitive kiểu Makaryo cho màn nhân viên, ưu tiên dùng lại `src/owner/ui.tsx` (`TONE`, `IconTile`, `BTN`), thêm cái còn thiếu:
+- [x] Gom primitive kiểu Makaryo cho màn nhân viên, ưu tiên dùng lại `src/owner/ui.tsx` (`TONE`, `IconTile`, `BTN`), thêm cái còn thiếu:
       badge nhỏ theo tone, segmented có icon + số đếm (nút đang chọn nền trắng, đổ bóng nhẹ), ô "Hình thức thanh toán"
       (dọc: ô icon + nhãn dưới; ngang: icon + nhãn trong ô, cho điện thoại), tay nắm sheet, ô ảnh món (nền xám, icon).
-- [ ] Nút: chính = cam (`brand`), phụ = viền trắng, xóa = đỏ nhạt (`danger` mềm), tắt = xám. Bỏ nút xanh lá / nền đen ở màn Bán hàng.
-- [ ] Không đổi màn nào ở ticket này (chỉ thêm + unit test nhỏ nếu có logic).
+- [x] Nút: chính = cam (`brand`), phụ = viền trắng, xóa = đỏ nhạt (`danger` mềm), tắt = xám. Bỏ nút xanh lá / nền đen ở màn Bán hàng.
+- [x] Không đổi màn nào ở ticket này (chỉ thêm + unit test nhỏ nếu có logic).
+
+Đã có ở [src/app/kit.tsx](../../src/app/kit.tsx) (`owner/ui.tsx` re-export `card`, `TONE`, `IconTile` từ đây): `Badge`, `AreaTitle`
+(tiêu đề + số đếm), `Segmented` (`stretch` chia đều / chip lọc có chấm + số đếm), `PayMethodTile` (+ `PAY_METHOD_LOOK`), `SheetHandle`,
+`ItemThumb`, `staffBtn(kind, size)` (primary / secondary / danger / dangerSolid, cỡ md 45 / lg 50, tắt = xám), `iconBtn()` (40 / 36).
 
 ## Ticket 3 — Sidebar tablet + dải đơn
 
