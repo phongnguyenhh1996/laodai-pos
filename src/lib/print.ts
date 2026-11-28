@@ -1,5 +1,4 @@
 import { useSyncExternalStore } from 'react';
-import { buildQueue } from '@/domain/queue';
 import type { Order } from '@/domain/types';
 import { deviceId, type PosEvent } from '@/pos';
 import { diffItems } from '@/print/diff';
@@ -18,14 +17,6 @@ import { supabase } from './supabase';
  * - Thanh toán xong (kể cả ghi nợ) ⇒ bill nếu bật `auto_print_bill`.
  * - Lệnh in từ xa của chủ: nghe Realtime, máy có máy in đang kết nối nhận lệnh.
  */
-
-/** Số thứ tự của đơn trên hàng đợi hiện tại (phiếu bếp). */
-function queueNo(orderId: string): number | null {
-  const s = tabletStore.getSnapshot();
-  const orders = s.open?.orders ?? [];
-  const q = buildQueue(orders, Date.now(), s.catalog?.config ?? { wait_yellow_min: 5, wait_red_min: 10 });
-  return [...q.serve, ...q.pay].find((c) => c.order.id === orderId)?.position ?? null;
-}
 
 /**
  * Máy in giả cho E2E: chỉ có khi build với `VITE_FAKE_PRINTER=1` (bản production không có) VÀ máy đặt
@@ -51,7 +42,7 @@ function makePrinter(): Printer {
 }
 
 function createService(api: PrintApi = supabasePrintApi(supabase), printer = makePrinter()) {
-  return new PrintService(api, printer, deviceId(), { queueNo, tz: tabletStore.getSnapshot().catalog?.config.timezone });
+  return new PrintService(api, printer, deviceId(), { tz: tabletStore.getSnapshot().catalog?.config.timezone });
 }
 
 let service = createService();
@@ -64,7 +55,6 @@ export function printService(): PrintService {
 export function setPrintService(s: PrintService): void {
   service.stop();
   service = s;
-  s.setQueueNo(queueNo);
   startedFor = null;
   notify();
 }

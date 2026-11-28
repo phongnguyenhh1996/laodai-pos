@@ -6,7 +6,6 @@ export type QueueGroup = 'serve' | 'pay';
 
 export interface QueueCard {
   order: Order;
-  position: number;
   group: QueueGroup;
   waitMinutes: number;
   color: WaitColor;
@@ -34,7 +33,7 @@ const byCreated = (a: Order, b: Order) =>
 
 /**
  * Hàng đợi tablet: "Chờ ra món" (open) trước, "Chờ thanh toán" (served) sau,
- * mỗi nhóm cũ nhất ở trên; số thứ tự đánh liên tục 1, 2, 3… trên toàn hàng đợi.
+ * mỗi nhóm cũ nhất ở trên.
  * Đơn paid/deleted không bao giờ xuất hiện.
  */
 export function buildQueue(
@@ -44,11 +43,9 @@ export function buildQueue(
 ): QueueView {
   const serve = orders.filter((o) => o.status === 'open').sort(byCreated);
   const pay = orders.filter((o) => o.status === 'served').sort(byCreated);
-  let pos = 0;
   const card = (group: QueueGroup) => (order: Order): QueueCard => ({
     order,
     group,
-    position: ++pos,
     waitMinutes: Math.max(0, Math.floor(minutesBetween(order.created_at, now))),
     color: waitColor(order, now, settings),
   });

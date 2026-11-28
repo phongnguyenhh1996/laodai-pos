@@ -35,11 +35,10 @@ const it_ = (name: string, qty: number, toppings: string[] = [], id = name + top
 });
 
 describe('phiếu bếp', () => {
-  it('đủ dòng: số thứ tự, mã đơn to, loại, nhãn + bàn, giờ tạo, món + topping; không có giá', () => {
-    const lines = layoutKitchen({ doc: doc(), template: tpl(), queueNo: 3, tz: TZ });
+  it('đủ dòng: mã đơn to (dòng đầu, không có số thứ tự), loại, nhãn + bàn, giờ tạo, món + topping; không có giá', () => {
+    const lines = layoutKitchen({ doc: doc(), template: tpl(), tz: TZ });
     expect(linesToText(lines)).toMatchInlineSnapshot(`
-      "Số 3
-      F15
+      "F15
       MANG VỀ
       Bàn 5 · Áo đỏ
       Giờ tạo 07:15
@@ -54,15 +53,15 @@ describe('phiếu bếp', () => {
   });
 
   it('tắt từng dòng ⇒ không xuất hiện; mã đơn + món luôn in; mã rất to', () => {
-    const t = { ...off('kitchen', ['queue_no', 'dine', 'label', 'time', 'toppings']), code_size: 'xlarge' as const };
-    const lines = layoutKitchen({ doc: doc(), template: t, queueNo: 3, tz: TZ });
+    const t = { ...off('kitchen', ['dine', 'label', 'time', 'toppings']), code_size: 'xlarge' as const };
+    const lines = layoutKitchen({ doc: doc(), template: t, tz: TZ });
     expect(linesToText(lines)).toBe('F15\n---\n2 x Xôi gà\n1 x Xôi xéo\n---');
     expect(lines[0]).toMatchObject({ size: 'code_xl' });
   });
 
   it('ĐÃ SỬA kèm giờ sửa + món thêm / bớt; tắt mọi dòng vẫn in ĐÃ SỬA', () => {
     const edit = { at: '2026-11-20T00:22:00Z', added: [{ name: 'Xôi gà', qty: 1, toppings: ['Trứng'] }], removed: [{ name: 'Xôi pate', qty: 2, toppings: [] }] };
-    const text = linesToText(layoutKitchen({ doc: doc(), template: off('kitchen', ['queue_no', 'dine', 'label', 'time']), edit, tz: TZ }));
+    const text = linesToText(layoutKitchen({ doc: doc(), template: off('kitchen', ['dine', 'label', 'time']), edit, tz: TZ }));
     expect(text).toContain('ĐÃ SỬA 07:22');
     expect(text).toContain('THÊM\n+ 1 x Xôi gà (Trứng)');
     expect(text).toContain('BỚT\n− 2 x Xôi pate');
@@ -140,6 +139,13 @@ describe('bill', () => {
     const t = normalizeTemplate({ shop_name: 'X', bill: { thanks: false } as PrintTemplate['bill'], footer: ['a', 'b', 'c', 'd'], code_size: 'bad' as 'large' });
     expect(t).toMatchObject({ shop_name: 'X', code_size: 'large', footer: ['a', 'b', 'c'], bill: { thanks: false, no_bill_free: true } });
     expect(normalizeTemplate(null)).toEqual(DEFAULT_TEMPLATE);
+  });
+
+  it('mẫu cũ còn kitchen.queue_no ⇒ bỏ khóa, phiếu bếp không có dòng "Số N"', () => {
+    const old = { kitchen: { queue_no: true, time: false } } as unknown as Partial<PrintTemplate>;
+    const t = normalizeTemplate(old);
+    expect(t.kitchen).toEqual({ ...DEFAULT_TEMPLATE.kitchen, time: false });
+    expect(linesToText(layoutKitchen({ doc: doc(), template: t, tz: TZ }))).not.toMatch(/^Số \d/m);
   });
 });
 

@@ -15,7 +15,6 @@ describe('queue', () => {
     const q = buildQueue([o1, o2, o3, o4], at(4), S);
     expect(q.serve.map((c) => c.order.id)).toEqual([o2.id, o4.id]);
     expect(q.pay.map((c) => c.order.id)).toEqual([o3.id, o1.id]);
-    expect([...q.serve, ...q.pay].map((c) => c.position)).toEqual([1, 2, 3, 4]);
   });
 
   it('cùng giờ tạo thì theo device_seq', () => {
@@ -24,11 +23,11 @@ describe('queue', () => {
     expect(buildQueue([a, b], at(1), S).serve.map((c) => c.order.id)).toEqual([b.id, a.id]);
   });
 
-  it('số thứ tự đánh lại liên tục khi có đơn rời hàng; đơn paid/deleted không hiện', () => {
+  it('đơn paid/deleted không hiện', () => {
     const os = [0, 1, 2, 3].map((m) => order({ created_at: at(m) }));
     const after = os.map((o, i) => (i === 1 ? { ...o, status: 'paid' as const } : i === 2 ? { ...o, status: 'deleted' as const } : o));
     const q = buildQueue(after, at(5), S);
-    expect(q.serve.map((c) => [c.order.id, c.position])).toEqual([[os[0].id, 1], [os[3].id, 2]]);
+    expect(q.serve.map((c) => c.order.id)).toEqual([os[0].id, os[3].id]);
   });
 
   it('màu theo thời gian chờ, ngưỡng lấy từ cài đặt', () => {

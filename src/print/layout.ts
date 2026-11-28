@@ -13,8 +13,6 @@ import type { EditLine, FontSize, KitchenEdit, Line, PrintDoc, PrintDocItem, Pri
 export interface KitchenInput {
   doc: PrintDoc;
   template: PrintTemplate;
-  /** Số thứ tự trong hàng đợi (chỉ khi đơn đang có trên hàng đợi của máy in). */
-  queueNo?: number | null;
   /** Phiếu in khi sửa đơn: giờ sửa + món thêm / bớt. */
   edit?: KitchenEdit | null;
   tz?: string;
@@ -52,10 +50,9 @@ function editLine(sign: string, l: EditLine): string {
 
 const codeSize = (t: PrintTemplate): FontSize => (t.code_size === 'xlarge' ? 'code_xl' : 'code');
 
-export function layoutKitchen({ doc, template, queueNo, edit, tz = TZ }: KitchenInput): Line[] {
+export function layoutKitchen({ doc, template, edit, tz = TZ }: KitchenInput): Line[] {
   const k = template.kitchen;
   const out: Line[] = [];
-  if (k.queue_no && queueNo) out.push(center(`Số ${queueNo}`, 'large', true));
   out.push(center(doc.code, codeSize(template), true));
   const editedAt = edit?.at ?? doc.edited_at;
   if (editedAt) out.push({ type: 'text', text: `ĐÃ SỬA ${hhmm(editedAt, tz)}`, size: 'large', align: 'center', bold: true, invert: true });
@@ -149,7 +146,7 @@ export function sampleDoc(now = new Date()): PrintDoc {
 export function layoutTest(template: PrintTemplate, tz = TZ, now = new Date()): Line[] {
   const doc = sampleDoc(now);
   const mark = center('— IN THỬ —', 'normal', true);
-  return [mark, ...layoutKitchen({ doc, template, queueNo: 3, tz }), { type: 'gap', px: 48 }, mark, ...layoutBill({ doc, template, tz })];
+  return [mark, ...layoutKitchen({ doc, template, tz }), { type: 'gap', px: 48 }, mark, ...layoutBill({ doc, template, tz })];
 }
 
 /** Chữ thuần của phiếu (nhật ký, test, đọc màn hình). */

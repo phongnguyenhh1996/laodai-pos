@@ -60,7 +60,6 @@ async function setup({ paired = true } = {}) {
   const f = fakeApi();
   const svc = new PrintService(f.api, printer, DEVICE, {
     render: async () => ({ width: 16, height: 2, bits: new Uint8Array(4) }),
-    queueNo: () => 2,
   });
   return { storage, t, printer, svc, ...f };
 }

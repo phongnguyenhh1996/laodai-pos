@@ -116,7 +116,7 @@ describe('M. Cài đặt', () => {
 
     cy.get(tid('tpl-bill-no_bill_free')).should('be.checked').uncheck();
     cy.get(tid('tpl-preview-bill')).should('have.attr', 'data-text').and('not.contain', 'Không có bill = miễn phí');
-    cy.get(tid('tpl-kitchen-queue_no')).uncheck();
+    cy.get(tid('tpl-kitchen-time')).uncheck();
     cy.get(tid('tpl-shop-name')).clear().type('Xôi Lão Đại 2');
     cy.get(tid('tpl-footer-0')).clear().type('Wifi: laodai123');
     cy.get(tid('tpl-preview-bill')).should('have.attr', 'data-text').and('contain', 'Xôi Lão Đại 2').and('contain', 'Wifi: laodai123');
@@ -138,7 +138,7 @@ describe('M. Cài đặt', () => {
     cy.get(tid('tpl-shop-name')).should('have.value', 'Xôi Lão Đại 2');
     cy.get(tid('tpl-footer-0')).should('have.value', 'Wifi: laodai123');
     cy.get(tid('tpl-bill-no_bill_free')).should('not.be.checked');
-    cy.get(tid('tpl-kitchen-queue_no')).should('not.be.checked');
+    cy.get(tid('tpl-kitchen-time')).should('not.be.checked');
 
     // Nhật ký nhóm "In": có lần đổi mẫu + lệnh in thử
     cy.ownerVisit('/owner/log?type=print');

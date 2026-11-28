@@ -21,7 +21,6 @@ export interface PrintTemplate {
     no_bill_free: boolean;
   };
   kitchen: {
-    queue_no: boolean;
     dine: boolean;
     label: boolean;
     time: boolean;
@@ -47,8 +46,15 @@ export const DEFAULT_TEMPLATE: PrintTemplate = {
     thanks: true,
     no_bill_free: true,
   },
-  kitchen: { queue_no: true, dine: true, label: true, time: true, toppings: true },
+  kitchen: { dine: true, label: true, time: true, toppings: true },
 };
+
+/** Chỉ giữ các khóa có trong mặc định (mẫu cũ còn `kitchen.queue_no` ⇒ bỏ, lưu lại không mang theo). */
+function pickKnown<T extends Record<string, boolean>>(base: T, s: Partial<T> | undefined): T {
+  const out = { ...base };
+  for (const k of Object.keys(base) as Array<keyof T>) if (typeof s?.[k] === 'boolean') out[k] = s[k] as T[keyof T];
+  return out;
+}
 
 /** Gộp mẫu từ server với mặc định (thiếu khóa / dữ liệu cũ vẫn in được). */
 export function normalizeTemplate(t: Partial<PrintTemplate> | null | undefined): PrintTemplate {
@@ -59,7 +65,7 @@ export function normalizeTemplate(t: Partial<PrintTemplate> | null | undefined):
     footer: Array.isArray(s.footer) ? s.footer.filter((x) => typeof x === 'string').slice(0, 3) : [],
     code_size: s.code_size === 'xlarge' ? 'xlarge' : 'large',
     bill: { ...DEFAULT_TEMPLATE.bill, ...(s.bill ?? {}) },
-    kitchen: { ...DEFAULT_TEMPLATE.kitchen, ...(s.kitchen ?? {}) },
+    kitchen: pickKnown(DEFAULT_TEMPLATE.kitchen, s.kitchen),
   };
 }
 

@@ -132,8 +132,6 @@ export type Renderer = (lines: Line[]) => Promise<MonoImage>;
 export interface PrintServiceOptions {
   render?: Renderer;
   tz?: string;
-  /** Số thứ tự hàng đợi của đơn trên máy này (phiếu bếp nhận từ xa). */
-  queueNo?: (orderId: string) => number | null;
   now?: () => number;
 }
 
@@ -147,13 +145,13 @@ async function defaultRender(lines: Line[]): Promise<MonoImage> {
 /** Phiếu cần in của một lệnh đã nhận. */
 export function linesForJob(
   res: Extract<CreateResult, { status: 'claimed' }>,
-  opts: { tz?: string; queueNo?: number | null } = {},
+  opts: { tz?: string } = {},
 ): Line[] {
   const template = normalizeTemplate(res.template);
   if (res.job.kind === 'test') return layoutTest(template, opts.tz);
   if (!res.doc) throw new PrinterError('Không có nội dung đơn');
   if (res.job.kind === 'bill') return layoutBill({ doc: res.doc, template, tz: opts.tz });
-  return layoutKitchen({ doc: res.doc, template, tz: opts.tz, queueNo: opts.queueNo, edit: res.job.detail?.edit ?? null });
+  return layoutKitchen({ doc: res.doc, template, tz: opts.tz, edit: res.job.detail?.edit ?? null });
 }
 
 export class PrintService {
@@ -161,7 +159,6 @@ export class PrintService {
   private listeners = new Set<() => void>();
   private render: Renderer;
   private tz?: string;
-  private queueNoOf: (orderId: string) => number | null;
   private now: () => number;
   private stopRemote: (() => void) | null = null;
   private stopPrinter: (() => void) | null = null;
@@ -176,17 +173,12 @@ export class PrintService {
   ) {
     this.render = opts.render ?? defaultRender;
     this.tz = opts.tz;
-    this.queueNoOf = opts.queueNo ?? (() => null);
     this.now = opts.now ?? Date.now;
   }
 
   /** Máy này in được không (app Android + có mã thiết bị). */
   get enabled(): boolean {
     return this.printer.supported && this.deviceId !== null;
-  }
-
-  setQueueNo(fn: (orderId: string) => number | null): void {
-    this.queueNoOf = fn;
   }
 
   getSnapshot = (): PrintServiceState => this.state;
@@ -226,7 +218,7 @@ export class PrintService {
     const device = job.device_id!;
     let error: string | null = null;
     try {
-      const lines = linesForJob(res, { tz: this.tz, queueNo: job.order_id ? this.queueNoOf(job.order_id) : null });
+      const lines = linesForJob(res, { tz: this.tz });
       const image = await this.render(lines);
       await this.printer.print(escposRaster(image));
     } catch (e) {

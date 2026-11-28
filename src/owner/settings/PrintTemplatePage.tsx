@@ -29,7 +29,6 @@ const BILL_LINES: Array<[keyof PrintTemplate['bill'], string]> = [
 ];
 
 const KITCHEN_LINES: Array<[keyof PrintTemplate['kitchen'], string]> = [
-  ['queue_no', 'Số thứ tự hàng đợi'],
   ['dine', 'Tại chỗ / Mang về'],
   ['label', 'Nhãn hoặc bàn'],
   ['time', 'Giờ tạo đơn'],
@@ -157,7 +156,7 @@ export function PrintTemplatePage() {
   const preview = t && (
     <Section title="Xem trước · đơn mẫu" subtitle="Khổ 58mm" testId="tpl-preview">
       <div className="grid grid-cols-2 items-start gap-3 rounded-xl bg-[#f8f8f8] p-3">
-        <Preview title="Phiếu bếp" lines={layoutKitchen({ doc: sampleDoc(), template: t, queueNo: 3 })} testId="tpl-preview-kitchen" />
+        <Preview title="Phiếu bếp" lines={layoutKitchen({ doc: sampleDoc(), template: t })} testId="tpl-preview-kitchen" />
         <Preview title="Bill" lines={layoutBill({ doc: sampleDoc(), template: t })} testId="tpl-preview-bill" />
       </div>
       <RemotePrint client={client} kind="test" orderId={null} defaultProfileId={null} label="In thử" optionPrefix="In tại: " testId="tpl-test-print" />

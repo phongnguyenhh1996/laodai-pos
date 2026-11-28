@@ -130,11 +130,15 @@ Test: `queue-flash` → `toast` (unit + Cypress); `printer-reconnect` giờ ph�
 
 Không phụ thuộc Figma màn Bán hàng (chỉ bớt một dòng trên phiếu và một công tắc), làm được song song.
 
-- [ ] `src/print/layout.ts`: bỏ dòng "Số N" và tham số `queueNo`; `src/print/service.ts`: bỏ `queueNo` / `setQueueNo` và chỗ gọi.
-- [ ] `src/print/types.ts`: bỏ `kitchen.queue_no` khỏi kiểu và mẫu mặc định (mẫu cũ còn khóa này thì bỏ qua).
-- [ ] `src/owner/settings/PrintTemplatePage.tsx`: bỏ công tắc "Số thứ tự hàng đợi".
-- [ ] `src/domain/queue.ts`: bỏ `position` (không còn ai dùng).
-- [ ] Sửa `print.test.ts`, `service.test.ts`, `queue.test.ts`; Cypress mẫu in (M) nếu có bấm công tắc này.
+- [x] `src/print/layout.ts`: bỏ dòng "Số N" và tham số `queueNo`; `src/print/service.ts`: bỏ `queueNo` / `setQueueNo` và chỗ gọi.
+- [x] `src/print/types.ts`: bỏ `kitchen.queue_no` khỏi kiểu và mẫu mặc định (mẫu cũ còn khóa này thì bỏ qua).
+- [x] `src/owner/settings/PrintTemplatePage.tsx`: bỏ công tắc "Số thứ tự hàng đợi".
+- [x] `src/domain/queue.ts`: bỏ `position` (không còn ai dùng).
+- [x] Sửa `print.test.ts`, `service.test.ts`, `queue.test.ts`; Cypress mẫu in (M) nếu có bấm công tắc này.
+
+Ghi chú khi làm: `normalizeTemplate` chỉ giữ các khóa `kitchen` có trong mẫu mặc định (`pickKnown`) ⇒ mẫu cũ còn `queue_no` không hiện, lưu lại thì mất khóa;
+mặc định SQL trong migration `20261120000002_printing.sql` vẫn còn `queue_no` (để yên, không migration). Cypress M đổi sang bấm `tpl-kitchen-time`.
+Cypress C14 / C15 (`c-sales.cy.ts`) còn đọc `data-position` (thẻ đã bỏ từ ticket 2): sửa ở ticket 6.
 
 ## Ticket 6 — Test
 
