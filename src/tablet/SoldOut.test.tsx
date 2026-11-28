@@ -18,9 +18,7 @@ async function openOrderScreen() {
   render(<App />);
   fireEvent.click(await screen.findByTestId('staff-s1'));
   click('open-shift');
-  await screen.findByTestId('queue-screen');
-  click('new-order');
-  await screen.findByTestId('order-screen');
+  await screen.findByTestId('order-screen'); // màn Bán hàng: giỏ là đơn mới
 }
 
 afterEach(() => {

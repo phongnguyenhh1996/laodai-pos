@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildQueue, waitColor } from './queue';
+import { buildQueue, queueCounts, queueStrip, waitColor } from './queue';
 import { order } from './fixtures';
 
 const S = { wait_yellow_min: 5, wait_red_min: 10 };
@@ -48,5 +48,18 @@ describe('queue', () => {
     const q = buildQueue([o], at(60), S);
     expect(q.pay[0].color).toBe('none');
     expect(q.pay[0].waitMinutes).toBe(60);
+  });
+
+  it('dải đơn: Tất cả = chờ ra món trước, chờ thanh toán sau; chip nhóm chỉ hiện nhóm đó; số đếm từng chip', () => {
+    const p1 = order({ created_at: at(0), status: 'served' });
+    const s1 = order({ created_at: at(1) });
+    const s2 = order({ created_at: at(2) });
+    const q = buildQueue([s2, p1, s1], at(3), S);
+    const ids = (f: 'all' | 'serve' | 'pay') => queueStrip(q.serve, q.pay, f).map((c) => c.order.id);
+    expect(ids('all')).toEqual([s1.id, s2.id, p1.id]);
+    expect(ids('serve')).toEqual([s1.id, s2.id]);
+    expect(ids('pay')).toEqual([p1.id]);
+    expect(queueCounts(q)).toEqual({ all: 3, serve: 2, pay: 1 });
+    expect(queueCounts(buildQueue([], at(0), S))).toEqual({ all: 0, serve: 0, pay: 0 });
   });
 });

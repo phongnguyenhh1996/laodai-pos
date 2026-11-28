@@ -64,15 +64,24 @@ async function startShift() {
   await screen.findByTestId('queue-screen');
 }
 
+/** Giỏ về đơn mới trống (sau Lưu / Thanh toán / Xóa / bỏ chọn). */
+async function cartIsNew() {
+  await waitFor(() => {
+    expect(tid('order-code')).toHaveTextContent('Đơn mới');
+    expect(tid('cart-lines').querySelectorAll('li[data-product]')).toHaveLength(0);
+  });
+}
+
 async function createOrder(productIds = [XOI_GA.id]) {
-  click('new-order');
-  await screen.findByTestId('order-screen');
+  await cartIsNew();
+  const before = server.openOrders().length;
   for (const p of productIds) {
     click(`menu-product-${p}`);
     click('topping-add');
   }
   click('order-save');
-  await screen.findByTestId('queue-screen');
+  await waitFor(() => expect(server.openOrders()).toHaveLength(before + 1));
+  await cartIsNew();
   return server.openOrders().at(-1)!;
 }
 
@@ -102,42 +111,37 @@ describe('tablet in phiếu', () => {
     expect(created[0]).toMatchObject({ orderId: o.id, deviceId: 'device-test-0001' });
     expect(transport.printedBytes).toBeGreaterThan(0);
 
-    fireEvent.click(await screen.findByTestId(`queue-open-${o.id}`));
-    await screen.findByTestId('order-screen');
+    fireEvent.click(await screen.findByTestId(`queue-card-${o.id}`));
+    expect(await screen.findByTestId('order-code')).toHaveTextContent(o.code);
     click(`menu-product-${XOI_XEO.id}`);
     click('topping-add');
-    click('order-back');
-    await screen.findByTestId('queue-screen');
+    click('order-deselect');
+    await cartIsNew();
     await waitFor(() => expect(kinds()).toEqual(['kitchen:auto', 'kitchen:auto']));
     expect(created[1].detail?.edit).toMatchObject({ added: [{ name: XOI_XEO.name, qty: 1 }], removed: [] });
 
-    fireEvent.click(await screen.findByTestId(`queue-pay-btn-${o.id}`).catch(() => screen.findByTestId(`queue-open-${o.id}`)));
-    if (screen.queryByTestId('order-screen')) click('order-pay-exact');
-    else {
-      await screen.findByTestId('pay-screen');
-      click('pay-exact');
-      click('pay-confirm');
-    }
-    await screen.findByTestId('queue-screen');
+    fireEvent.click(await screen.findByTestId(`queue-card-${o.id}`));
+    expect(await screen.findByTestId('order-code')).toHaveTextContent(o.code);
+    click('order-pay-exact');
+    await cartIsNew();
     await waitFor(() => expect(kinds()).toEqual(['kitchen:auto', 'kitchen:auto', 'bill:auto']));
     expect(finished.every((f) => f.ok)).toBe(true);
     // Tablet không có nút in bill.
     expect(screen.queryByTestId(/bill/i)).toBeNull();
   });
 
-  it('tắt công tắc ⇒ không tự in; nút In lại phiếu bếp trên thẻ vẫn in được', async () => {
+  it('tắt công tắc ⇒ không tự in; nút In lại phiếu bếp trong giỏ vẫn in được', async () => {
     useFakeServer({
       ...CATALOG,
       profile: { ...CATALOG.profile, auto_print_kitchen: false, auto_reprint_kitchen_on_edit: false, auto_print_bill: false },
     });
     await startShift();
     const o = await createOrder();
-    click(`queue-reprint-${o.id}`);
+    fireEvent.click(await screen.findByTestId(`queue-card-${o.id}`));
+    fireEvent.click(await screen.findByTestId('order-reprint'));
     await waitFor(() => expect(kinds()).toEqual(['kitchen:staff']));
-    fireEvent.click(await screen.findByTestId(`queue-open-${o.id}`));
-    await screen.findByTestId('order-screen');
     click('order-pay-exact');
-    await screen.findByTestId('queue-screen');
+    await cartIsNew();
     await new Promise((r) => setTimeout(r, 20));
     expect(kinds()).toEqual(['kitchen:staff']);
   });
@@ -167,18 +171,17 @@ describe('tablet in phiếu', () => {
     await startShift();
     const o = await createOrder();
     await waitFor(() => expect(kinds()).toEqual(['kitchen:auto']));
-    fireEvent.click(await screen.findByTestId(`queue-open-${o.id}`));
-    await screen.findByTestId('order-screen');
+    fireEvent.click(await screen.findByTestId(`queue-card-${o.id}`));
+    expect(await screen.findByTestId('order-code')).toHaveTextContent(o.code);
     click(`menu-product-${XOI_XEO.id}`);
     click('topping-add');
-    click('order-back');
-    await screen.findByTestId('queue-screen');
+    click('order-deselect');
+    await cartIsNew();
     await waitFor(() => expect(server.kinds).toContain('update_order'));
-    fireEvent.click(await screen.findByTestId(`queue-open-${o.id}`));
-    await screen.findByTestId('order-screen');
-    click('order-delete');
+    fireEvent.click(await screen.findByTestId(`queue-card-${o.id}`));
+    fireEvent.click(await screen.findByTestId('order-delete'));
     fireEvent.click(await screen.findByTestId('delete-reason-mistake'));
-    await screen.findByTestId('queue-screen');
+    await cartIsNew();
     expect(kinds()).toEqual(['kitchen:auto']);
   });
 });
@@ -190,7 +193,9 @@ describe('PWA (không có máy in)', () => {
     await startShift();
     const o = await createOrder();
     expect(screen.queryByTestId('printer-status')).toBeNull();
-    expect(screen.queryByTestId(`queue-reprint-${o.id}`)).toBeNull();
+    click(`queue-card-${o.id}`);
+    expect(await screen.findByTestId('order-deselect')).toBeInTheDocument();
+    expect(screen.queryByTestId('order-reprint')).toBeNull();
     expect(created).toEqual([]);
   });
 });

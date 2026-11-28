@@ -13,7 +13,7 @@ import { MoneyInput } from '@/app/MoneyInput';
 import type { PaymentInput } from '@/pos';
 import { ChosenCustomer, CustomerSuggestions, useDebtBook } from './debt';
 import { Notice, useTablet } from './parts';
-import type { QueueFlash } from './QueueScreen';
+import type { SalesFlash } from './SalesScreen';
 
 type Method = 'cash' | 'transfer' | 'debt';
 
@@ -46,10 +46,10 @@ export function PayScreen() {
   const busyRef = useRef(false);
 
   if (!order) {
-    // Đang thanh toán trên máy này: chờ chuyển về hàng đợi kèm thông báo.
+    // Đang thanh toán trên máy này: chờ chuyển về màn Bán hàng kèm thông báo.
     if (busyRef.current) return <Splash />;
     const flash = seen.current ? 'Đơn đã được thanh toán hoặc xóa ở máy khác' : null;
-    return <Navigate to="/" replace state={flash ? ({ flash } satisfies QueueFlash) : null} />;
+    return <Navigate to="/" replace state={flash ? ({ flash } satisfies SalesFlash) : null} />;
   }
   seen.current = true;
   const o = order;
@@ -72,7 +72,7 @@ export function PayScreen() {
     setError(null);
     try {
       await pos.payOrder(o.id, payment);
-      navigate('/', { replace: true, state: { flash, paid: o } satisfies QueueFlash });
+      navigate('/', { replace: true, state: { flash, paid: o } satisfies SalesFlash });
     } catch (e) {
       setError(errorMessage(e));
       busyRef.current = false;
@@ -92,7 +92,7 @@ export function PayScreen() {
   return (
     <main data-testid="pay-screen" className="flex h-full flex-col">
       <header className="flex h-[60px] shrink-0 items-center gap-3 border-b border-line bg-surface px-4 md:h-[76px] md:px-6">
-        <Link to={`/order/${o.id}`} className="btn btn-secondary min-h-[44px] pl-3 pr-4 text-[15px]" data-testid="pay-back">
+        <Link to={`/?order=${o.id}`} className="btn btn-secondary min-h-[44px] pl-3 pr-4 text-[15px]" data-testid="pay-back">
           <ChevronLeft aria-hidden className="h-5 w-5" />
           Đơn
         </Link>

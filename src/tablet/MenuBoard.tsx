@@ -146,7 +146,7 @@ export function MenuBoard({
           <Grid
             title="Món"
             count={board.products.length}
-            cols="grid-cols-2 lg:grid-cols-4"
+            cols="grid-cols-2 lg:grid-cols-3"
             action={isPhone && marking && !marking.active ? markingToggle(true) : null}
           >
             {board.products.map((p) => (
@@ -165,7 +165,7 @@ export function MenuBoard({
             ))}
           </Grid>
           {marking?.active && board.toppings.length > 0 && (
-            <Grid title="Topping" count={board.toppings.length} cols="grid-cols-2 lg:grid-cols-4">
+            <Grid title="Topping" count={board.toppings.length} cols="grid-cols-2 lg:grid-cols-3">
               {board.toppings.map((t: Topping) => (
                 <Tile
                   key={t.id}

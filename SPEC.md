@@ -122,7 +122,12 @@ Ghi chú:
 Chủ có thể **bổ sung giữa ca** (vd. "+50 hộp", "+200k tiền lẻ") từ điện thoại → `shift_adjustments`.
 
 ### 4.2 Tạo / sửa đơn
-- Tab điểm bán ở trên cùng (chỉ các điểm của hồ sơ tablet).
+Gọi món và sửa đơn nằm ngay trong màn **Bán hàng** (mục 4.3): thực đơn ở giữa, giỏ bên phải (điện thoại: giỏ ở đáy).
+- **Đơn đang chọn**: không chọn thẻ nào trong hàng đợi ⇒ giỏ là đơn mới trống. Bấm một thẻ ⇒ giỏ sửa đơn đó (thẻ viền nổi bật; điện thoại: giỏ tự mở rộng); bấm thẻ khác ⇒ chuyển thẳng sang đơn đó.
+  - **Bỏ chọn** (về đơn mới), như bỏ focus một ô nhập: bấm vùng trống của hàng đợi (giữa / sau các thẻ, hàng chip), bấm nút **✕** trên đầu giỏ, hoặc bấm lại thẻ đang chọn. Bấm vào thực đơn hoặc giỏ không bỏ chọn.
+  - Rời đơn (bỏ chọn, chọn thẻ khác, sang màn khác): đơn đã lưu còn món ⇒ tự lưu rồi đi, không hỏi; đơn mới chưa lưu đã có món, hoặc đơn ship không lưu được (thiếu địa chỉ / trả shipper) ⇒ hỏi **"Bỏ thay đổi?"**.
+  - Lưu / ra món đơn mới ⇒ thẻ đơn đó xuất hiện trong hàng đợi, giỏ về đơn mới trống. Thanh toán / xóa xong ⇒ toast, giỏ về đơn mới trống.
+- Tab điểm bán ở trên cùng thực đơn (chỉ các điểm của hồ sơ tablet).
 - Lưới **combo** (bấm 1 lần là thêm) + lưới **món chính** → bảng chọn **topping** (cộng giá).
 - Nút **Tại chỗ / Mang về** (mặc định: Xôi = Mang về, Cơm gà = Tại chỗ); ô **nhãn** ngắn hoặc số bàn (tùy chọn).
 - Nhân viên **thấy giá**, không sửa được giá; không có giảm giá.
@@ -137,23 +142,27 @@ Chủ có thể **bổ sung giữa ca** (vd. "+50 hộp", "+200k tiền lẻ") t
 - Đơn đang mở (`open`/`served`): nhân viên sửa món & xóa đơn được. Mọi thay đổi ghi `audit_log` (trước/sau).
   - **Xóa đơn** → chọn nhanh lý do (1 chạm: bấm nhầm / khách bỏ về / khách đổi ý / khác) → Telegram ngay, kèm nội dung đơn và trạng thái lúc xóa (đã ra món hay chưa).
 
-### 4.3 Hàng đợi (màn hình chính tablet)
-- Hai nhóm: **Chờ ra món** (trên) và **Chờ thanh toán** (dưới), mỗi nhóm xếp theo giờ tạo, đơn cũ nhất ở trên.
-- Mỗi thẻ đơn: **số thứ tự trong hàng đợi** (1, 2, 3… đánh lại liên tục), **mã đơn** `3F5`, nhãn/bàn, giờ tạo, **đồng hồ chờ**, tóm tắt món, tổng tiền đơn.
+### 4.3 Bán hàng và hàng đợi (màn hình chính tablet)
+Màn **Bán hàng** gộp hàng đợi, gọi món (4.2) và thanh toán (4.4) vào một màn. **Hàng đợi** là dải đơn đang mở ở đầu màn.
+- Chip lọc **Tất cả · Chờ ra món · Chờ thanh toán**, mỗi chip kèm số đơn; mặc định Tất cả.
+- Thẻ đơn xếp thành một hàng cuộn ngang: chờ ra món trước, chờ thanh toán sau, trong mỗi nhóm đơn cũ nhất trước. Không có đơn ⇒ "Chưa có đơn đang mở".
+- Mỗi thẻ đơn: **mã đơn** `A30`, nhãn/bàn, số món, **đồng hồ chờ**, tổng tiền đơn, badge trạng thái. Không có số thứ tự, tóm tắt món hay nút thao tác: bấm thẻ để mở đơn trong giỏ.
 - Đơn ship: badge "+10k ship" (quán ship, khi phí > 0); đơn shipper ngoài thì badge **"Ship ngoài · trả 10k"** để nhắc lấy tiền két đưa shipper.
 - Chờ ra món đổi màu: vàng ≥ 5 phút, đỏ ≥ 10 phút (chủ chỉnh).
-- Bấm **Đã ra món** → chuyển nhóm, lưu `served_at`.
+- Chọn đơn rồi bấm **Đã ra món** trong giỏ → đơn chuyển nhóm, lưu `served_at`.
+- Thông báo một lần (đã thanh toán, đã xóa, đơn đổi ở máy khác, in lỗi) hiện bằng **toast**.
 - Mã đơn: 1 chữ + 2 số, ví dụ `A30` (chữ đầu bỏ `I L O`), ngẫu nhiên, không trùng trong ngày của tablet. Không phản ánh số lượng đơn.
 
 ### 4.4 Thanh toán
-Chọn một hình thức (không chia, không nợ một phần). Số cần thu là tổng đơn, **đã gồm phí ship** (màn thanh toán hiện dòng "Phí ship" riêng):
+Thanh toán ngay trong giỏ của màn Bán hàng, không có màn riêng: nút chính **"Thu đủ tiền mặt"** (1 chạm) và hàng **TM · CK · Ghi nợ**; bấm một hình thức thì phần của nó mở ngay trong giỏ (Ghi nợ mở thành bảng đè lên giỏ).
+Chọn một hình thức (không chia, không nợ một phần). Số cần thu là tổng đơn, **đã gồm phí ship** (giỏ hiện dòng "Phí ship" riêng):
 - **Tiền mặt**: nút mệnh giá nhanh "Khách đưa" (đủ tiền, 50k, 100k, 200k, 500k, nhập tay) → hiện tiền thối.
 - **Chuyển khoản**: nhân viên xác nhận đã nhận.
 - **Ghi nợ**: ô tên (bắt buộc) với **gợi ý khách có sẵn**; ô mô tả ("giáo viên", "20 Lê Lợi") và SĐT tùy chọn; tên mới → tự tạo khách. Telegram ngay.
 
 Sau khi thanh toán, đơn **biến mất khỏi tablet** và nhân viên không sửa được nữa. Tiền tính vào **ca đang mở lúc thu** (`paid_shift_id`), kể cả khi đơn được mở từ ca trước.
 
-Đơn shipper ngoài: màn thanh toán hiện dòng **"Trả shipper −10.000 (lấy từ két)"** dưới tổng để nhắc; số cần thu vẫn là tổng đơn. Tiền trả shipper **luôn là tiền mặt từ két**, bất kể khách trả TM / CK / Nợ, và được tính vào **ca thanh toán đơn** (`paid_shift_id`). Đơn bị xóa ⇒ không có khoản chi (đã đưa tiền shipper rồi mới xóa thì chủ ghi chú lúc đối soát).
+Đơn shipper ngoài: giỏ hiện dòng **"Trả shipper −10.000 (lấy từ két)"** dưới tổng để nhắc; số cần thu vẫn là tổng đơn. Tiền trả shipper **luôn là tiền mặt từ két**, bất kể khách trả TM / CK / Nợ, và được tính vào **ca thanh toán đơn** (`paid_shift_id`). Đơn bị xóa ⇒ không có khoản chi (đã đưa tiền shipper rồi mới xóa thì chủ ghi chú lúc đối soát).
 
 ### 4.5 Thu nợ (tablet)
 Chọn khách → thấy dư nợ của khách đó → nhập số tiền + hình thức → lưu `debt_payments` vào ca hiện tại. Tiền mặt thu nợ tính vào két ca. Telegram ngay.
@@ -177,7 +186,7 @@ Chỉ trên chế độ chủ. Sửa món / hình thức thanh toán / khách n�
 
 ### 4.9 Khoản chi giữa ca
 Lấy **tiền mặt từ két** của ca để mua đồ (đá, ga…). Chỉ chi, chỉ tiền mặt; chi phí trả bằng CK / tiền túi chủ không ghi ở đây. Xem [ADR 0006](docs/adr/0006-khoan-chi-giua-ca.md).
-- **Tablet**: menu phụ của hàng đợi → **Chi tiền** (cần ca đang mở). Nhập số tiền (nhập theo nghìn, mục 7) + **ghi chú bắt buộc**. Hàng nút **ghi chú gần đây**: tối đa 8 ghi chú dùng nhiều nhất 30 ngày qua, mọi quầy, so khớp không phân biệt hoa thường / khoảng trắng thừa; bấm nút chỉ điền ghi chú, **không** điền số tiền. Lưu → màn xác nhận to "Chi **50.000đ** – mua đá?" → `sync_push` (`create_expense`). Mất mạng ⇒ không lưu, như mọi thao tác ([ADR 0001](docs/adr/0001-server-la-nguon-su-that.md)).
+- **Tablet**: menu phụ (sidebar / ☰) → **Chi tiền** (cần ca đang mở). Nhập số tiền (nhập theo nghìn, mục 7) + **ghi chú bắt buộc**. Hàng nút **ghi chú gần đây**: tối đa 8 ghi chú dùng nhiều nhất 30 ngày qua, mọi quầy, so khớp không phân biệt hoa thường / khoảng trắng thừa; bấm nút chỉ điền ghi chú, **không** điền số tiền. Lưu → màn xác nhận to "Chi **50.000đ** – mua đá?" → `sync_push` (`create_expense`). Mất mạng ⇒ không lưu, như mọi thao tác ([ADR 0001](docs/adr/0001-server-la-nguon-su-that.md)).
 - Màn Chi tiền liệt kê các khoản chi của **ca đang mở** (cả khoản chủ ghi, nhãn "Chủ ghi") và tổng chi của ca. Không thấy ca khác.
 - **Hủy**: nhân viên hủy được khoản chính nhân viên ghi khi ca còn mở (`void_expense`, `voided_at`); không sửa — nhầm thì hủy rồi ghi lại. Khoản chủ ghi thì nhân viên không hủy được.
 - **Chủ**: ở chi tiết ca, nút **Ghi khoản chi** (cạnh bổ sung giữa ca), được cả với ca đã đóng; hủy hoặc sửa số tiền / ghi chú mọi khoản. Ca đã đóng ⇒ **tính lại** đối soát, đánh dấu "đã điều chỉnh".
@@ -261,18 +270,18 @@ Mỗi tin có link mở thẳng chi tiết trong app chủ.
 ### Tablet (chế độ bán hàng)
 1. **Đăng nhập**: đăng nhập chủ → chọn quầy (chỉ một lần).
 2. **Mở ca**: danh sách tên nhân viên → Mở ca.
-3. **Hàng đợi** (màn hình chính): hai nhóm đơn, nút lớn **+ Đơn mới**, menu phụ: Thu nợ · Chi tiền · Đóng ca · Chế độ chủ.
-4. **Đơn**: tab điểm bán, combo, món, topping, Tại chỗ/Mang về, nhãn → Lưu / Đã ra món / Thanh toán / Xóa; nút **Báo hết món** (mục 4.8).
-5. **Thanh toán**: TM / CK / Ghi nợ.
-6. **Thu nợ**.
-7. **Chi tiền** (mục 4.9).
-8. **Đóng ca**: các ô đếm → Xác nhận; màn xác nhận hiện lại số đã nhập dạng đầy đủ ("2.080.000đ"), vẫn không hiện kỳ vọng.
+3. **Bán hàng** (màn hình chính, mục 4.2–4.4): hàng đợi (chip lọc + thẻ đơn cuộn ngang) ở trên; thực đơn (tab điểm bán, combo, món, topping; nút **Báo hết món**, mục 4.8) ở giữa; giỏ (Tại chỗ / Mang về / Ship, nhãn, món → Lưu / Đã ra món / Thu đủ tiền mặt / TM · CK · Ghi nợ / Xóa / In lại phiếu bếp, nút ✕ bỏ chọn đơn) bên phải.
+   - Tablet (md+): sidebar (tên quầy, ca, menu **Bán hàng** · Thu nợ · Chi tiền · Đóng ca, chế độ chủ) | hàng đợi + thực đơn | cột giỏ.
+   - Điện thoại: hàng đợi thu nhỏ ở đầu, thực đơn ở giữa, giỏ thu gọn ở đáy (chọn đơn ⇒ giỏ tự mở rộng); menu phụ trong nút **☰** trên header.
+4. **Thu nợ**.
+5. **Chi tiền** (mục 4.9).
+6. **Đóng ca**: các ô đếm → Xác nhận; màn xác nhận hiện lại số đã nhập dạng đầy đủ ("2.080.000đ"), vẫn không hiện kỳ vọng.
 
 **Nhập theo nghìn** (`MoneyInput`, mọi ô tiền ở tablet và chế độ chủ: tiền khách đưa, đếm tiền đóng ca, thu nợ, khoản chi, bổ sung giữa ca và sổ lương khi đang chọn loại tiền, giá món / topping, lương một ngày, tiền lẻ đầu ca): gõ `50` = 50.000đ; ô hiện phần nghìn có dấu chấm (`1.500`) và đuôi `.000đ` cố định, **cùng màu và cỡ chữ với số đã gõ** (ô trống thì cả placeholder lẫn đuôi cùng màu placeholder); không nhập được số lẻ dưới 1.000.
 
-In ấn (mục 12): trạng thái máy in + "Kết nối lại" trên hàng đợi, nút "In lại phiếu bếp" trên thẻ đơn, báo đỏ khi in lỗi.
+In ấn (mục 12): icon trạng thái máy in trên header màn Bán hàng (bấm ⇒ chi tiết + "Kết nối lại"), nút "In lại phiếu bếp" trong giỏ khi đang chọn đơn, in lỗi ⇒ toast đỏ.
 
-Thiết kế: nút ≥ 56px, chữ to, tối đa 2–3 chạm cho một đơn combo, hiện trạng thái kết nối (đã kết nối / đang kết nối / mất kết nối; mất kết nối thì có dải báo đỏ).
+Thiết kế: nút ≥ 56px, chữ to, tối đa 2–3 chạm cho một đơn combo, hiện trạng thái kết nối (đã kết nối / đang kết nối / mất kết nối; mất kết nối thì có dải báo đỏ mỏng, không dùng toast vì là trạng thái kéo dài).
 
 ### Chế độ chủ (vào bằng mật khẩu chủ trên bất kỳ máy nào đã chọn quầy; giao diện tối ưu cho điện thoại)
 1. **Tổng quan** (realtime): doanh thu hôm nay theo điểm; các ca đang mở; đơn đang chờ lâu.
@@ -357,7 +366,6 @@ Toàn bộ logic nghiệp vụ phía client nằm trong `src/domain/` dưới d�
 
 **Hàng đợi** (`domain/queue`)
 - Xếp theo `created_at` tăng dần, nhóm "Chờ ra món" trước nhóm "Chờ thanh toán".
-- Số thứ tự trong hàng đợi đánh lại liên tục 1, 2, 3… khi có đơn rời hàng.
 - Màu theo thời gian chờ: < 5 phút thường, ≥ 5 phút vàng, ≥ 10 phút đỏ. Ngưỡng lấy từ cài đặt. Đơn đã ra món không đổi màu.
 
 **Đối soát** (chỉ có ở hàm SQL `reconcile_shift`, test trong `tests/db/reconcile.test.ts`, xem 10.3)
@@ -429,12 +437,12 @@ Mỗi kịch bản bắt đầu bằng `cy.task('db:reset')` để reset và see
 
 **C. Bán hàng**
 
-10. Bấm combo 1 lần rồi thanh toán tiền mặt "đủ tiền": tối đa 3 chạm từ hàng đợi đến lúc xong đơn.
+10. Bấm combo 1 lần rồi thanh toán tiền mặt "đủ tiền": tối đa 3 chạm từ màn Bán hàng đến lúc xong đơn.
 11. Món + 2 topping, mang về: tổng tiền đúng, nút Tại chỗ/Mang về mặc định đúng theo điểm bán.
 12. Chuyển tab Xôi ↔ Cơm gà trong cùng ca: đơn được gắn nhãn điểm bán đúng.
 13. Nhân viên không có ô nào để sửa giá hay giảm giá.
-14. Hàng đợi: tạo 3 đơn, đơn cũ nhất ở trên. Sau 5 phút đơn chuyển vàng, sau 10 phút chuyển đỏ (`cy.clock`). Bấm "Đã ra món" thì đơn xuống nhóm "Chờ thanh toán".
-15. Mã đơn hiển thị đúng dạng 1 chữ + 2 số. Số thứ tự trong hàng đợi đánh lại sau khi thanh toán một đơn.
+14. Hàng đợi: tạo 3 đơn, đơn cũ nhất đứng trước. Sau 5 phút đơn chuyển vàng, sau 10 phút chuyển đỏ (`cy.clock`). Chọn đơn, bấm "Đã ra món" trong giỏ ⇒ đơn sang chip "Chờ thanh toán", đứng sau các đơn chờ ra món ở chip Tất cả. Chọn thẻ ⇒ giỏ là đơn đó; bấm vùng trống / ✕ / bấm lại thẻ ⇒ về đơn mới; bấm thực đơn không bỏ chọn. Đơn mới chưa lưu có món mà chọn thẻ khác ⇒ hỏi "Bỏ thay đổi?".
+15. Mã đơn hiển thị đúng dạng 1 chữ + 2 số trên thẻ đơn; thẻ không hiện số thứ tự.
 16. Thanh toán xong, đơn biến mất khỏi tablet. Không có màn hình nào cho xem lại đơn đã thanh toán.
 
 **D. Ghi nợ & thu nợ**
@@ -457,7 +465,7 @@ Mỗi kịch bản bắt đầu bằng `cy.task('db:reset')` để reset và see
 **F. Nhiều máy & mất kết nối** (đã có ở test component `TabletFlow.test.tsx` với server giả và test DB `pos-client.test.ts` với Supabase thật)
 
 28. Máy khác cùng hồ sơ mở ca ⇒ máy này tự vào hàng đợi của ca đó; không mở được ca thứ hai.
-29. Máy khác tạo / sửa / thanh toán đơn ⇒ hàng đợi và màn đơn / thanh toán đang mở trên máy này cập nhật ngay (đơn đã thanh toán ở máy khác ⇒ về hàng đợi kèm thông báo).
+29. Máy khác tạo / sửa / thanh toán đơn ⇒ hàng đợi và đơn đang chọn trên máy này cập nhật ngay (đơn đang chọn bị thanh toán / xóa ở máy khác ⇒ toast, giỏ về đơn mới).
 30. Mất mạng: thao tác báo "mất kết nối", đơn đang soạn còn nguyên; có mạng lại bấm lại là lưu, không bị trùng.
 31. Mở app lúc mất mạng: báo cần mạng, có nút Thử lại.
 
@@ -519,8 +527,8 @@ Có 3 công tắc. Công tắc **chỉ bật hoặc tắt việc in tự động
 - **Sửa đơn** thì in lại nguyên phiếu, có dòng **"ĐÃ SỬA" kèm giờ sửa**, ghi rõ món thêm hoặc bớt (nếu bật công tắc). **Xóa đơn** thì không in.
   - Màn đơn tự lưu từng chạm ⇒ các lần sửa liên tiếp được **gom thành một phiếu** (in sau khi ngừng sửa khoảng 4 giây, hoặc ngay khi thu tiền). Sửa rồi sửa lại như cũ thì không in.
   - Sửa rồi thu tiền ngay: phiếu "ĐÃ SỬA" vẫn in được trong 10 phút sau khi thanh toán.
-- Nội dung: **mã đơn chữ to**, số thứ tự hàng đợi, Tại chỗ/Mang về, nhãn hoặc bàn, giờ tạo, món kèm topping và số lượng. **Không in giá.**
-- Nút **"In lại phiếu bếp"** trên thẻ đơn **luôn hiện** khi đơn còn trong hàng đợi, bất kể công tắc. Chủ in lại được từ xa.
+- Nội dung: **mã đơn chữ to**, Tại chỗ/Mang về, nhãn hoặc bàn, giờ tạo, món kèm topping và số lượng. **Không in giá.**
+- Nút **"In lại phiếu bếp"** trong giỏ **luôn hiện** khi đang chọn một đơn còn trong hàng đợi, bất kể công tắc. Chủ in lại được từ xa.
 
 ### 12.4 Bill thanh toán
 - Tự in **sau khi thanh toán thành công**, kể cả đơn ghi nợ (nếu bật công tắc).
@@ -533,7 +541,7 @@ Có 3 công tắc. Công tắc **chỉ bật hoặc tắt việc in tự động
 Chủ chỉnh trong **Cài đặt → Mẫu in**:
 - **Bật/tắt từng dòng**:
   - Bill: tên quán, điểm bán, SĐT, địa chỉ, giờ, Tại chỗ/Mang về, nhãn hoặc bàn, đơn giá, "Cảm ơn quý khách", "Không có bill = miễn phí".
-  - Phiếu bếp: số thứ tự hàng đợi, Tại chỗ/Mang về, nhãn hoặc bàn, giờ tạo, topping.
+  - Phiếu bếp: Tại chỗ/Mang về, nhãn hoặc bàn, giờ tạo, topping.
 - **Chữ tự nhập**: tên quán, SĐT, địa chỉ, 1–3 dòng chân trang. Tên điểm bán tự lấy theo điểm bán của đơn.
 - **Cỡ chữ mã đơn**: to hoặc rất to.
 - **Luôn in, không tắt được**: mã đơn, món kèm số lượng, Tổng (trên bill), "ĐÃ SỬA" kèm giờ sửa (trên phiếu bếp).

@@ -19,7 +19,7 @@ function go(path: string) {
   render(<App />);
 }
 
-/** Tablet đã kích hoạt, Lan đã mở ca, đang ở hàng đợi. */
+/** Tablet đã kích hoạt, Lan đã mở ca, đang ở màn Bán hàng. */
 async function startShift(staff = 's1') {
   activateDevice();
   go('/');
@@ -28,9 +28,23 @@ async function startShift(staff = 's1') {
   await screen.findByTestId('queue-screen');
 }
 
+/** Giỏ đang là đơn mới (màn Bán hàng không chọn thẻ nào). */
 async function newOrder() {
-  click('new-order');
-  await screen.findByTestId('order-screen');
+  await cartIsNew();
+}
+
+/** Giỏ về đơn mới trống (sau Lưu / Ra món / Thanh toán / Xóa / bỏ chọn). */
+async function cartIsNew() {
+  await waitFor(() => {
+    expect(tid('order-code')).toHaveTextContent('Đơn mới');
+    expect(tid('cart-lines').querySelectorAll('li[data-product]')).toHaveLength(0);
+  });
+}
+
+/** Mục menu bán hàng: điện thoại nằm trong nút ☰. */
+function nav(id: string) {
+  if (screen.queryByTestId('open-menu')) click('open-menu');
+  click(id);
 }
 
 /** Thêm món + topping qua bảng chọn topping. */
@@ -95,11 +109,10 @@ describe('mở ca', () => {
 });
 
 describe('tạo đơn & thanh toán', () => {
-  it('C10: combo 1 chạm + thu đủ tiền mặt = 3 chạm từ hàng đợi đến lúc xong đơn', async () => {
+  it('C10: combo 1 chạm + thu đủ tiền mặt = 2 chạm từ màn Bán hàng đến lúc xong đơn', async () => {
     await startShift();
-    click('new-order'); // 1
-    fireEvent.click(await screen.findByTestId(`menu-combo-${COMBO_XOI_FULL.id}`)); // 2
-    click('order-pay-exact'); // 3
+    fireEvent.click(await screen.findByTestId(`menu-combo-${COMBO_XOI_FULL.id}`)); // 1
+    click('order-pay-exact'); // 2
     expect(await screen.findByTestId('queue-flash')).toHaveTextContent('Đã thu 39.000');
     expect(cards()).toHaveLength(0);
     expect(server.kinds).toEqual(['open_shift', 'create_order', 'pay_order']);
@@ -114,7 +127,7 @@ describe('tạo đơn & thanh toán', () => {
     addProduct(XOI_GA.id, [TRUNG.id, CHA.id]);
     expect(tid('order-total')).toHaveTextContent('39.000');
     click('order-save');
-    await screen.findByTestId('queue-screen');
+    await cartIsNew();
     const [o] = server.openOrders();
     expect(o).toMatchObject({ point_id: 'xoi-a', dine_type: 'takeaway', total: 39_000 });
     expect(o.items[0].toppings_snap.map((t) => t.id)).toEqual([TRUNG.id, CHA.id]);
@@ -150,11 +163,10 @@ describe('tạo đơn & thanh toán', () => {
     expect(screen.queryByTestId('order-address-missing')).toBeNull();
     expect(tid('order-ship-summary')).toHaveTextContent('12 Lê Lợi – 0909 123 456');
     click('order-save');
-    await screen.findByTestId('queue-screen');
+    await cartIsNew();
     const [o] = server.openOrders();
     expect(o).toMatchObject({ dine_type: 'delivery', address: '12 Lê Lợi – 0909 123 456' });
     expect(await screen.findByTestId(`queue-dine-${o.id}`)).toHaveTextContent('Ship');
-    expect(tid(`queue-address-${o.id}`)).toHaveTextContent('12 Lê Lợi – 0909 123 456');
     const create = server.ops.find((op) => op.kind === 'create_order')!;
     expect(create.payload).toMatchObject({ order: { dine_type: 'delivery', address: '12 Lê Lợi – 0909 123 456' } });
   });
@@ -172,21 +184,20 @@ describe('tạo đơn & thanh toán', () => {
     click('ship-sheet-done');
     expect(tid('order-ship-summary')).toHaveTextContent('20 Lê Lợi, P.3 · Cô Hoa (20 Lê Lợi)');
     click('order-save');
-    await screen.findByTestId('queue-screen');
+    await cartIsNew();
     const [o] = server.openOrders();
     expect(o).toMatchObject({ dine_type: 'delivery', address: '20 Lê Lợi, P.3', customer_id: 'c-hoa' });
     expect(server.ops.find((op) => op.kind === 'create_order')!.payload).toMatchObject({ customer: { id: 'c-hoa' } });
-    expect(await screen.findByTestId(`queue-customer-${o.id}`)).toHaveTextContent('Cô Hoa');
 
     // Mở lại đơn: khách vẫn chọn; thanh toán ghi nợ ⇒ khách chọn sẵn.
-    click(`queue-open-${o.id}`);
+    click(`queue-card-${o.id}`);
     expect(await screen.findByTestId('order-ship-summary')).toHaveTextContent('Cô Hoa');
     click('order-pay');
     await screen.findByTestId('pay-screen');
     click('pay-method-debt');
     expect(tid('customer-chosen-label')).toHaveTextContent('Cô Hoa');
     click('pay-debt-confirm');
-    await screen.findByTestId('queue-screen');
+    await cartIsNew();
     expect(server.order(o.id)).toMatchObject({ status: 'paid', payment_method: 'debt', customer_id: 'c-hoa' });
   });
 
@@ -226,7 +237,7 @@ describe('tạo đơn & thanh toán', () => {
     click('order-dine-takeaway');
     expect(screen.queryByTestId('order-ship-details')).toBeNull();
     click('order-save');
-    await screen.findByTestId('queue-screen');
+    await cartIsNew();
     const [o] = server.openOrders();
     expect(o).toMatchObject({ dine_type: 'takeaway', address: null });
   });
@@ -280,12 +291,12 @@ describe('tạo đơn & thanh toán', () => {
     fireEvent.change(tid('order-address'), { target: { value: '12 Lê Lợi' } });
     click('ship-sheet-done');
     click('order-save');
-    await screen.findByTestId('queue-screen');
+    await cartIsNew();
     const [o] = server.openOrders();
     expect(o).toMatchObject({ ship_fee: 5_000, total: 20_000 });
     expect(tid(`queue-ship-fee-${o.id}`)).toHaveTextContent('+5k ship');
 
-    click(`queue-open-${o.id}`);
+    click(`queue-card-${o.id}`);
     expect(await screen.findByTestId('order-ship-fee-5000')).toHaveAttribute('aria-pressed', 'true');
     expect(tid('order-autosave')).toHaveAttribute('data-state', 'saved'); // mở lại không bị coi là đã sửa
     click('order-ship-fee-20000');
@@ -309,7 +320,7 @@ describe('tạo đơn & thanh toán', () => {
       expect(tid('order-total')).toHaveTextContent('45.000');
       fireEvent.change(tid('order-address'), { target: { value: '12 Lê Lợi' } });
       click('order-save');
-      await screen.findByTestId('queue-screen');
+      await cartIsNew();
       expect(server.openOrders()[0]).toMatchObject({ dine_type: 'delivery', address: '12 Lê Lợi', ship_fee: 20_000, total: 45_000 });
     } finally {
       restore();
@@ -356,9 +367,9 @@ describe('tạo đơn & thanh toán', () => {
     expect(tid('pay-ship-payout')).toHaveTextContent('Trả shipper −10.000 (lấy từ két)');
 
     click('pay-back');
-    await screen.findByTestId('order-screen');
-    click('order-back');
-    await screen.findByTestId('queue-screen');
+    expect(await screen.findByTestId('order-deselect')).toBeInTheDocument(); // về màn Bán hàng, đơn đó đang chọn
+    click('order-deselect');
+    await cartIsNew();
     expect(tid(`queue-ship-external-${create.entity_id}`)).toHaveTextContent('Ship ngoài · trả 10k');
   });
 
@@ -390,7 +401,7 @@ describe('tạo đơn & thanh toán', () => {
     expect(tid('order-payout-missing')).toBeInTheDocument();
     click('order-dine-takeaway');
     click('order-save');
-    await screen.findByTestId('queue-screen');
+    await cartIsNew();
     const take = server.ops.filter((op) => op.kind === 'create_order').at(-1)!;
     expect(take.payload).toMatchObject({ order: { dine_type: 'takeaway', ship_mode: 'shop', ship_payout: 0, ship_fee: 0, total: 15_000 } });
   });
@@ -421,14 +432,14 @@ describe('tạo đơn & thanh toán', () => {
     addProduct(COM_GA.id);
     expect(tid('point-tab-xoi-a')).toBeDisabled(); // đơn cơm gà không thể chứa món xôi
     click('order-save');
-    await screen.findByTestId('queue-screen');
+    await cartIsNew();
     // Đơn kế tiếp mở đúng tab đang bán (Cơm gà)
     await newOrder();
     expect(tid('order-screen')).toHaveAttribute('data-point', 'com');
     click('point-tab-xoi-a');
     fireEvent.click(screen.getByTestId(`menu-combo-${COMBO_XOI_FULL.id}`));
     click('order-save');
-    await screen.findByTestId('queue-screen');
+    await cartIsNew();
     const orders = (server.openOrders()).sort((a, b) => a.device_seq - b.device_seq);
     expect(orders.map((o) => [o.point_id, o.dine_type])).toEqual([
       ['com', 'dinein'],
@@ -469,7 +480,7 @@ describe('tạo đơn & thanh toán', () => {
     click('cash-quick-100000');
     expect(tid('cash-change')).toHaveTextContent('65.000');
     click('pay-confirm');
-    await screen.findByTestId('queue-screen');
+    await cartIsNew();
     const pay = server.ops.at(-1)!;
     expect(pay).toMatchObject({ kind: 'pay_order' });
     expect(pay.payload).toMatchObject({ method: 'cash', cash_given: 100_000, total: 35_000 });
@@ -487,14 +498,14 @@ describe('tạo đơn & thanh toán', () => {
     expect(server.ops.at(-1)!.payload).toMatchObject({ method: 'transfer', cash_given: null });
   });
 
-  it('C16: thanh toán xong đơn biến mất; mở lại đường dẫn của đơn đó chỉ về hàng đợi', async () => {
+  it('C16: thanh toán xong đơn biến mất; mở lại đường dẫn của đơn đó chỉ về đơn mới trên màn Bán hàng', async () => {
     await startShift();
     await newOrder();
     fireEvent.click(screen.getByTestId(`menu-combo-${COMBO_XOI_FULL.id}`));
     click('order-save');
-    await screen.findByTestId('queue-screen');
+    await cartIsNew();
     const [o] = server.openOrders();
-    fireEvent.click(await screen.findByTestId(`queue-open-${o.id}`));
+    fireEvent.click(await screen.findByTestId(`queue-card-${o.id}`));
     await screen.findByTestId('order-screen');
     click('order-pay');
     fireEvent.click(await screen.findByTestId('cash-exact'));
@@ -506,7 +517,8 @@ describe('tạo đơn & thanh toán', () => {
       act(() => window.history.pushState({}, '', path));
       act(() => window.dispatchEvent(new PopStateEvent('popstate')));
       await waitFor(() => expect(window.location.pathname).toBe('/'));
-      expect(screen.queryByTestId('order-screen')).not.toBeInTheDocument();
+      await waitFor(() => expect(window.location.search).toBe(''));
+      await cartIsNew();
       expect(screen.queryByTestId('pay-screen')).not.toBeInTheDocument();
     }
   });
@@ -518,24 +530,42 @@ describe('tạo đơn & thanh toán', () => {
     click('order-save');
     click('order-save');
     click('order-save');
-    await screen.findByTestId('queue-screen');
+    await cartIsNew();
     expect((server.kinds).filter((k) => k === 'create_order')).toHaveLength(1);
   });
 
   it('rời đơn chưa lưu ⇒ hỏi lại; đơn mới chưa lưu thì không để lại gì', async () => {
     await startShift();
     await newOrder();
-    click('order-back'); // chưa có gì ⇒ về luôn
-    await screen.findByTestId('queue-screen');
-    await newOrder();
     fireEvent.click(screen.getByTestId(`menu-combo-${COMBO_XOI_FULL.id}`));
-    click('order-back');
+    click('order-save');
+    await cartIsNew();
+    const [o] = server.openOrders();
+
+    // Đơn mới chưa có gì ⇒ chọn thẻ là sang luôn; bỏ chọn ⇒ về đơn mới
+    click(`queue-card-${o.id}`);
+    expect(await screen.findByTestId('order-code')).toHaveTextContent(o.code);
+    click('order-deselect');
+    await cartIsNew();
+
+    // Đơn mới có món ⇒ chọn thẻ khác thì hỏi "Bỏ thay đổi?"
+    fireEvent.click(screen.getByTestId(`menu-combo-${COMBO_XOI_FULL.id}`));
+    click(`queue-card-${o.id}`);
     click('discard-no');
-    expect(tid('order-screen')).toBeInTheDocument();
-    click('order-back');
+    expect(tid('order-code')).toHaveTextContent('Đơn mới');
+    expect(tid('cart-lines').querySelectorAll('li[data-product]')).toHaveLength(1);
+    click(`queue-card-${o.id}`);
     click('discard-yes');
-    await screen.findByTestId('queue-empty');
-    expect(server.kinds).toEqual(['open_shift']);
+    expect(await screen.findByTestId('order-code')).toHaveTextContent(o.code);
+    // Sang màn khác cũng hỏi
+    click('order-deselect');
+    await cartIsNew();
+    fireEvent.click(screen.getByTestId(`menu-combo-${COMBO_XOI_FULL.id}`));
+    nav('open-debt');
+    expect(tid('discard-sheet')).toBeInTheDocument();
+    click('discard-yes');
+    expect(await screen.findByTestId('debt-screen')).toBeInTheDocument();
+    expect(server.kinds).toEqual(['open_shift', 'create_order']);
   });
 });
 
@@ -550,13 +580,15 @@ describe('hàng đợi', () => {
       fireEvent.change(tid('order-label'), { target: { value: label } });
       fireEvent.click(screen.getByTestId(`menu-combo-${COMBO_XOI_FULL.id}`));
       click('order-save');
-      await screen.findByTestId('queue-screen');
+      await cartIsNew();
       vi.setSystemTime(Date.now() + 60_000);
     }
     await waitFor(() => expect(cards()).toHaveLength(3));
-    const serveCards = () => within(tid('queue-serve')).queryAllByTestId(/^queue-card-/);
+    const serveCards = () => cards().filter((c) => c.dataset.group === 'serve');
     expect(serveCards().map((c) => within(c).getByTestId(/^queue-label-/).textContent)).toEqual(['một', 'hai', 'ba']);
-    expect(serveCards().map((c) => c.dataset.position)).toEqual(['1', '2', '3']);
+    expect(tid('queue-count-all')).toHaveTextContent('3');
+    expect(tid('queue-count-serve')).toHaveTextContent('3');
+    expect(tid('queue-count-pay')).toHaveTextContent('0');
     for (const c of serveCards()) expect(within(c).getByTestId(/^queue-code-/).textContent).toMatch(/^[ABCDEFGHJKMNPQRSTUVWXYZ][0-9]{2}$/);
     expect(serveCards().map((c) => c.dataset.color)).toEqual(['normal', 'normal', 'normal']);
 
@@ -566,26 +598,60 @@ describe('hàng đợi', () => {
     // t0 + 10 phút: đơn đầu đỏ, đơn hai (t0+1) vàng, đơn ba (t0+2) vàng
     act(() => void vi.advanceTimersByTime(5 * 60_000));
     expect(serveCards().map((c) => c.dataset.color)).toEqual(['red', 'yellow', 'yellow']);
-    expect(within(serveCards()[0]).getByTestId(/^queue-wait-/)).toHaveTextContent('10 phút');
+    expect(within(serveCards()[0]).getByTestId(/^queue-wait-/)).toHaveTextContent('10′');
 
-    // Đã ra món đơn đầu ⇒ xuống nhóm Chờ thanh toán, hết màu, số thứ tự đánh lại
+    // Chọn đơn đầu, Đã ra món trong giỏ ⇒ sang nhóm Chờ thanh toán (đứng sau các đơn chờ ra món), hết màu
     const first = serveCards()[0];
     const firstId = first.dataset.testid!.replace('queue-card-', '');
-    fireEvent.click(within(first).getByTestId(`queue-serve-btn-${firstId}`));
-    await waitFor(() => expect(within(tid('queue-pay')).getByTestId(`queue-card-${firstId}`)).toBeInTheDocument());
+    fireEvent.click(first);
+    expect(tid(`queue-card-${firstId}`)).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(await screen.findByTestId('order-serve'));
+    await waitFor(() => expect(tid(`queue-card-${firstId}`)).toHaveAttribute('data-group', 'pay'));
+    await cartIsNew();
     const payCard = tid(`queue-card-${firstId}`);
     expect(payCard).toHaveAttribute('data-color', 'none');
-    expect(payCard).toHaveAttribute('data-position', '3');
-    expect(serveCards().map((c) => c.dataset.position)).toEqual(['1', '2']);
+    expect(cards().map((c) => c.dataset.group)).toEqual(['serve', 'serve', 'pay']);
     expect((server.order(firstId))?.served_at).not.toBeNull();
 
-    // Thanh toán đơn hai (số 1) ⇒ đơn ba thành số 1, đơn đã ra món thành số 2
+    // Chip lọc: Chờ thanh toán chỉ còn đơn đã ra món
+    click('queue-filter-pay');
+    expect(cards().map((c) => c.dataset.testid)).toEqual([`queue-card-${firstId}`]);
+    click('queue-filter-all');
+
+    // Thanh toán đơn hai ⇒ thẻ rời hàng đợi
     const secondId = serveCards()[0].dataset.testid!.replace('queue-card-', '');
-    fireEvent.click(tid(`queue-open-${secondId}`));
+    fireEvent.click(tid(`queue-card-${secondId}`));
     fireEvent.click(await screen.findByTestId('order-pay-exact'));
     await waitFor(() => expect(cards()).toHaveLength(2));
-    expect(cards().map((c) => c.dataset.position)).toEqual(['1', '2']);
-    expect(tid(`queue-card-${firstId}`)).toHaveAttribute('data-position', '2');
+    expect(screen.queryByTestId(`queue-card-${secondId}`)).toBeNull();
+  });
+
+  it('bỏ chọn đơn: bấm lại thẻ, bấm vùng trống của hàng đợi; bấm thực đơn không bỏ chọn', async () => {
+    await startShift();
+    addProduct(XOI_GA.id);
+    click('order-save');
+    await cartIsNew();
+    const [o] = server.openOrders();
+    const selected = () => tid(`queue-card-${o.id}`).getAttribute('aria-pressed') === 'true';
+
+    click(`queue-card-${o.id}`);
+    await waitFor(() => expect(selected()).toBe(true));
+    click(`queue-card-${o.id}`); // bấm lại thẻ
+    await cartIsNew();
+    expect(selected()).toBe(false);
+
+    click(`queue-card-${o.id}`);
+    await waitFor(() => expect(selected()).toBe(true));
+    click('queue-filter-serve'); // bấm chip chỉ lọc
+    expect(selected()).toBe(true);
+    addProduct(XOI_XEO.id); // bấm thực đơn: vẫn sửa đơn đó
+    expect(selected()).toBe(true);
+    expect(tid('order-code')).toHaveTextContent(o.code);
+    fireEvent.click(tid('queue-screen')); // vùng trống ⇒ tự lưu rồi về đơn mới
+    await cartIsNew();
+    expect(selected()).toBe(false);
+    await waitFor(() => expect(server.order(o.id)?.items).toHaveLength(2));
+    expect(window.location.search).toBe('');
   });
 
   it('sửa đơn đang mở: tăng / bớt số lượng, đổi nhãn ⇒ update_order với tổng mới; không đổi gì thì không ghi', async () => {
@@ -594,18 +660,18 @@ describe('hàng đợi', () => {
     addProduct(XOI_GA.id);
     addProduct(XOI_XEO.id);
     click('order-save');
-    await screen.findByTestId('queue-screen');
+    await cartIsNew();
     const [o] = server.openOrders();
-    fireEvent.click(await screen.findByTestId(`queue-open-${o.id}`));
+    fireEvent.click(await screen.findByTestId(`queue-card-${o.id}`));
     await screen.findByTestId('order-screen');
     expect(tid('order-code')).toHaveTextContent(o.code);
     expect(screen.queryByTestId('order-save')).not.toBeInTheDocument(); // đơn đã lưu thì tự lưu, không có nút Lưu
     expect(tid('order-autosave')).toHaveTextContent('Đã lưu');
-    click('order-back'); // không đổi gì
-    await screen.findByTestId('queue-screen');
+    click('order-deselect'); // không đổi gì
+    await cartIsNew();
     expect(server.kinds).toEqual(['open_shift', 'create_order']);
 
-    fireEvent.click(await screen.findByTestId(`queue-open-${o.id}`));
+    fireEvent.click(await screen.findByTestId(`queue-card-${o.id}`));
     await screen.findByTestId('order-screen');
     const [ga, xeo] = o.items;
     click(`cart-line-${ga.id}-plus`);
@@ -613,11 +679,11 @@ describe('hàng đợi', () => {
     fireEvent.change(tid('order-label'), { target: { value: 'Bàn 4' } });
     expect(tid('order-total')).toHaveTextContent('50.000');
     click('order-serve');
-    await screen.findByTestId('queue-screen');
+    await cartIsNew();
     expect(server.kinds).toEqual(['open_shift', 'create_order', 'update_order', 'serve_order']);
     const upd = server.ops[2].payload;
     expect(upd).toMatchObject({ total: 50_000, label: 'Bàn 4' });
-    expect(await within(tid('queue-pay')).findByTestId(`queue-card-${o.id}`)).toBeInTheDocument();
+    await waitFor(() => expect(tid(`queue-card-${o.id}`)).toHaveAttribute('data-group', 'pay'));
   });
 
   it('đơn đã lưu tự lưu khi sửa: gom các chạm liên tiếp thành một update_order, không cần bấm gì', async () => {
@@ -625,9 +691,9 @@ describe('hàng đợi', () => {
     await newOrder();
     addProduct(XOI_GA.id);
     click('order-save');
-    await screen.findByTestId('queue-screen');
+    await cartIsNew();
     const [o] = server.openOrders();
-    fireEvent.click(await screen.findByTestId(`queue-open-${o.id}`));
+    fireEvent.click(await screen.findByTestId(`queue-card-${o.id}`));
     await screen.findByTestId('order-screen');
     const [ga] = o.items;
     click(`cart-line-${ga.id}-plus`);
@@ -637,12 +703,12 @@ describe('hàng đợi', () => {
     await waitFor(() => expect(tid('order-autosave')).toHaveAttribute('data-state', 'saved'), { timeout: 3000 });
     expect(server.kinds).toEqual(['open_shift', 'create_order', 'update_order']);
     expect(server.order(o.id)).toMatchObject({ label: 'Bàn 2', total: 75_000 });
-    expect(tid('order-screen')).toBeInTheDocument(); // vẫn ở màn đơn
+    expect(tid('order-code')).toHaveTextContent(o.code); // vẫn đang sửa đơn đó
 
-    // Sửa rồi về ngay (chưa kịp tự lưu) ⇒ vẫn ghi, không hỏi bỏ thay đổi
+    // Sửa rồi bỏ chọn ngay (chưa kịp tự lưu) ⇒ vẫn ghi, không hỏi bỏ thay đổi
     click(`cart-line-${ga.id}-minus`);
-    click('order-back');
-    await screen.findByTestId('queue-screen');
+    click('order-deselect');
+    await cartIsNew();
     expect(screen.queryByTestId('discard-sheet')).not.toBeInTheDocument();
     expect(server.kinds).toEqual(['open_shift', 'create_order', 'update_order', 'update_order']);
     expect((server.order(o.id))?.total).toBe(50_000);
@@ -655,9 +721,9 @@ describe('hàng đợi', () => {
     addProduct(XOI_GA.id);
     addProduct(XOI_XEO.id);
     click('order-save');
-    await screen.findByTestId('queue-screen');
+    await cartIsNew();
     const [o] = server.openOrders();
-    fireEvent.click(await screen.findByTestId(`queue-open-${o.id}`));
+    fireEvent.click(await screen.findByTestId(`queue-card-${o.id}`));
     await screen.findByTestId('order-screen');
     const [ga, xeo] = o.items;
     expect(ga.qty).toBe(2);
@@ -700,8 +766,8 @@ describe('hàng đợi', () => {
     expect(lines).toHaveLength(2);
     expect(screen.queryByTestId(`cart-line-${xeo.id}`)).not.toBeInTheDocument();
 
-    click('order-back');
-    await screen.findByTestId('queue-screen');
+    click('order-deselect');
+    await cartIsNew();
     expect(server.kinds).toEqual(['open_shift', 'create_order', 'update_order']);
     const saved = server.order(o.id);
     expect(saved?.items.map((i) => [i.product_id, i.qty])).toEqual([
@@ -716,15 +782,15 @@ describe('hàng đợi', () => {
     await newOrder();
     addProduct(XOI_GA.id);
     click('order-save');
-    await screen.findByTestId('queue-screen');
+    await cartIsNew();
     const [o] = server.openOrders();
-    fireEvent.click(await screen.findByTestId(`queue-open-${o.id}`));
+    fireEvent.click(await screen.findByTestId(`queue-card-${o.id}`));
     await screen.findByTestId('order-screen');
     click(`cart-line-${o.items[0].id}-minus`);
     expect(tid('order-error')).toHaveTextContent('Xóa đơn');
-    click('order-back');
+    click('order-deselect');
     click('discard-yes');
-    await screen.findByTestId('queue-screen');
+    await cartIsNew();
     expect(server.kinds).toEqual(['open_shift', 'create_order']);
     expect((server.order(o.id))?.items).toHaveLength(1);
   });
@@ -734,9 +800,9 @@ describe('hàng đợi', () => {
     await newOrder();
     fireEvent.click(screen.getByTestId(`menu-combo-${COMBO_XOI_FULL.id}`));
     click('order-serve');
-    await screen.findByTestId('queue-screen');
+    await cartIsNew();
     const [o] = server.openOrders();
-    fireEvent.click(await screen.findByTestId(`queue-open-${o.id}`));
+    fireEvent.click(await screen.findByTestId(`queue-card-${o.id}`));
     fireEvent.click(await screen.findByTestId('order-delete'));
     expect(tid('delete-sheet')).toBeInTheDocument();
     click('delete-cancel');
@@ -755,10 +821,10 @@ describe('đóng ca', () => {
     await newOrder();
     fireEvent.click(screen.getByTestId(`menu-combo-${COMBO_XOI_FULL.id}`));
     click('order-save');
-    await screen.findByTestId('queue-screen');
+    await cartIsNew();
     const [o] = server.openOrders();
 
-    click('open-close-shift');
+    nav('open-close-shift');
     await screen.findByTestId('close-shift-screen');
     click('close-review');
     expect(tid('close-error')).toBeInTheDocument(); // chưa nhập
@@ -783,7 +849,7 @@ describe('đóng ca', () => {
     click('open-shift');
     // Đơn của ca trước vẫn ở hàng đợi, ca Mai thu được
     expect(await screen.findByTestId(`queue-card-${o.id}`)).toBeInTheDocument();
-    fireEvent.click(tid(`queue-open-${o.id}`));
+    fireEvent.click(tid(`queue-card-${o.id}`));
     fireEvent.click(await screen.findByTestId('order-pay-exact'));
     await screen.findByTestId('queue-empty');
     const paid = server.order(o.id);
@@ -794,7 +860,7 @@ describe('đóng ca', () => {
   it('quầy tắt đếm dĩa, bật đếm lon: chỉ hiện ô hộp, lon, tiền; xác nhận ghi đúng các số đó', async () => {
     server.catalog.profile = { ...server.catalog.profile, default_cans: 48, count_items: ['cash', 'boxes', 'cans'] };
     await startShift('s1');
-    click('open-close-shift');
+    nav('open-close-shift');
     await screen.findByTestId('close-shift-screen');
     expect(screen.queryByTestId('close-plates')).not.toBeInTheDocument();
     fireEvent.change(tid('close-boxes'), { target: { value: '186' } });
@@ -850,7 +916,7 @@ describe('ghi nợ & thu nợ', () => {
     const c = server.lastOp('pay_order').payload.customer!;
     expect(c).toMatchObject({ is_new: true, name: 'Hùng', description: 'xe ôm', phone: null });
 
-    click('open-debt');
+    nav('open-debt');
     fireEvent.change(await screen.findByTestId('debt-search'), { target: { value: 'hung' } });
     expect(await screen.findByTestId(`customer-suggest-${c.id}`)).toHaveTextContent('nợ 39.000');
   });
@@ -864,7 +930,7 @@ describe('ghi nợ & thu nợ', () => {
     await screen.findByTestId('queue-flash');
     const o = server.orders.find((x) => x.customer_id === 'c-gv')!;
 
-    click('open-debt');
+    nav('open-debt');
     fireEvent.change(await screen.findByTestId('debt-search'), { target: { value: 'giao vien' } });
     fireEvent.click(await screen.findByTestId('customer-suggest-c-gv'));
     const row = await screen.findByTestId(`debt-open-${o.id}`);
@@ -881,7 +947,7 @@ describe('ghi nợ & thu nợ', () => {
 
   it('D19: thu nợ 50.000 tiền mặt: dư nợ giảm đúng ngay trên máy; không thu quá dư nợ', async () => {
     await startShift();
-    click('open-debt');
+    nav('open-debt');
     await screen.findByTestId('debt-screen');
     // Ô tìm trống: hiện sẵn khách đang nợ
     expect(await screen.findByTestId('customer-suggest-c-pb')).toHaveTextContent('120.000');
@@ -918,7 +984,7 @@ describe('chi tiền (khoản chi giữa ca)', () => {
   const rows = () => screen.queryAllByTestId('expense-row');
 
   async function openExpenses() {
-    click('open-expenses');
+    nav('open-expenses');
     await screen.findByTestId('expense-screen');
   }
 
@@ -1040,7 +1106,7 @@ describe('nhiều máy cùng hồ sơ tablet (realtime)', () => {
     await newOrder();
     fireEvent.click(screen.getByTestId(`menu-combo-${COMBO_XOI_FULL.id}`));
     click('order-save');
-    await screen.findByTestId('queue-screen');
+    await cartIsNew();
     const b = await otherDevice();
     const theirs = await b.pos.createOrder({ point_id: 'xoi-a', dine_type: 'takeaway', label: 'máy B', items: [combo()] });
     expect(await screen.findByTestId(`queue-card-${theirs.id}`)).toBeInTheDocument();
@@ -1072,9 +1138,9 @@ describe('nhiều máy cùng hồ sơ tablet (realtime)', () => {
     await newOrder();
     addProduct(XOI_GA.id);
     click('order-save');
-    await screen.findByTestId('queue-screen');
+    await cartIsNew();
     const [o] = server.openOrders();
-    fireEvent.click(await screen.findByTestId(`queue-open-${o.id}`));
+    fireEvent.click(await screen.findByTestId(`queue-card-${o.id}`));
     await screen.findByTestId('order-screen');
     const b = await otherDevice();
     await b.pos.updateOrder(o.id, { items: o.items.map((it) => ({ ...it, qty: 3 })) });
@@ -1087,13 +1153,15 @@ describe('nhiều máy cùng hồ sơ tablet (realtime)', () => {
     await newOrder();
     fireEvent.click(screen.getByTestId(`menu-combo-${COMBO_XOI_FULL.id}`));
     click('order-save');
-    await screen.findByTestId('queue-screen');
+    await cartIsNew();
     const [o] = server.openOrders();
     // Thanh toán thẳng trên server, không báo realtime (kênh của máy này đang trễ)
     Object.assign(server.order(o.id)!, { status: 'paid' });
-    fireEvent.click(tid(`queue-serve-btn-${o.id}`));
-    expect(await screen.findByTestId('queue-error')).toHaveTextContent('thanh toán hoặc xóa');
+    click(`queue-card-${o.id}`);
+    fireEvent.click(await screen.findByTestId('order-serve'));
     await waitFor(() => expect(cards()).toHaveLength(0));
+    expect(await screen.findByTestId('queue-flash')).toHaveTextContent('thanh toán hoặc xóa');
+    await cartIsNew();
   });
 });
 
@@ -1110,7 +1178,7 @@ describe('mất kết nối', () => {
     expect(tid('order-total')).toHaveTextContent('39.000');
     server.offline = false;
     click('order-save');
-    await screen.findByTestId('queue-screen');
+    await cartIsNew();
     expect(server.kinds).toEqual(['open_shift', 'create_order']);
     await waitFor(() => expect(tid('conn-status')).toHaveAttribute('data-state', 'live'));
   });
@@ -1123,18 +1191,18 @@ describe('mất kết nối', () => {
     click('order-save');
     expect(await screen.findByTestId('order-error')).toHaveTextContent('mất kết nối');
     click('order-save');
-    await screen.findByTestId('queue-screen');
+    await cartIsNew();
     expect(server.kinds).toEqual(['open_shift', 'create_order']);
     expect(server.openOrders()).toHaveLength(1);
 
     const [o] = server.openOrders();
-    fireEvent.click(tid(`queue-open-${o.id}`));
+    fireEvent.click(tid(`queue-card-${o.id}`));
     click('order-pay');
     fireEvent.click(await screen.findByTestId('cash-exact'));
     server.dropNextResponse = true;
     click('pay-confirm');
     // Lần gửi đầu đã ghi trên server ⇒ máy tải lại thấy đơn đã thanh toán, về hàng đợi; không gửi thêm lần nào.
-    await screen.findByTestId('queue-screen');
+    await cartIsNew();
     expect(server.kinds.filter((k) => k === 'pay_order')).toHaveLength(1);
     expect(server.order(o.id)?.status).toBe('paid');
   });

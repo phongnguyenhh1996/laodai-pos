@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeftRight, Banknote, Bike, ChefHat, ChevronLeft, ChevronRight, ChevronUp, Check, MapPin, Minus, Plus, Receipt, Save, ShoppingBag, Soup, Tag, Trash2, UtensilsCrossed, Wallet, X } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { ArrowLeftRight, Banknote, Bike, ChefHat, ChevronRight, ChevronUp, Check, MapPin, Minus, Plus, Receipt, Save, ShoppingBag, Soup, Tag, Trash2, UtensilsCrossed, Wallet, X } from 'lucide-react';
 import { v7 as uuidv7 } from 'uuid';
 import {
   addCombo,
@@ -39,11 +39,11 @@ import { pos } from '@/lib/pos';
 import { Splash, errorMessage } from '@/app/ui';
 import { useIsTablet } from '@/app/useMediaQuery';
 import { MenuBoard } from './MenuBoard';
-import { Notice, Sheet, useTablet } from './parts';
+import { Notice, Sheet, useTablet, type LeaveGuard } from './parts';
 import { useDebtBook } from './debt';
 import { ShipCustomerPicker } from './ShipCustomer';
 import { ShipSheet } from './ShipSheet';
-import type { QueueFlash } from './QueueScreen';
+import { ReprintKitchenButton } from './PrintBar';
 
 const DINE_TYPES: ReadonlyArray<{ id: DineType; Icon: typeof ShoppingBag }> = [
   { id: 'dinein', Icon: UtensilsCrossed },
@@ -56,23 +56,49 @@ const SHIP_MODES: readonly ShipMode[] = ['shop', 'external'];
 const DELETE_REASONS = (['mistake', 'customer_left', 'customer_changed', 'other'] as const).map((id) => ({ id, label: DELETE_REASON_LABELS[id] }));
 
 /** Nút thao tác phụ: điện thoại ba nút một hàng 44px, biểu tượng cạnh chữ (Figma MS1). */
-const ACTION_BTN = 'min-h-[44px] gap-1.5 px-1 text-[13px] md:min-h-[52px] md:gap-2 md:px-4 md:text-base';
+const ACTION_BTN = 'min-h-[44px] gap-1.5 whitespace-nowrap px-1 text-[13px] md:min-h-[52px] md:gap-2 md:px-4 md:text-base';
 
 /** Chờ ngần này sau lần sửa cuối mới tự lưu (gõ nhãn, bấm +/− liên tục chỉ ra một update_order). */
 const AUTOSAVE_MS = 800;
 
-type Dialog = { kind: 'toppings'; product: Product; initial: string[] } | { kind: 'delete' } | { kind: 'discard' } | null;
+type Dialog = { kind: 'toppings'; product: Product; initial: string[] } | { kind: 'delete' } | { kind: 'discard'; go: () => void } | null;
+
+/** Giỏ xong việc với đơn đang sửa ⇒ về đơn mới trống. */
+export interface OrderDone {
+  /** Thông báo một lần (đã thu / đã xóa / đơn đổi ở máy khác). */
+  flash?: string;
+  /** Đơn vừa thanh toán trên máy này: thẻ rời hàng đợi kèm dấu "Đã thanh toán". */
+  paidId?: string;
+}
 
 /**
- * Tạo / sửa đơn (mục 4.2): tab điểm bán, combo (1 chạm), món → topping, Tại chỗ / Mang về / Ship (+ phí, địa chỉ), nhãn.
+ * Thực đơn + giỏ của màn Bán hàng (mục 4.2): tab điểm bán, combo (1 chạm), món → topping, Tại chỗ / Mang về / Ship (+ phí, địa chỉ), nhãn.
+ * `orderId` = đơn đang chọn trong hàng đợi; null = đơn mới. Màn Bán hàng dựng lại component này mỗi khi đổi đơn đang chọn.
  * Điện thoại (Figma MS1 / MS2): chọn Ship không mở bàn phím; địa chỉ + khách nhập trong bảng riêng.
  * Nhân viên thấy giá nhưng không có ô nào để sửa giá hay giảm giá.
  * Đơn mới chỉ ghi lên server khi bấm Tạo đơn / Đã ra món / Thanh toán.
  * Đơn đã lưu thì tự lưu mỗi khi sửa (gom các chạm liên tiếp thành một update_order).
- * Máy khác sửa / thanh toán / xóa cùng đơn: đơn trên màn này cập nhật theo (nếu chưa sửa dở) hoặc về hàng đợi.
+ * Máy khác sửa / thanh toán / xóa cùng đơn: đơn trong giỏ cập nhật theo (nếu chưa sửa dở) hoặc về đơn mới kèm thông báo.
+ *
+ * Phần tử gốc là `display: contents`: thực đơn và giỏ đặt thẳng vào lưới của màn Bán hàng (cột giữa / cột phải).
  */
-export function OrderScreen() {
-  const { orderId } = useParams();
+export function OrderEditor({
+  orderId,
+  leaveRef,
+  onDone,
+  onClose,
+  hideCard,
+}: {
+  orderId: string | null;
+  /** Màn Bán hàng gọi trước khi đổi đơn đang chọn / sang màn khác (luật rời đơn). */
+  leaveRef: MutableRefObject<LeaveGuard | null>;
+  /** Lưu / ra món / thanh toán / xóa xong, hoặc đơn biến mất ⇒ về đơn mới trống. */
+  onDone: (r: OrderDone) => void;
+  /** Bỏ chọn đơn (nút ✕), đã qua luật rời đơn. */
+  onClose: () => void;
+  /** Ẩn thẻ của đơn vừa tạo đang thu tiền ngay (null = hiện lại). */
+  hideCard: (id: string | null) => void;
+}) {
   const { catalog, orders, lastPointId, setLastPointId } = useTablet();
   const navigate = useNavigate();
   const [saved, setSaved] = useState<Order | null>(null);
@@ -80,8 +106,8 @@ export function OrderScreen() {
   const [dialog, setDialog] = useState<Dialog>(null);
   /** Dòng đang chọn để đổi món: bấm món / combo kế tiếp sẽ thay dòng này thay vì thêm mới. */
   const [swapId, setSwapId] = useState<string | null>(null);
-  /** Điện thoại: giỏ đang mở rộng (tablet luôn hiện đủ). */
-  const [cartOpen, setCartOpen] = useState(false);
+  /** Điện thoại: giỏ đang mở rộng (tablet luôn hiện đủ). Chọn đơn trong hàng đợi ⇒ mở sẵn. */
+  const [cartOpen, setCartOpen] = useState(!!orderId);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   /** Chế độ báo hết món (mục 4.8) + món đang gửi lên server. */
@@ -102,8 +128,10 @@ export function OrderScreen() {
   const queueRef = useRef<Promise<unknown>>(Promise.resolve());
   /** Id của đơn mới, cố định cho tới khi tạo xong: bấm lại sau lỗi mạng không tạo đơn thứ hai. */
   const newIdRef = useRef(uuidv7());
-  /** Đơn được tạo ở lần mở màn này ⇒ về hàng đợi thẻ hiện ra có hiệu ứng. */
+  /** Đơn được tạo trong giỏ này (thu tiền ngay ⇒ không hiện thẻ "Đã thanh toán"). */
   const createdHere = useRef<string | null>(null);
+  /** Đã báo xong (về đơn mới): đổi URL là chuyển tiếp chậm, trong lúc chờ không phản ứng với đơn biến mất nữa. */
+  const finished = useRef(false);
 
   /** Ghi bản nháp: đơn mới ⇒ create_order; đơn cũ có thay đổi ⇒ update_order. */
   async function persist(): Promise<Order> {
@@ -160,15 +188,29 @@ export function OrderScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoPending, draft, typingAddress, shipOpen]);
 
-  // Tablet tắt màn / chuyển app giữa chừng: ghi luôn phần đang chờ.
+  // Tablet tắt màn / chuyển app giữa chừng: ghi luôn phần đang chờ. Rời giỏ (vd. nút Back của trình duyệt) cũng vậy.
   useEffect(() => {
     const onHide = () => {
       if (document.visibilityState === 'hidden') flushAuto().catch(() => undefined);
     };
     document.addEventListener('visibilitychange', onHide);
-    return () => document.removeEventListener('visibilitychange', onHide);
+    return () => {
+      document.removeEventListener('visibilitychange', onHide);
+      flushAuto().catch(() => undefined);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Màn Bán hàng gọi luật rời đơn qua `leaveRef` (hàm cố định cho cả vòng đời giỏ này, luôn chạy bản mới nhất).
+  const latestLeave = useRef<LeaveGuard>((go) => go());
+  const stableLeave = useRef<LeaveGuard>((go) => latestLeave.current(go));
+  leaveRef.current = stableLeave.current;
+  useEffect(
+    () => () => {
+      if (leaveRef.current === stableLeave.current) leaveRef.current = null;
+    },
+    [leaveRef],
+  );
 
   const points = useMemo(() => (catalog ? tabletPoints(catalog.profile, catalog.points) : []), [catalog]);
   const book = useDebtBook();
@@ -179,7 +221,11 @@ export function OrderScreen() {
   // Nạp đơn (sửa) hoặc dựng bản nháp mới ở điểm bán gần nhất.
   useEffect(() => {
     if (orderId) {
-      if (!remote) return void navigate('/', { replace: true }); // đã thanh toán / đã xóa / không có
+      if (!remote) {
+        // đã thanh toán / đã xóa / không có
+        finished.current = true;
+        return void onDone({});
+      }
       adopt(remote);
     } else if (!draft && points.length > 0) {
       setDraft(newDraft(points.find((p) => p.id === lastPointId) ?? points[0], pos.cachedShipDefaults()));
@@ -201,20 +247,22 @@ export function OrderScreen() {
   }, [orderId]);
 
   // Máy khác vừa đổi đơn này. Đang sửa dở / đang lưu ⇒ giữ bản trên màn (lần lưu tới ghi đè);
-  // chưa sửa gì ⇒ hiện bản mới. Đơn bị thanh toán / xóa ở máy khác ⇒ về hàng đợi.
+  // chưa sửa gì ⇒ hiện bản mới. Đơn bị thanh toán / xóa ở máy khác ⇒ về đơn mới kèm thông báo.
   useEffect(() => {
     const s = savedRef.current;
-    if (!s || busyRef.current) return;
+    if (!s || busyRef.current || finished.current) return;
     if (!remote) {
-      navigate('/', { replace: true, state: { flash: `Đơn ${s.code} đã được thanh toán hoặc xóa ở máy khác` } satisfies QueueFlash });
+      finished.current = true;
+      onDone({ flash: `Đơn ${s.code} đã được thanh toán hoặc xóa ở máy khác` });
       return;
     }
     if (remote === s) return;
     const x = draftRef.current;
     if (x && !draftChanged(x, s)) adopt(remote);
     else setSaved(remote);
+    // `busy`: đơn biến mất đúng lúc đang ghi (vd. server từ chối vì máy khác vừa thu) ⇒ xét lại khi ghi xong.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [remote]);
+  }, [remote, busy]);
 
   function adopt(o: Order) {
     savedRef.current = o;
@@ -249,17 +297,18 @@ export function OrderScreen() {
     if (pointGone && draft && draft.items.length === 0) setDraft(switchPoint(draft, points, points[0]));
   }, [pointGone, draft, points]);
 
-  if (!catalog) return <Splash />;
+  const cell = 'min-h-0 md:col-start-1 md:row-start-2';
+  if (!catalog) return <div className={cell}><Splash /></div>;
   if (points.length === 0) {
     return (
-      <main className="p-6">
+      <div className={`${cell} p-6`}>
         <p data-testid="menu-no-points" className="text-ink-subtle">
           Quầy này chưa có điểm bán nào. Nhờ chủ chọn điểm bán trong Cài đặt.
         </p>
-      </main>
+      </div>
     );
   }
-  if (!draft) return <Splash />;
+  if (!draft) return <div className={cell}><Splash /></div>;
 
   const cat = catalog;
   const d = draft;
@@ -358,8 +407,10 @@ export function OrderScreen() {
     }
   }
 
-  const done = (flash?: string, extra?: Omit<QueueFlash, 'flash'>) =>
-    navigate('/', { replace: true, state: { flash, created: createdHere.current ?? undefined, ...extra } satisfies QueueFlash });
+  const done = (r: OrderDone = {}) => {
+    finished.current = true;
+    onDone(r);
+  };
 
   const save = () => run(async () => {
     await flush();
@@ -374,31 +425,41 @@ export function OrderScreen() {
     const o = await flush();
     navigate(`/order/${o.id}/pay`);
   });
-  /** Thu đủ tiền mặt ngay từ màn đơn: combo + thanh toán đủ tiền chỉ mất 3 chạm từ hàng đợi. */
+  /** Thu đủ tiền mặt ngay từ giỏ: combo + thanh toán đủ tiền chỉ mất 2–3 chạm từ màn Bán hàng. */
   const payExact = () => run(async () => {
-    const o = await flush();
-    await pos.payOrder(o.id, { method: 'cash', cash_given: o.total });
-    // Đơn đã có trong hàng đợi trước khi mở ⇒ thẻ hiện "Đã thanh toán" rồi biến mất; đơn vừa tạo thì không hiện gì.
-    const fresh = createdHere.current === o.id;
-    done(`Đã thu ${formatVnd(o.total)} – đơn ${o.code}`, fresh ? { created: undefined } : { paid: o });
+    // Đơn mới: thẻ không hiện trong hàng đợi (chỉ lóe lên rồi mất). Đơn đã có thẻ ⇒ thẻ hiện "Đã thanh toán" rồi biến mất.
+    const fresh = !savedRef.current || createdHere.current === savedRef.current.id;
+    if (fresh) hideCard(savedRef.current?.id ?? newIdRef.current);
+    try {
+      const o = await flush();
+      await pos.payOrder(o.id, { method: 'cash', cash_given: o.total });
+      done({ flash: `Đã thu ${formatVnd(o.total)} – đơn ${o.code}`, paidId: fresh ? undefined : o.id });
+    } catch (e) {
+      if (fresh) hideCard(null);
+      throw e;
+    }
   });
   const remove = (reason: DeleteReason) => run(async () => {
     if (!saved) return;
     await pos.deleteOrder(saved.id, reason);
     setDialog(null);
-    done(`Đã xóa đơn ${saved.code}`);
+    done({ flash: `Đã xóa đơn ${saved.code}` });
   });
 
-  function back() {
-    // Đơn đã lưu còn món: ghi nốt phần đang chờ tự lưu rồi về, không hỏi.
-    // (Đơn ship bị xóa mất địa chỉ / thiếu tiền trả shipper ⇒ không lưu được: hỏi bỏ thay đổi.)
+  /**
+   * Luật rời đơn (bỏ chọn, chọn thẻ khác, sang màn khác): đơn đã lưu ⇒ ghi nốt phần đang chờ tự lưu rồi đi, không hỏi.
+   * Đơn mới đã có món, hoặc đơn ship không lưu được (mất địa chỉ / thiếu tiền trả shipper) ⇒ hỏi "Bỏ thay đổi?".
+   */
+  function requestLeave(go: () => void) {
+    if (busyRef.current) return;
     if (saved && !problem) void run(async () => {
       await flushAuto();
-      navigate('/', { state: { created: createdHere.current ?? undefined } satisfies QueueFlash });
+      go();
     });
-    else if (dirty) setDialog({ kind: 'discard' });
-    else navigate('/');
+    else if (dirty) setDialog({ kind: 'discard', go });
+    else go();
   }
+  latestLeave.current = requestLeave;
 
   const itemCount = d.items.reduce((s, it) => s + it.qty, 0);
   const isShip = d.dine_type === 'delivery';
@@ -408,54 +469,12 @@ export function OrderScreen() {
   const feeNoun = external ? 'Phụ thu' : 'Phí ship';
   const cartQty = (productId: string) => d.items.reduce((s, it) => s + (it.product_id === productId ? it.qty : 0), 0);
 
-  // Điện thoại: đầu đơn ở trên, thực đơn cuộn ở giữa, giỏ (thu gọn còn một dòng) + nút thao tác luôn ở đáy:
+  // Điện thoại: hàng đợi ở trên, thực đơn cuộn ở giữa, giỏ (thu gọn còn một dòng) + nút thao tác luôn ở đáy:
   // bấm món là thấy ngay số món / tổng tiền, không phải cuộn xuống mới tạo đơn được.
-  // Tablet (md+), theo Figma Makaryo: thanh trên + thực đơn bên trái, cột giỏ trắng bên phải (đầu đơn ở đầu cột).
+  // Tablet (md+), theo Figma: hàng đợi + thực đơn ở cột giữa, cột giỏ trắng bên phải (đầu đơn ở đầu cột).
   return (
-    <main
-      data-testid="order-screen"
-      data-point={d.point_id}
-      className="grid h-full grid-cols-[auto_minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)_auto] md:grid-cols-[minmax(0,1fr)_380px] md:grid-rows-[auto_minmax(0,1fr)] lg:grid-cols-[minmax(0,1fr)_390px]"
-    >
-      <div className="col-start-1 row-start-1 flex items-center border-b border-line bg-surface py-2 pl-4 md:h-[76px] md:px-6">
-        <button type="button" className="btn btn-secondary min-h-[40px] pl-3 pr-4 text-[15px] md:min-h-[44px]" onClick={back} data-testid="order-back">
-          <ChevronLeft aria-hidden className="h-5 w-5" />
-          Hàng đợi
-        </button>
-      </div>
-
-      <div className="col-start-2 row-start-1 flex items-center justify-end gap-3 border-b border-line bg-surface py-2 pr-4 md:justify-start md:border-b-0 md:border-l md:px-5 md:pb-2 md:pt-4">
-        <span aria-hidden className="icon-tile hidden h-11 w-11 rounded-xl bg-brand-soft text-brand-strong md:flex">
-          <Receipt className="h-[22px] w-[22px]" />
-        </span>
-        {saved ? (
-          <span className="flex min-w-0 flex-col items-end md:items-start">
-            <span className="text-xl font-bold leading-tight">
-              Đơn #
-              <span className="font-mono tracking-wider" data-testid="order-code">
-                {saved.code}
-              </span>
-            </span>
-            <span
-              className={`badge mt-0.5 rounded-md px-2 text-xs ${autoPending ? 'bg-warning-soft text-warning-strong' : empty ? 'bg-surface-sunken text-ink-muted' : 'bg-success-soft text-success-strong'}`}
-              data-testid="order-autosave"
-              data-state={autoPending ? 'saving' : 'saved'}
-            >
-              <span aria-hidden className={`dot h-1.5 w-1.5 ${autoPending ? 'bg-warning' : empty ? 'bg-ink-subtle' : 'bg-success'}`} />
-              {autoPending ? 'Đang lưu…' : empty ? 'Chưa lưu: đơn trống' : 'Đã lưu'}
-            </span>
-          </span>
-        ) : (
-          <span className="flex min-w-0 flex-col items-end md:items-start">
-            <span className="text-xl font-bold leading-tight" data-testid="order-code">
-              Đơn mới
-            </span>
-            <span className="text-[13px] text-ink-subtle">{empty ? 'Chưa có món' : 'Chưa lưu'}</span>
-          </span>
-        )}
-      </div>
-
-      <div className="col-span-2 row-start-2 flex min-h-0 flex-col gap-3 overflow-y-auto px-4 py-3 md:col-span-1 md:col-start-1 md:p-5">
+    <div data-testid="order-screen" data-point={d.point_id} data-order={saved?.id} className="contents">
+      <div className="row-start-2 flex min-h-0 flex-col gap-3 overflow-y-auto px-4 py-3 md:col-start-1 md:p-5">
         {swapLine && (
           <div data-testid="swap-banner" role="status" className="sticky top-0 z-10 flex items-center gap-3 rounded-xl border border-brand-line bg-brand-soft px-4 py-3 text-lg font-medium text-brand-deep shadow-card">
             <ArrowLeftRight aria-hidden className="h-5 w-5 shrink-0" />
@@ -491,9 +510,66 @@ export function OrderScreen() {
 
       <aside
         data-testid="cart"
-        className="col-span-2 row-start-3 flex max-h-[78vh] flex-col gap-2 rounded-t-3xl bg-surface px-4 pb-[max(16px,env(safe-area-inset-bottom))] pt-2 shadow-raised md:col-span-1 md:col-start-2 md:row-start-2 md:max-h-none md:min-h-0 md:gap-3 md:rounded-none md:border-l md:border-line md:px-5 md:pb-5 md:pt-1 md:shadow-none"
+        className="row-start-3 flex max-h-[78vh] min-w-0 flex-col gap-2 rounded-t-3xl bg-surface px-4 pb-[max(16px,env(safe-area-inset-bottom))] pt-2 shadow-raised md:col-start-2 md:row-span-2 md:row-start-1 md:max-h-none md:min-h-0 md:gap-3 md:rounded-none md:border-l md:border-line md:px-5 md:pb-5 md:pt-4 md:shadow-none"
       >
         <span aria-hidden className="mx-auto h-1 w-10 shrink-0 rounded-full bg-line-strong md:hidden" />
+        {/* Đầu giỏ: mã đơn + trạng thái lưu, in lại phiếu bếp, ✕ bỏ chọn. Điện thoại chỉ hiện khi đang chọn đơn. */}
+        <div className={`${saved ? 'flex' : 'hidden md:flex'} shrink-0 items-center gap-3`}>
+          <span aria-hidden className={`icon-tile hidden h-11 w-11 rounded-xl md:flex ${saved ? 'bg-brand text-white' : 'bg-brand-soft text-brand-strong'}`}>
+            {saved ? <Receipt className="h-[22px] w-[22px]" /> : <Plus className="h-[22px] w-[22px]" />}
+          </span>
+          {saved ? (
+            <span className="flex min-w-0 flex-1 flex-col">
+              <span className="truncate text-xl font-bold leading-tight">
+                Đơn #
+                <span className="font-mono tracking-wider" data-testid="order-code">
+                  {saved.code}
+                </span>
+              </span>
+              <span className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                <span
+                  className={`badge rounded-md px-2 text-xs ${autoPending ? 'bg-warning-soft text-warning-strong' : empty ? 'bg-surface-sunken text-ink-muted' : 'bg-success-soft text-success-strong'}`}
+                  data-testid="order-autosave"
+                  data-state={autoPending ? 'saving' : 'saved'}
+                >
+                  <span aria-hidden className={`dot h-1.5 w-1.5 ${autoPending ? 'bg-warning' : empty ? 'bg-ink-subtle' : 'bg-success'}`} />
+                  {autoPending ? 'Đang lưu…' : empty ? 'Chưa lưu: đơn trống' : 'Đã lưu'}
+                </span>
+                {saved.status === 'open' ? (
+                  <span className="badge rounded-md bg-warning-soft text-xs text-warning-strong" data-testid="order-status">
+                    <ChefHat aria-hidden className="h-3.5 w-3.5" />
+                    Chờ ra món
+                  </span>
+                ) : (
+                  <span className="badge rounded-md bg-brand-soft text-xs text-brand-deep" data-testid="order-status">
+                    <Wallet aria-hidden className="h-3.5 w-3.5" />
+                    Chờ thanh toán
+                  </span>
+                )}
+              </span>
+            </span>
+          ) : (
+            <span className="flex min-w-0 flex-1 flex-col">
+              <span className="text-xl font-bold leading-tight" data-testid="order-code">
+                Đơn mới
+              </span>
+              <span className="text-[13px] text-ink-subtle">{empty ? 'Chưa có món' : 'Chưa lưu'}</span>
+            </span>
+          )}
+          {saved && <ReprintKitchenButton orderId={saved.id} code={saved.code} testId="order-reprint" />}
+          {saved && (
+            <button
+              type="button"
+              className="btn btn-secondary h-11 min-h-0 w-11 min-w-0 shrink-0 px-0"
+              onClick={() => requestLeave(onClose)}
+              aria-label="Bỏ chọn, về đơn mới"
+              title="Bỏ chọn, về đơn mới"
+              data-testid="order-deselect"
+            >
+              <X aria-hidden className="h-5 w-5 text-ink-muted" />
+            </button>
+          )}
+        </div>
         {/* Chỉ trên điện thoại: một dòng tóm tắt giỏ, bấm để mở / thu gọn chi tiết (dòng món, nhãn). */}
         <button
           type="button"
@@ -512,7 +588,7 @@ export function OrderScreen() {
           </span>
           <span className="flex min-w-0 flex-1 flex-col">
             <span className="truncate text-[15px] font-semibold leading-tight">
-              {empty ? 'Chưa có món' : `${DINE_LABELS[d.dine_type]}${d.label.trim() ? ` · ${d.label.trim()}` : ''} · ${itemsSummary(d.items)}`}
+              {empty ? (saved ? 'Chưa có món' : 'Đơn mới · chưa có món') : `${DINE_LABELS[d.dine_type]}${d.label.trim() ? ` · ${d.label.trim()}` : ''} · ${itemsSummary(d.items)}`}
             </span>
             {shipFee > 0 || payout > 0 ? (
               <span className="num truncate text-xs font-medium text-ink-subtle" data-testid="cart-ship-breakdown">
@@ -831,18 +907,35 @@ export function OrderScreen() {
       )}
 
       {dialog?.kind === 'discard' && (
-        <Sheet testId="discard-sheet" title="Bỏ các thay đổi chưa lưu?">
+        <Sheet
+          testId="discard-sheet"
+          title="Bỏ thay đổi?"
+          subtitle={
+            saved
+              ? `Đơn ${saved.code} chưa lưu được (${noAddress ? 'thiếu địa chỉ giao' : noPayout ? 'chưa chọn tiền trả shipper' : 'không còn món'}). Rời đơn sẽ bỏ các thay đổi.`
+              : `Đơn mới chưa lưu${itemCount > 0 ? ` có ${itemCount} món` : ''}. Rời đơn sẽ bỏ các thay đổi này.`
+          }
+        >
           <div className="grid grid-cols-2 gap-3">
             <button type="button" className="btn btn-secondary" onClick={() => setDialog(null)} data-testid="discard-no">
               Ở lại
             </button>
-            <button type="button" className="btn btn-danger" onClick={() => navigate('/')} data-testid="discard-yes">
+            <button
+              type="button"
+              className="btn btn-danger"
+              onClick={() => {
+                const go = dialog.go;
+                setDialog(null);
+                go();
+              }}
+              data-testid="discard-yes"
+            >
               Bỏ thay đổi
             </button>
           </div>
         </Sheet>
       )}
-    </main>
+    </div>
   );
 }
 

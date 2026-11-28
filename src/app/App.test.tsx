@@ -81,10 +81,9 @@ describe('cổng tablet', () => {
     go('/');
     expect(await screen.findByTestId('staff-s1')).toBeInTheDocument();
     expect(screen.queryByTestId('staff-s9')).not.toBeInTheDocument();
-    // Bảng chọn món nằm trong màn tạo đơn (sau khi mở ca)
+    // Bảng chọn món nằm trong màn Bán hàng (sau khi mở ca)
     fireEvent.click(screen.getByTestId('staff-s1'));
     fireEvent.click(screen.getByTestId('open-shift'));
-    fireEvent.click(await screen.findByTestId('new-order'));
     await screen.findByTestId('menu-board');
     // Hồ sơ A: Xôi A + Cơm gà, không có Xôi B
     expect(screen.getByTestId('point-tab-xoi-a')).toHaveAttribute('aria-selected', 'true');
@@ -128,7 +127,6 @@ describe('cổng tablet', () => {
     go('/');
     fireEvent.click(await screen.findByTestId('staff-s1'));
     fireEvent.click(screen.getByTestId('open-shift'));
-    fireEvent.click(await screen.findByTestId('new-order'));
     expect(await screen.findByTestId('menu-no-points')).toBeInTheDocument();
   });
 

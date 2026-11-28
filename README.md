@@ -106,7 +106,7 @@ src/print/         in phiếu (SPEC mục 12): `layout.ts` (phiếu → dòng, h
                    `render.ts` (canvas 384 điểm → ảnh 1-bit), `escpos.ts` (GS v 0), `printer.ts` (máy in: SPP thật / giả / không có),
                    `service.ts` (tạo / nhận / báo kết quả lệnh `print_jobs`, nghe lệnh từ xa), `native.ts` (cầu nối plugin Capacitor)
 src/lib/print.ts   nối in vào bán hàng: tự in theo công tắc quầy, gom phiếu "ĐÃ SỬA", `usePrint()` cho giao diện
-src/tablet/        màn bán hàng: mở ca → hàng đợi → tạo / sửa / xóa đơn → thanh toán (TM, CK, ghi nợ) → thu nợ → đóng ca (đếm mù)
+src/tablet/        màn bán hàng: mở ca → Bán hàng (hàng đợi + thực đơn + giỏ: tạo / sửa / xóa đơn) → thanh toán (TM, CK, ghi nợ) → thu nợ → đóng ca (đếm mù)
 src/app|owner      khung app, chế độ chủ; trang đầu = Tổng quan hôm nay (realtime, `owner/live.ts`),
                    `owner/orders/` = Đơn (lọc ngày / điểm / nhân viên / hình thức / trạng thái) + sửa đơn đã thanh toán,
                    `owner/reports/` = Báo cáo (ngày / điểm / ca / nhân viên, đối chiếu chuyển khoản, món bán chạy),

@@ -56,3 +56,21 @@ export function buildQueue(
   const payCards = pay.map(card('pay'));
   return { serve: serveCards, pay: payCards };
 }
+
+/** Chip lọc của hàng đợi trên màn Bán hàng. */
+export type QueueFilter = 'all' | QueueGroup;
+
+/**
+ * Thẻ hiện trong dải đơn theo chip đang chọn: "Tất cả" ⇒ chờ ra món trước, chờ thanh toán sau
+ * (mỗi nhóm cũ nhất trước); chip nhóm ⇒ chỉ nhóm đó.
+ */
+export function queueStrip<T>(serve: T[], pay: T[], filter: QueueFilter): T[] {
+  if (filter === 'serve') return serve;
+  if (filter === 'pay') return pay;
+  return [...serve, ...pay];
+}
+
+/** Số đơn trên mỗi chip lọc. */
+export function queueCounts(view: QueueView): Record<QueueFilter, number> {
+  return { all: view.serve.length + view.pay.length, serve: view.serve.length, pay: view.pay.length };
+}

@@ -16,7 +16,9 @@ Thêm thuật ngữ mới vào đây ngay khi nó xuất hiện. Chi tiết nghi
 | Mã đơn | `orders.code` | Do server cấp, vd. "3F5" |
 | Số thứ tự | `device_seq` | Do server cấp theo quầy, không trùng giữa các máy |
 | Ra món | `served` | Đã đưa món cho khách, chưa thu tiền |
-| Hàng đợi | — | Màn chính của tablet: các đơn đang mở, màu theo thời gian chờ |
+| Bán hàng | — | Màn chính của tablet và điện thoại: hàng đợi ở trên, thực đơn ở giữa, giỏ (gọi món + thanh toán) bên phải. Thay cho ba màn cũ Hàng đợi / Đơn / Thanh toán |
+| Hàng đợi | — | Dải thẻ các đơn đang mở ở đầu màn Bán hàng, lọc Tất cả / Chờ ra món / Chờ thanh toán, màu theo thời gian chờ. Không còn là màn riêng |
+| Đơn đang chọn | — | Đơn của thẻ đang được bấm trong hàng đợi, đang hiện trong giỏ. Không chọn thẻ nào ⇒ giỏ là đơn mới. Bỏ chọn như bỏ focus: bấm vùng trống của hàng đợi, nút ✕ đầu giỏ hoặc bấm lại thẻ |
 | Món | `products` | Có giá và định mức bao bì (`boxes_*`, `plates_dinein`, `cans`) |
 | Topping | `toppings` | Thêm vào món, có thể cần thêm hộp khi mang về |
 | Combo | `combos` | Món + topping cố định. Giá = tổng, không có giá combo riêng |

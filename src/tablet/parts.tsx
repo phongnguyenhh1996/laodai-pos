@@ -1,4 +1,4 @@
-import { createContext, useContext, type ReactNode } from 'react';
+import { createContext, useContext, type MutableRefObject, type ReactNode } from 'react';
 import { CircleAlert, CircleCheckBig, Info, X } from 'lucide-react';
 import type { Order, ShiftExpense } from '@/domain/types';
 import type { Activation, Catalog, TabletShift } from '@/pos';
@@ -23,6 +23,20 @@ export function useTablet(): TabletCtx {
   const c = useContext(TabletContext);
   if (!c) throw new Error('useTablet() phải nằm trong TabletContext');
   return c;
+}
+
+/**
+ * Rời đơn đang sửa trong giỏ (mục 4.2): gọi `go` khi được rời (đã tự lưu, đã bấm "Bỏ thay đổi", hoặc không có gì để giữ).
+ * Màn Bán hàng đặt hàm này; menu (sidebar / ☰) gọi trước khi sang màn khác.
+ */
+export type LeaveGuard = (go: () => void) => void;
+
+export const LeaveGuardContext = createContext<MutableRefObject<LeaveGuard | null> | null>(null);
+
+/** Hàm rời đơn đang sửa (không có màn Bán hàng ⇒ đi luôn). */
+export function useLeave(): LeaveGuard {
+  const ref = useContext(LeaveGuardContext);
+  return (go) => (ref?.current ? ref.current(go) : go());
 }
 
 /**
