@@ -5,8 +5,9 @@ import { externalShipBadge, shipFeeLabel } from '@/domain/pricing';
 import { buildQueue, queueCounts, queueStrip, type QueueCard, type QueueFilter, type WaitColor } from '@/domain/queue';
 import { DINE_LABELS, type DineType, type Order } from '@/domain/types';
 import { useNow } from '@/app/useLive';
+import { useIsTablet } from '@/app/useMediaQuery';
 import { useTablet } from './parts';
-import { PrintBar } from './PrintBar';
+import { PrinterButton } from './PrinterStatus';
 import { ENTER_MS, EXIT_MS, canAnimate, playEnter, playExit, useFlip } from './useQueueMotion';
 
 const DEFAULT_WAIT = { wait_yellow_min: 5, wait_red_min: 10 };
@@ -80,6 +81,7 @@ export function QueueStrip({
 }) {
   const { catalog, orders } = useTablet();
   const now = useNow(1000);
+  const isTablet = useIsTablet();
   const [filter, setFilter] = useState<QueueFilter>('all');
   const visible = hiddenIds.size > 0 ? orders.filter((o) => !hiddenIds.has(o.id)) : orders;
   const queue = buildQueue(visible, now, catalog?.config ?? DEFAULT_WAIT);
@@ -132,15 +134,18 @@ export function QueueStrip({
   useEffect(() => {
     if (entering.size === 0) return;
     const next = Math.min(...entering.values());
-    const t = setTimeout(
-      () => setEntering((m) => new Map([...m].filter(([, until]) => until > Date.now() + 20))),
-      Math.max(0, next - Date.now()),
-    );
+    const t = setTimeout(() => setEntering((m) => new Map([...m].filter(([, until]) => until > Date.now() + 20))), Math.max(0, next - Date.now()));
     return () => clearTimeout(t);
   }, [entering]);
 
-  const serveSlots = withLeaving(queue.serve, leaving.filter((l) => l.card.group === 'serve'));
-  const paySlots = withLeaving(queue.pay, leaving.filter((l) => l.card.group === 'pay'));
+  const serveSlots = withLeaving(
+    queue.serve,
+    leaving.filter((l) => l.card.group === 'serve'),
+  );
+  const paySlots = withLeaving(
+    queue.pay,
+    leaving.filter((l) => l.card.group === 'pay'),
+  );
   const slots = queueStrip(serveSlots, paySlots, filter);
 
   // Đã ra món ⇒ thẻ trượt sang chỗ mới; các thẻ còn lại trượt vào chỗ trống.
@@ -162,37 +167,36 @@ export function QueueStrip({
   const stop = (e: MouseEvent) => e.stopPropagation();
 
   return (
-    <section
-      data-testid="queue-screen"
-      aria-label="Hàng đợi"
-      onClick={onDeselect}
-      className="flex min-w-0 shrink-0 flex-col gap-2 border-b border-line bg-surface py-2.5 md:gap-3 md:py-4"
-    >
-      <div className="flex items-center gap-1.5 overflow-x-auto px-3 md:gap-2 md:px-5" role="group" aria-label="Lọc đơn">
-        {CHIPS.map((c) => {
-          const on = filter === c.id;
-          return (
-            <button
-              key={c.id}
-              type="button"
-              aria-pressed={on}
-              onClick={(e) => {
-                stop(e);
-                setFilter(c.id);
-              }}
-              data-testid={`queue-filter-${c.id}`}
-              className={`flex min-h-[34px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-[13px] font-medium md:min-h-[40px] md:px-4 md:text-[15px] ${
-                on ? 'border-ink-muted bg-surface font-semibold text-ink ring-1 ring-inset ring-ink-muted' : 'border-line bg-surface text-ink-muted'
-              }`}
-            >
-              {c.dot && <span aria-hidden className={`dot h-2 w-2 ${c.dot}`} />}
-              {c.label}
-              <span className="num rounded-full bg-surface-sunken px-1.5 text-xs font-bold leading-5 text-ink" data-testid={`queue-count-${c.id}`}>
-                {counts[c.id]}
-              </span>
-            </button>
-          );
-        })}
+    <section data-testid="queue-screen" aria-label="Hàng đợi" onClick={onDeselect} className="flex min-w-0 shrink-0 flex-col gap-2 border-b border-line bg-surface py-2.5 md:gap-3 md:py-4">
+      <div className="flex items-center gap-2 px-3 md:gap-3 md:px-5">
+        <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto md:gap-2" role="group" aria-label="Lọc đơn">
+          {CHIPS.map((c) => {
+            const on = filter === c.id;
+            return (
+              <button
+                key={c.id}
+                type="button"
+                aria-pressed={on}
+                onClick={(e) => {
+                  stop(e);
+                  setFilter(c.id);
+                }}
+                data-testid={`queue-filter-${c.id}`}
+                className={`flex min-h-[34px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-[13px] font-medium md:min-h-[40px] md:px-4 md:text-[15px] ${
+                  on ? 'border-ink-muted bg-surface font-semibold text-ink ring-1 ring-inset ring-ink-muted' : 'border-line bg-surface text-ink-muted'
+                }`}
+              >
+                {c.dot && <span aria-hidden className={`dot h-2 w-2 ${c.dot}`} />}
+                {c.label}
+                <span className="num rounded-full bg-surface-sunken px-1.5 text-xs font-bold leading-5 text-ink" data-testid={`queue-count-${c.id}`}>
+                  {counts[c.id]}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        {/* Tablet: trạng thái máy in ở cuối hàng chip (điện thoại: trên header). */}
+        {isTablet && <PrinterButton />}
       </div>
 
       {slots.length === 0 ? (
@@ -222,10 +226,6 @@ export function QueueStrip({
           ))}
         </div>
       )}
-
-      <div className="flex flex-col gap-2 px-3 empty:hidden md:px-5" onClick={stop}>
-        <PrintBar canReprint={(id) => orders.some((o) => o.id === id)} />
-      </div>
     </section>
   );
 }
@@ -280,11 +280,7 @@ function Card({
       } ${leaving ? 'pointer-events-none' : ''}`}
     >
       {leaving === 'paid' && (
-        <span
-          ref={overlayRef}
-          style={{ opacity: 0 }}
-          className="absolute inset-0 z-10 flex items-center justify-center gap-2 rounded-[inherit] bg-success-soft text-success-strong"
-        >
+        <span ref={overlayRef} style={{ opacity: 0 }} className="absolute inset-0 z-10 flex items-center justify-center gap-2 rounded-[inherit] bg-success-soft text-success-strong">
           <span className="icon-tile h-8 w-8 rounded-full bg-success text-white md:h-10 md:w-10">
             <Check className="h-5 w-5" strokeWidth={3} />
           </span>

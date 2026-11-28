@@ -14,7 +14,7 @@ function sell(opts: { combo?: keyof typeof SEED.combos; product?: keyof typeof S
     cy.get(tid('topping-add')).click();
   }
   cy.get(tid('order-pay-exact')).click();
-  cy.get(tid('queue-flash')).should('be.visible');
+  cy.get(tid('toast')).should('be.visible');
 }
 
 /** Bán một combo nhưng bấm "Chuyển khoản" (E24: thực ra khách trả tiền mặt). */
@@ -24,7 +24,7 @@ function sellAsTransfer(combo: keyof typeof SEED.combos, point?: keyof typeof SE
   cy.get(tid(`menu-combo-${SEED.combos[combo]}`)).click();
   cy.get(tid('order-pay-transfer')).click();
   cy.get(tid('pay-transfer-confirm')).click();
-  cy.get(tid('queue-flash')).should('be.visible');
+  cy.get(tid('toast')).should('be.visible');
 }
 
 /** Đóng ca đếm mù trên tablet. */

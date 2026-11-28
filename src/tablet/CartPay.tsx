@@ -12,8 +12,8 @@ import { Notice } from './parts';
 /** Hình thức thanh toán (mục 4.4): một hình thức cho cả đơn, không chia, không nợ một phần. */
 export type PayMethod = 'cash' | 'transfer' | 'debt';
 
-/** Xác nhận thanh toán: `flash` là thông báo khi xong. */
-export type ConfirmPay = (payment: PaymentInput, flash: string) => void;
+/** Xác nhận thanh toán: `toast` là thông báo khi xong. */
+export type ConfirmPay = (payment: PaymentInput, toast: string) => void;
 
 export const PAY_METHODS = [
   { m: 'cash', label: 'Tiền mặt', short: 'Tiền mặt', Icon: Banknote, on: 'border-success bg-success-soft text-success-strong ring-1 ring-inset ring-success', icon: 'text-success' },

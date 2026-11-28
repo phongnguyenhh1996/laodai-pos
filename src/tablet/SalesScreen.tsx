@@ -1,11 +1,9 @@
 import { useContext, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { OrderEditor, type OrderDone } from './OrderEditor';
-import { LeaveGuardContext, Notice, type LeaveGuard } from './parts';
+import { LeaveGuardContext, type LeaveGuard } from './parts';
 import { QueueStrip } from './QueueStrip';
-
-/** Thông báo một lần còn hiện bao lâu. */
-const FLASH_MS = 4000;
+import { useToast } from './Toast';
 
 /**
  * Bán hàng (mục 4.2–4.4), màn chính khi có ca: hàng đợi (dải đơn) ở trên, thực đơn ở giữa, giỏ bên phải
@@ -15,7 +13,7 @@ const FLASH_MS = 4000;
 export function SalesScreen() {
   const [params, setParams] = useSearchParams();
   const selectedId = params.get('order');
-  const [flash, setFlash] = useState<string | null>(null);
+  const toast = useToast();
   /** Tăng mỗi lần giỏ về đơn mới trống: dựng lại giỏ (bản nháp mới, id đơn mới). */
   const [newSeq, setNewSeq] = useState(0);
   const [hiddenIds, setHiddenIds] = useState<ReadonlySet<string>>(new Set());
@@ -32,18 +30,12 @@ export function SalesScreen() {
     };
   }, [navGuard]);
 
-  useEffect(() => {
-    if (!flash) return;
-    const t = setTimeout(() => setFlash(null), FLASH_MS);
-    return () => clearTimeout(t);
-  }, [flash]);
-
   const setSelected = (id: string | null) => setParams(id ? { order: id } : {}, { replace: true });
   const leave = (go: () => void) => (leaveRef.current ? leaveRef.current(go) : go());
 
   function onDone(r: OrderDone) {
     if (r.paidId) paidId.current = r.paidId;
-    if (r.flash) setFlash(r.flash);
+    if (r.toast) toast(r.toast.text, r.toast.tone);
     setHiddenIds(new Set());
     setSelected(null);
     setNewSeq((n) => n + 1);
@@ -77,13 +69,6 @@ export function SalesScreen() {
         }}
         hideCard={(id) => setHiddenIds(id ? new Set([id]) : new Set())}
       />
-      {flash && (
-        <div className="pointer-events-none absolute inset-x-3 top-3 z-30 mx-auto max-w-[600px] rounded-xl shadow-raised md:left-0 md:right-[380px] lg:right-[390px]">
-          <Notice testId="queue-flash" tone="ok">
-            {flash}
-          </Notice>
-        </div>
-      )}
     </main>
   );
 }

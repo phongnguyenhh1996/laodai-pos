@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type MouseEvent, type ReactNode } from 'react';
 import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { CloudOff, HandCoins, KeyRound, Menu as MenuIcon, Power, RefreshCw, ShoppingBag, Store, UserRound, Wallet, type LucideIcon } from 'lucide-react';
+import { CloudOff, HandCoins, KeyRound, Menu as MenuIcon, Power, RefreshCw, ShoppingBag, Store, UserRound, Wallet, X, type LucideIcon } from 'lucide-react';
 import { startTablet, tabletStore } from '@/lib/pos';
 import { startPrinting } from '@/lib/print';
 import { ConnectionBadge } from '@/app/ConnectionBadge';
@@ -9,13 +9,15 @@ import { useTabletName } from '@/app/useActivation';
 import { Splash } from '@/app/ui';
 import { useIsTablet } from '@/app/useMediaQuery';
 import { hhmm } from '@/domain/time';
-import type { Activation } from '@/pos';
+import type { Activation, TabletShift } from '@/pos';
 import { CloseShiftScreen } from './CloseShiftScreen';
 import { DebtScreen } from './DebtScreen';
 import { ExpenseScreen } from './ExpenseScreen';
 import { OpenShiftScreen } from './OpenShiftScreen';
+import { PrintErrorToast, PrinterButton } from './PrinterStatus';
 import { SalesScreen } from './SalesScreen';
-import { LeaveGuardContext, Sheet, TabletContext, useLeave, type LeaveGuard, type TabletCtx } from './parts';
+import { ToastHost } from './Toast';
+import { LeaveGuardContext, TabletContext, useLeave, type LeaveGuard, type TabletCtx } from './parts';
 
 /**
  * Màn bán hàng của tablet (mục 7): chưa có ca ⇒ chọn tên + Mở ca; có ca ⇒ màn Bán hàng (hàng đợi + thực đơn + giỏ), thanh toán, đóng ca.
@@ -25,7 +27,8 @@ import { LeaveGuardContext, Sheet, TabletContext, useLeave, type LeaveGuard, typ
  * Khung theo Figma "Makaryo":
  * - Tablet (md+): sidebar trắng bên trái (tên quầy, ca đang mở, menu Bán hàng / Thu nợ / Chi tiền / Đóng ca, chế độ chủ, kết nối).
  *   Màn Bán hàng có sidebar; chỉ màn thanh toán chiếm trọn màn hình.
- * - Điện thoại: chỉ màn Bán hàng có header một dòng, menu phụ (Thu nợ · Chi tiền · Đóng ca) trong nút ☰; màn khác tự có header riêng.
+ * - Điện thoại: chỉ màn Bán hàng có header một dòng, menu phụ (Thu nợ · Chi tiền · Đóng ca · Chế độ chủ) trong nút ☰; màn khác tự có header riêng.
+ * Trạng thái máy in là icon nhỏ cạnh chỉ báo kết nối; sự kiện một lần (đã thu, in lỗi…) là toast.
  * Mỗi phần tử có data-testid chỉ có một bản trong DOM, đổi vị trí theo cỡ màn bằng CSS.
  */
 export function TabletHome({ activation }: { activation: Activation }) {
@@ -46,10 +49,7 @@ export function TabletHome({ activation }: { activation: Activation }) {
   }, [activation.tablet_profile_id]);
 
   const ctx = useMemo<TabletCtx | null>(
-    () =>
-      snap.open
-        ? { activation, catalog: snap.catalog, shift: snap.open.shift, orders: snap.open.orders, expenses: snap.open.expenses ?? [], lastPointId, setLastPointId }
-        : null,
+    () => (snap.open ? { activation, catalog: snap.catalog, shift: snap.open.shift, orders: snap.open.orders, expenses: snap.open.expenses ?? [], lastPointId, setLastPointId } : null),
     [activation, snap.catalog, snap.open, lastPointId],
   );
 
@@ -57,85 +57,97 @@ export function TabletHome({ activation }: { activation: Activation }) {
   /** Thanh toán: toàn màn hình, không sidebar. */
   const fullScreen = pathname.startsWith('/order');
   const shift = ctx?.shift ?? null;
+  /** Điện thoại có ca: Chế độ chủ nằm trong ☰ (thay thanh đáy cũ). */
+  const phoneMenu = !!shift && !isTablet;
+  const orders = ctx?.orders;
 
   return (
     <LeaveGuardContext.Provider value={leaveGuard}>
-      <div data-testid="tablet-home" className="flex h-full flex-col bg-canvas md:flex-row">
-        <aside
-          className={`${onQueue || !ctx ? 'flex' : 'hidden'} ${fullScreen ? 'md:hidden' : 'md:flex'} shrink-0 items-center gap-2 border-b border-line bg-surface px-3 py-2 md:w-60 md:flex-col md:items-stretch md:gap-5 md:overflow-y-auto md:border-b-0 md:border-r md:px-4 md:pb-5 md:pt-6`}
-        >
-          <div className="order-1 flex min-w-0 items-center gap-2 md:order-none md:gap-3 md:px-1">
-            <span aria-hidden className="icon-tile h-9 w-9 bg-brand text-white md:h-10 md:w-10">
-              <Store className="h-5 w-5 md:h-[22px] md:w-[22px]" />
-            </span>
-            <h1 className="min-w-0 truncate text-lg font-bold md:text-[19px]" data-testid="tablet-name">
-              {tabletName}
-            </h1>
-          </div>
+      <ToastHost extra={<PrintErrorToast canReprint={(id) => !!orders?.some((o) => o.id === id)} />}>
+        <div data-testid="tablet-home" className="flex h-full flex-col bg-canvas md:flex-row">
+          <aside
+            className={`${onQueue || !ctx ? 'flex' : 'hidden'} ${fullScreen ? 'md:hidden' : 'md:flex'} shrink-0 items-center gap-2 border-b border-line bg-surface px-3 py-2 md:w-60 md:flex-col md:items-stretch md:gap-5 md:overflow-y-auto md:border-b-0 md:border-r md:px-4 md:pb-5 md:pt-6`}
+          >
+            <div className="order-1 flex min-w-0 items-center gap-2 md:order-none md:gap-3 md:px-1">
+              <span aria-hidden className="icon-tile h-9 w-9 bg-brand text-white md:h-10 md:w-10">
+                <Store className="h-5 w-5 md:h-[22px] md:w-[22px]" />
+              </span>
+              <h1 className="min-w-0 truncate text-lg font-bold md:text-[19px]" data-testid="tablet-name">
+                {tabletName}
+              </h1>
+            </div>
 
-          {shift && (
-            <div
-              data-testid="shift-staff"
-              className="order-2 flex min-w-0 shrink items-center gap-1.5 rounded-full bg-brand-soft px-2.5 py-1 text-sm font-medium text-brand-deep md:order-none md:flex-col md:items-stretch md:gap-2 md:rounded-xl md:border md:border-line md:bg-surface md:p-3 md:text-ink"
-            >
-              <span className="hidden text-xs font-normal text-ink-subtle md:block">Ca đang mở</span>
-              <span className="flex min-w-0 items-center gap-1.5 md:gap-2.5">
-                <span aria-hidden className="icon-tile rounded-full md:h-9 md:w-9 md:bg-brand-tint md:text-brand-deep">
-                  <UserRound className="h-4 w-4 md:h-[18px] md:w-[18px]" />
-                </span>
-                <span className="flex min-w-0 flex-col">
-                  <span className="truncate md:text-[15px] md:font-semibold">
-                    <span className="md:hidden">Ca của </span>
-                    {shift.staff_name}
+            {shift && (
+              <div
+                data-testid="shift-staff"
+                className="order-2 flex min-w-0 shrink items-center gap-1.5 rounded-full bg-brand-soft px-2.5 py-1 text-sm font-medium text-brand-deep md:order-none md:flex-col md:items-stretch md:gap-2 md:rounded-xl md:border md:border-line md:bg-surface md:p-3 md:text-ink"
+              >
+                <span className="hidden text-xs font-normal text-ink-subtle md:block">Ca đang mở</span>
+                <span className="flex min-w-0 items-center gap-1.5 md:gap-2.5">
+                  <span aria-hidden className="icon-tile rounded-full md:h-9 md:w-9 md:bg-brand-tint md:text-brand-deep">
+                    <UserRound className="h-4 w-4 md:h-[18px] md:w-[18px]" />
                   </span>
-                  <span className="hidden truncate text-[13px] font-normal text-ink-subtle md:block">từ {hhmm(shift.opened_at)}</span>
+                  <span className="flex min-w-0 flex-col">
+                    <span className="truncate md:text-[15px] md:font-semibold">
+                      <span className="sr-only">Ca của </span>
+                      {shift.staff_name}
+                    </span>
+                    <span className="hidden truncate text-[13px] font-normal text-ink-subtle md:block">từ {hhmm(shift.opened_at)}</span>
+                  </span>
                 </span>
+              </div>
+            )}
+
+            {shift && isTablet && <SideNav />}
+
+            <div className="hidden flex-1 md:block" />
+
+            {!phoneMenu && (
+              <GuardedLink
+                to="/owner"
+                className="btn btn-secondary order-4 min-h-[44px] min-w-[44px] shrink-0 px-2.5 md:order-none md:min-h-[48px] md:w-full md:justify-start md:gap-3 md:text-[15px] md:font-medium md:text-ink-muted"
+                data-testid="open-owner-mode"
+                aria-label="Chế độ chủ"
+              >
+                <KeyRound aria-hidden className="h-5 w-5" />
+                <span className="hidden md:inline">Chế độ chủ</span>
+              </GuardedLink>
+            )}
+
+            <div className="order-3 ml-auto flex items-center gap-2 md:order-none md:ml-0 md:px-1">
+              <ConnectionBadge state={snap.conn} />
+              <span className="hidden text-xs text-ink-subtle md:inline" data-testid="app-version" title="Phiên bản app">
+                v{APP_VERSION.split('-')[0]}
               </span>
             </div>
-          )}
 
-          {shift && isTablet && <SideNav />}
+            {ctx && !isTablet && <PrinterButton className="order-4" />}
+            {phoneMenu && <PhoneMenu shift={shift} tabletName={tabletName} />}
+          </aside>
 
-          <div className="hidden flex-1 md:block" />
-
-          <GuardedLink
-            to="/owner"
-            className="btn btn-secondary order-4 min-h-[44px] min-w-[44px] shrink-0 px-2.5 md:order-none md:min-h-[48px] md:w-full md:justify-start md:gap-3 md:text-[15px] md:font-medium md:text-ink-muted"
-            data-testid="open-owner-mode"
-            aria-label="Chế độ chủ"
-          >
-            <KeyRound aria-hidden className="h-5 w-5" />
-            <span className="hidden md:inline">Chế độ chủ</span>
-          </GuardedLink>
-
-          <div className="order-3 ml-auto flex items-center gap-2 md:order-none md:ml-0 md:px-1">
-            <ConnectionBadge state={snap.conn} />
-            <span className="hidden text-xs text-ink-subtle md:inline" data-testid="app-version" title="Phiên bản app">
-              v{APP_VERSION.split('-')[0]}
-            </span>
-          </div>
-
-          {shift && !isTablet && <PhoneMenu />}
-        </aside>
-
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          {ctx && snap.conn === 'offline' && (
-            <p data-testid="offline-banner" role="alert" className="flex items-center gap-3 border-b border-danger-line bg-danger-soft px-4 py-2 text-base font-medium text-danger-strong md:px-6">
-              <CloudOff aria-hidden className="h-5 w-5 shrink-0" />
-              Mất kết nối máy chủ: đơn, thanh toán, đóng ca… sẽ không lưu được cho tới khi có mạng.
-            </p>
-          )}
-          <div className="min-h-0 flex-1">
-            {!ctx ? (
-              snap.error ? <LoadError /> : <Splash />
-            ) : (
-              <TabletContext.Provider value={ctx}>
-                <TabletRoutes hasShift={!!ctx.shift} />
-              </TabletContext.Provider>
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+            {ctx && snap.conn === 'offline' && (
+              <p data-testid="offline-banner" role="alert" className="flex items-center gap-3 border-b border-danger-line bg-danger-soft px-4 py-2 text-base font-medium text-danger-strong md:px-6">
+                <CloudOff aria-hidden className="h-5 w-5 shrink-0" />
+                Mất kết nối máy chủ: đơn, thanh toán, đóng ca… sẽ không lưu được cho tới khi có mạng.
+              </p>
             )}
+            <div className="min-h-0 flex-1">
+              {!ctx ? (
+                snap.error ? (
+                  <LoadError />
+                ) : (
+                  <Splash />
+                )
+              ) : (
+                <TabletContext.Provider value={ctx}>
+                  <TabletRoutes hasShift={!!ctx.shift} />
+                </TabletContext.Provider>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      </ToastHost>
     </LeaveGuardContext.Provider>
   );
 }
@@ -202,10 +214,7 @@ function NavItem({ to, end, icon: Icon, testId, label, onNavigate }: (typeof NAV
     >
       {({ isActive }) => (
         <>
-          <span
-            aria-hidden
-            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full md:h-8 md:w-8 ${isActive ? 'bg-brand text-white' : 'bg-surface-muted text-ink-muted'}`}
-          >
+          <span aria-hidden className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full md:h-8 md:w-8 ${isActive ? 'bg-brand text-white' : 'bg-surface-muted text-ink-muted'}`}>
             <Icon className="h-5 w-5 md:h-[18px] md:w-[18px]" strokeWidth={2.25} />
           </span>
           {label}
@@ -215,9 +224,13 @@ function NavItem({ to, end, icon: Icon, testId, label, onNavigate }: (typeof NAV
   );
 }
 
-/** Điện thoại: nút ☰ trên header màn Bán hàng mở bảng menu (thay thanh đáy cũ). */
-function PhoneMenu() {
+/**
+ * Điện thoại: nút ☰ trên header màn Bán hàng mở bảng menu (thay thanh đáy cũ; Figma P10).
+ * Đầu bảng là ca đang mở; mục: Thu nợ · Chi tiền · Đóng ca · Chế độ chủ (đang ở Bán hàng nên không có mục đó).
+ */
+function PhoneMenu({ shift, tabletName }: { shift: TabletShift; tabletName: string }) {
   const [open, setOpen] = useState(false);
+  const close = () => setOpen(false);
   return (
     <>
       <button
@@ -231,13 +244,35 @@ function PhoneMenu() {
         <MenuIcon aria-hidden className="h-5 w-5" />
       </button>
       {open && (
-        <Sheet testId="menu-sheet" title="Menu" onClose={() => setOpen(false)}>
-          <nav aria-label="Menu bán hàng" className="flex flex-col gap-2">
-            {NAV.map((n) => (
-              <NavItem key={n.to} {...n} onNavigate={() => setOpen(false)} />
-            ))}
-          </nav>
-        </Sheet>
+        <div className="fixed inset-0 z-20 flex items-end bg-black/45" role="dialog" aria-modal aria-label="Menu" onClick={close}>
+          <div
+            data-testid="menu-sheet"
+            onClick={(e) => e.stopPropagation()}
+            className="flex w-full flex-col gap-2 rounded-t-3xl bg-surface px-4 pb-[max(24px,env(safe-area-inset-bottom))] pt-3 shadow-raised"
+          >
+            <span aria-hidden className="mx-auto mb-1 h-1 w-10 shrink-0 rounded-full bg-line-strong" />
+            <div className="mb-1 flex items-center gap-3 px-1">
+              <span aria-hidden className="icon-tile h-10 w-10 rounded-full bg-brand-tint text-brand-deep">
+                <UserRound className="h-5 w-5" />
+              </span>
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="truncate text-base font-semibold">Ca của {shift.staff_name}</span>
+                <span className="truncate text-[13px] text-ink-subtle">
+                  từ {hhmm(shift.opened_at)} · {tabletName} · v{APP_VERSION.split('-')[0]}
+                </span>
+              </span>
+              <button type="button" className="btn btn-secondary h-11 min-h-0 w-11 min-w-0 shrink-0 px-0" onClick={close} aria-label="Đóng">
+                <X aria-hidden className="h-5 w-5 text-ink-muted" />
+              </button>
+            </div>
+            <nav aria-label="Menu bán hàng" className="flex flex-col gap-2">
+              {NAV.filter((n) => n.to !== '/').map((n) => (
+                <NavItem key={n.to} {...n} onNavigate={close} />
+              ))}
+              <NavItem to="/owner" icon={KeyRound} label="Chế độ chủ" testId="open-owner-mode" onNavigate={close} />
+            </nav>
+          </div>
+        </div>
       )}
     </>
   );

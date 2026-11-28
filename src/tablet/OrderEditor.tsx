@@ -42,7 +42,8 @@ import { Notice, Sheet, useTablet, type LeaveGuard } from './parts';
 import { useDebtBook } from './debt';
 import { ShipCustomerPicker } from './ShipCustomer';
 import { ShipSheet } from './ShipSheet';
-import { ReprintKitchenButton } from './PrintBar';
+import { ReprintKitchenButton } from './PrinterStatus';
+import type { ToastTone } from './Toast';
 import { CartPay, DebtSheet, PayMethodRow, type ConfirmPay, type PayMethod } from './CartPay';
 import type { PaymentInput } from '@/pos';
 
@@ -67,7 +68,7 @@ type Dialog = { kind: 'toppings'; product: Product; initial: string[] } | { kind
 /** Giỏ xong việc với đơn đang sửa ⇒ về đơn mới trống. */
 export interface OrderDone {
   /** Thông báo một lần (đã thu / đã xóa / đơn đổi ở máy khác). */
-  flash?: string;
+  toast?: { text: string; tone: ToastTone };
   /** Đơn vừa thanh toán trên máy này: thẻ rời hàng đợi kèm dấu "Đã thanh toán". */
   paidId?: string;
 }
@@ -258,7 +259,7 @@ export function OrderEditor({
     if (!s || busyRef.current || finished.current) return;
     if (!remote) {
       finished.current = true;
-      onDone({ flash: `Đơn ${s.code} đã được thanh toán hoặc xóa ở máy khác` });
+      onDone({ toast: { text: `Đơn ${s.code} đã được thanh toán hoặc xóa ở máy khác`, tone: 'info' } });
       return;
     }
     if (remote === s) return;
@@ -445,7 +446,7 @@ export function OrderEditor({
       setPaying({ method, back: null });
     });
   const pickPayMethod = (method: PayMethod) => setPaying((cur) => ({ method, back: method === 'debt' ? (cur?.method ?? null) : null }));
-  const confirmPay: ConfirmPay = (payment: PaymentInput, flash: string) =>
+  const confirmPay: ConfirmPay = (payment: PaymentInput, text: string) =>
     void run(async () => {
       const o = savedRef.current!;
       // Như "Thu đủ": đơn vừa tạo trong giỏ này không hiện thẻ "Đã thanh toán"; đơn đã có thẻ thì có.
@@ -453,7 +454,7 @@ export function OrderEditor({
       if (fresh) hideCard(o.id);
       try {
         await pos.payOrder(o.id, payment);
-        done({ flash, paidId: fresh ? undefined : o.id });
+        done({ toast: { text, tone: 'ok' }, paidId: fresh ? undefined : o.id });
       } catch (e) {
         if (fresh) hideCard(null);
         throw e;
@@ -468,7 +469,7 @@ export function OrderEditor({
       try {
         const o = await flush();
         await pos.payOrder(o.id, { method: 'cash', cash_given: o.total });
-        done({ flash: `Đã thu ${formatVnd(o.total)} – đơn ${o.code}`, paidId: fresh ? undefined : o.id });
+        done({ toast: { text: `Đã thu ${formatVnd(o.total)} – đơn ${o.code}`, tone: 'ok' }, paidId: fresh ? undefined : o.id });
       } catch (e) {
         if (fresh) hideCard(null);
         throw e;
@@ -479,7 +480,7 @@ export function OrderEditor({
       if (!saved) return;
       await pos.deleteOrder(saved.id, reason);
       setDialog(null);
-      done({ flash: `Đã xóa đơn ${saved.code}` });
+      done({ toast: { text: `Đã xóa đơn ${saved.code}`, tone: 'info' } });
     });
 
   /**

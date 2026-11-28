@@ -48,7 +48,7 @@ describe('C. Bán hàng', () => {
     cy.get(tid(`menu-combo-${SEED.combos.xoiGaTrung}`)).click(); // 2
     cy.get(tid('order-pay-exact')).should('contain.text', '31.000').click(); // 3
     cy.get(tid('queue-screen')).should('be.visible');
-    cy.get(tid('queue-flash')).should('contain.text', '31.000');
+    cy.get(tid('toast')).should('contain.text', '31.000');
     cy.get('[data-testid^=queue-card-]').should('not.exist');
 
     cy.waitLive();
@@ -364,7 +364,7 @@ describe('C. Bán hàng', () => {
     cy.get(tid('pay-ship-payout')).should('have.text', 'Trả shipper −10.000 (lấy từ két)');
     cy.get(tid('pay-method-transfer')).click();
     cy.get(tid('pay-transfer-confirm')).click();
-    cy.get(tid('queue-flash')).should('contain.text', 'chuyển khoản');
+    cy.get(tid('toast')).should('contain.text', 'chuyển khoản');
     cy.telegramWaitFor('Shipper ngoài · phụ thu 5.000 · trả shipper 10.000');
 
     // Máy thứ hai của cùng quầy hỏi server ⇒ cùng mặc định (đơn đã thanh toán vẫn tính).

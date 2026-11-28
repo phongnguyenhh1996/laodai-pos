@@ -32,7 +32,7 @@ function sellCombo(combo: keyof typeof SEED.combos) {
   cy.get(tid('new-order')).click();
   cy.get(tid(`menu-combo-${SEED.combos[combo]}`)).click();
   cy.get(tid('order-pay-exact')).click();
-  cy.get(tid('queue-flash')).should('be.visible');
+  cy.get(tid('toast')).should('be.visible');
 }
 
 /** Chủ (điện thoại) mở báo cáo ca đang mở / vừa đóng của tablet. */
@@ -284,7 +284,7 @@ describe('B. Ca', () => {
     }
     cy.get('[data-testid^=cart-line-][data-testid$=-qty]').should('have.length', 1).and('have.text', '2');
     cy.get(tid('order-pay-exact')).click();
-    cy.get(tid('queue-flash')).should('be.visible');
+    cy.get(tid('toast')).should('be.visible');
 
     // Đóng ca: chỉ hộp, lon, tiền (dùng 3 lon, đơn ghi 2 lon)
     cy.get(tid('open-close-shift')).click();

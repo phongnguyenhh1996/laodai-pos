@@ -22,8 +22,17 @@ let transport: FakeTransport;
 function docOf(orderId: string): PrintDoc {
   const o = server.order(orderId)!;
   return {
-    order_id: o.id, code: o.code, status: o.status, dine_type: o.dine_type, label: o.label, table_no: o.table_no,
-    point_name: 'Xôi A', created_at: o.created_at, paid_at: o.paid_at, edited_at: null, total: o.total,
+    order_id: o.id,
+    code: o.code,
+    status: o.status,
+    dine_type: o.dine_type,
+    label: o.label,
+    table_no: o.table_no,
+    point_name: 'Xôi A',
+    created_at: o.created_at,
+    paid_at: o.paid_at,
+    edited_at: null,
+    total: o.total,
     items: o.items.map((i) => ({ name: i.name_snap, qty: i.qty, unit_price: i.unit_price_snap, toppings: [] })),
   };
 }
@@ -38,8 +47,20 @@ function usePrinter({ supported = true } = {}) {
       created.push(a);
       return {
         status: 'claimed',
-        job: { id: `j${created.length}`, kind: a.kind, order_id: a.orderId ?? null, tablet_profile_id: ACT.tablet_profile_id, source: a.source ?? 'auto',
-          status: 'claimed', device_id: a.deviceId ?? null, detail: a.detail ?? null, created_at: '', claimed_at: '', finished_at: null, error: null },
+        job: {
+          id: `j${created.length}`,
+          kind: a.kind,
+          order_id: a.orderId ?? null,
+          tablet_profile_id: ACT.tablet_profile_id,
+          source: a.source ?? 'auto',
+          status: 'claimed',
+          device_id: a.deviceId ?? null,
+          detail: a.detail ?? null,
+          created_at: '',
+          claimed_at: '',
+          finished_at: null,
+          error: null,
+        },
         doc: a.orderId ? docOf(a.orderId) : null,
         template: DEFAULT_TEMPLATE,
       };
@@ -50,9 +71,7 @@ function usePrinter({ supported = true } = {}) {
     onJob: () => () => undefined,
   };
   const printer = new Printer(supported ? transport : null, { sleep: async () => undefined });
-  setPrintService(
-    new PrintService(api, printer, 'device-test-0001', { render: async () => ({ width: 8, height: 1, bits: new Uint8Array(1) }) }),
-  );
+  setPrintService(new PrintService(api, printer, 'device-test-0001', { render: async () => ({ width: 8, height: 1, bits: new Uint8Array(1) }) }));
 }
 
 async function startShift() {
@@ -162,6 +181,7 @@ describe('tablet in phiếu', () => {
 
     transport.drop();
     await waitFor(() => expect(tid('printer-status')).toHaveAttribute('data-state', 'disconnected'));
+    click('printer-status');
     click('printer-reconnect');
     await waitFor(() => expect(tid('printer-status')).toHaveAttribute('data-state', 'connected'));
   });

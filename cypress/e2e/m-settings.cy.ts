@@ -93,7 +93,7 @@ describe('M. Cài đặt', () => {
     cy.get<string>('@topping').then((t) => cy.get(tid(`topping-option-${t}`)).should('contain.text', '+7.000'));
     cy.get(tid('topping-cancel')).click();
     cy.get(tid('order-pay-exact')).click();
-    cy.get(tid('queue-flash')).should('be.visible');
+    cy.get(tid('toast')).should('be.visible');
     cy.waitLive();
     cy.task<Array<{ total: number; status: string; items: Array<{ product_id: string; toppings: Array<{ name: string }> }> }>>('db:orders', 'A').then(([o]) => {
       expect(o).to.include({ total: 22_000, status: 'paid' });

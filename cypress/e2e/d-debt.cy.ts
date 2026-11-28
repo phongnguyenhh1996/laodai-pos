@@ -36,7 +36,7 @@ describe('D. Ghi nợ & thu nợ', () => {
     cy.get(tid(`customer-suggest-${GV}`)).click();
     cy.get(tid('customer-chosen-label')).should('have.text', 'Dũng (giáo viên)');
     cy.get(tid('pay-debt-confirm')).click();
-    cy.get(tid('queue-flash')).should('contain.text', 'Đã ghi nợ 31.000 – Dũng (giáo viên)');
+    cy.get(tid('toast')).should('contain.text', 'Đã ghi nợ 31.000 – Dũng (giáo viên)');
     cy.get('[data-testid^=queue-card-]').should('not.exist');
 
     cy.waitLive();
@@ -55,7 +55,7 @@ describe('D. Ghi nợ & thu nợ', () => {
     cy.get(tid('debt-desc')).type('bán vé số');
     cy.get(tid('debt-phone')).should('have.value', '');
     cy.get(tid('pay-debt-confirm')).click();
-    cy.get(tid('queue-flash')).should('contain.text', 'Tú (bán vé số)');
+    cy.get(tid('toast')).should('contain.text', 'Tú (bán vé số)');
 
     // Khách mới có ngay trên tablet (trước cả khi đồng bộ) để thu nợ
     cy.get(tid('open-debt')).click();

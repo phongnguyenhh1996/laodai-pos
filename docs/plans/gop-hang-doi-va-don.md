@@ -114,9 +114,17 @@ Cypress: đã đổi test id (`order-pay-cash|transfer|debt`, `cart-pay`); kiể
 
 ## Ticket 4 — Toast, máy in, menu điện thoại
 
-- [ ] Component toast dùng chung; chuyển các thông báo một lần sang toast (bỏ dải "Đã thanh toán", flash của hàng đợi).
-- [ ] `PrintBar` thành icon trên header + chi tiết; in lỗi ⇒ toast.
-- [ ] Điện thoại: dải thẻ nhỏ, chọn thẻ ⇒ giỏ mở rộng, menu ☰ thay thanh đáy.
+- [x] Component toast dùng chung; chuyển các thông báo một lần sang toast (bỏ dải "Đã thanh toán", flash của hàng đợi).
+- [x] `PrintBar` thành icon trên header + chi tiết; in lỗi ⇒ toast.
+- [x] Điện thoại: dải thẻ nhỏ, chọn thẻ ⇒ giỏ mở rộng, menu ☰ thay thanh đáy.
+
+Ghi chú khi làm: `src/tablet/Toast.tsx` (`ToastHost` bọc cả `TabletHome`, `useToast()`; testid `toast`): viên tối (in lỗi: viên đỏ đậm có "In lại"),
+không nút ✕, tự ẩn sau 4 giây (in lỗi 10 giây ⇒ `dismissFailure`); tablet giữa cột thực đơn ở y=78, điện thoại ngay dưới header (S16–S18, P11).
+`PrintBar.tsx` → `PrinterStatus.tsx`: `PrinterButton` = nút 44px, tablet ở cuối hàng chip của dải đơn, điện thoại trên header; chưa sẵn sàng ⇒ vàng + chấm;
+bấm ⇒ ô chi tiết 320px ngay dưới nút (`printer-detail`, "Kết nối lại") (S19, P13). `OrderDone.flash` → `toast: { text, tone }`.
+Điện thoại: ☰ mở bảng có đầu "Ca của …" (giờ mở · quầy · phiên bản) + Thu nợ · Chi tiền · Đóng ca · Chế độ chủ (P10); chip ca trên header chỉ còn tên.
+Dải thẻ nhỏ và giỏ tự mở khi chọn thẻ đã có từ ticket 2. Đã so số đo với Figma qua trình duyệt (S18, S19, P10, P13 khớp, lệch ≤ 4px).
+Test: `queue-flash` → `toast` (unit + Cypress); `printer-reconnect` giờ phải bấm `printer-status` trước (unit đã sửa; Cypress I chỉ đọc `data-state`).
 
 ## Ticket 5 — Bỏ số thứ tự trên phiếu bếp
 
