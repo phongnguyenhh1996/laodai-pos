@@ -1,4 +1,4 @@
-import { CircleCheck, CloudOff, RefreshCw, type LucideIcon } from 'lucide-react';
+import { CircleCheck, RefreshCw, WifiOff, type LucideIcon } from 'lucide-react';
 import type { ConnState } from '@/pos';
 
 /** Điện thoại: viên có viền; tablet (sidebar, Figma BH1): huy hiệu nhỏ bo 6 như `Badge` của kit. */
@@ -11,7 +11,7 @@ const STYLE: Record<ConnState, string> = {
 const ICON: Record<ConnState, LucideIcon> = {
   live: CircleCheck,
   connecting: RefreshCw,
-  offline: CloudOff,
+  offline: WifiOff,
 };
 
 export const CONN_LABELS: Record<ConnState, string> = {

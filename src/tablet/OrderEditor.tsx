@@ -990,15 +990,21 @@ export function OrderEditor({
       )}
 
       {dialog?.kind === 'delete' && (
-        <Sheet testId="delete-sheet" title={`Xóa đơn ${saved?.code ?? ''}? Chọn lý do`}>
-          <div className="grid grid-cols-2 gap-3">
+        <Sheet
+          testId="delete-sheet"
+          size="md"
+          title={`Xóa đơn ${saved?.code ? `#${saved.code}` : ''}?`}
+          subtitle="Chọn lý do để ghi vào nhật ký"
+          icon={<IconTile icon={Trash2} className="h-11 w-11 rounded-xl" iconClass="h-[22px] w-[22px]" tone="bg-[#fdecec] text-[#dc2626]" />}
+        >
+          <div className="grid grid-cols-2 gap-2.5">
             {DELETE_REASONS.map((r) => (
-              <button key={r.id} type="button" className="btn btn-danger-outline min-h-[64px] bg-danger-soft" disabled={busy} onClick={() => void remove(r.id)} data-testid={`delete-reason-${r.id}`}>
+              <button key={r.id} type="button" className={staffBtn('danger', 'md', 'min-h-[47px] px-2')} disabled={busy} onClick={() => void remove(r.id)} data-testid={`delete-reason-${r.id}`}>
                 {r.label}
               </button>
             ))}
           </div>
-          <button type="button" className="btn btn-secondary" onClick={() => setDialog(null)} data-testid="delete-cancel">
+          <button type="button" className={staffBtn('secondary', 'md', 'min-h-[47px] w-full')} onClick={() => setDialog(null)} data-testid="delete-cancel">
             Không xóa
           </button>
         </Sheet>
@@ -1007,6 +1013,7 @@ export function OrderEditor({
       {dialog?.kind === 'discard' && (
         <Sheet
           testId="discard-sheet"
+          size="sm"
           title="Bỏ thay đổi?"
           subtitle={
             saved
@@ -1014,13 +1021,13 @@ export function OrderEditor({
               : `Đơn mới chưa lưu${itemCount > 0 ? ` có ${itemCount} món` : ''}. Rời đơn sẽ bỏ các thay đổi này.`
           }
         >
-          <div className="grid grid-cols-2 gap-3">
-            <button type="button" className="btn btn-secondary" onClick={() => setDialog(null)} data-testid="discard-no">
+          <div className="grid grid-cols-2 gap-2.5">
+            <button type="button" className={staffBtn('secondary', 'md', 'min-h-[47px]')} onClick={() => setDialog(null)} data-testid="discard-no">
               Ở lại
             </button>
             <button
               type="button"
-              className="btn btn-danger"
+              className={staffBtn('dangerSolid', 'md', 'min-h-[47px]')}
               onClick={() => {
                 const go = dialog.go;
                 setDialog(null);

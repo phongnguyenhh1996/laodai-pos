@@ -2,6 +2,7 @@ import { createContext, useContext, type MutableRefObject, type ReactNode } from
 import { CircleAlert, CircleCheckBig, Info, X } from 'lucide-react';
 import type { Order, ShiftExpense } from '@/domain/types';
 import type { Activation, Catalog, TabletShift } from '@/pos';
+import { SheetHandle, iconBtn } from '@/app/kit';
 
 /** Dữ liệu chung của màn bán hàng (lấy từ server, cập nhật realtime): máy, danh mục, ca đang mở, đơn đang mở. */
 export interface TabletCtx {
@@ -39,19 +40,28 @@ export function useLeave(): LeaveGuard {
   return (go) => (ref?.current ? ref.current(go) : go());
 }
 
+/** Bề rộng hộp trên tablet: `sm` 420 (Bỏ thay đổi?, BH13), `md` 440 (Xóa đơn, BH14); mặc định 520 cho bảng chưa có khung (topping, chi tiền…). */
+const SHEET_WIDTH = { sm: 'md:max-w-[420px]', md: 'md:max-w-[440px]', lg: 'md:max-w-[520px]' } as const;
+
 /**
- * Bảng chọn (topping, lý do xóa, xác nhận). Điện thoại: tấm trượt từ đáy lên; tablet: hộp giữa màn hình (Makaryo).
+ * Bảng chọn (topping, lý do xóa, xác nhận). Figma BH13 / BH14 / BHP11.
+ * Điện thoại: sheet trồi từ đáy, bo trên 24, tay nắm, bóng lên. Tablet: hộp giữa màn bo 20, đổ bóng, nền tối 45%.
+ * `icon`: ô icon 44 cạnh tiêu đề (Xóa đơn: thùng rác đỏ), khi đó dòng phụ nhỏ xám 13.
  */
 export function Sheet({
   testId,
   title,
   subtitle,
+  icon,
+  size = 'lg',
   onClose,
   children,
 }: {
   testId: string;
   title: string;
   subtitle?: ReactNode;
+  icon?: ReactNode;
+  size?: keyof typeof SHEET_WIDTH;
   /** Có ⇒ hiện nút X ở góc. */
   onClose?: () => void;
   children: ReactNode;
@@ -60,17 +70,18 @@ export function Sheet({
     <div className="fixed inset-0 z-20 flex items-end justify-center bg-black/45 md:items-center md:p-4" role="dialog" aria-modal aria-label={title}>
       <div
         data-testid={testId}
-        className="flex max-h-[92%] w-full flex-col gap-4 overflow-y-auto rounded-t-3xl bg-surface px-5 pb-[max(24px,env(safe-area-inset-bottom))] pt-3 shadow-raised md:max-h-full md:max-w-[520px] md:gap-[18px] md:rounded-[20px] md:p-6"
+        className={`flex max-h-[92%] w-full flex-col gap-3.5 overflow-y-auto rounded-t-3xl bg-white px-4 pb-[max(24px,env(safe-area-inset-bottom))] pt-2 shadow-[0_-6px_24px_rgba(0,0,0,0.08)] md:max-h-full md:gap-4 md:rounded-[20px] md:p-6 md:shadow-[0_12px_32px_rgba(0,0,0,0.16)] ${SHEET_WIDTH[size]}`}
       >
-        <span aria-hidden className="mx-auto h-1 w-10 shrink-0 rounded-full bg-line-strong md:hidden" />
+        <SheetHandle className="md:hidden" />
         <div className="flex items-start gap-3">
-          <div className="flex min-w-0 flex-1 flex-col gap-1">
-            <h2 className="text-[22px] font-bold leading-tight">{title}</h2>
-            {subtitle && <p className="text-sm text-ink-subtle">{subtitle}</p>}
+          {icon}
+          <div className={`flex min-w-0 flex-1 flex-col ${icon ? 'gap-0.5' : 'gap-1.5'}`}>
+            <h2 className="text-xl font-bold leading-[25px] text-[#111]">{title}</h2>
+            {subtitle && <p className={icon ? 'text-[13px] leading-4 text-[#888]' : 'text-sm leading-5 text-[#6d6d6d]'}>{subtitle}</p>}
           </div>
           {onClose && (
-            <button type="button" className="btn btn-secondary h-11 min-h-0 w-11 min-w-0 shrink-0 px-0" onClick={onClose} aria-label="Đóng">
-              <X aria-hidden className="h-5 w-5 text-ink-muted" />
+            <button type="button" className={iconBtn()} onClick={onClose} aria-label="Đóng">
+              <X aria-hidden className="h-[18px] w-[18px]" />
             </button>
           )}
         </div>
@@ -83,11 +94,7 @@ export function Sheet({
 export function Notice({ testId, tone = 'info', children }: { testId: string; tone?: 'info' | 'error' | 'ok'; children: ReactNode }) {
   if (!children) return null;
   const cls =
-    tone === 'error'
-      ? 'border-danger-line bg-danger-soft text-danger-strong'
-      : tone === 'ok'
-        ? 'border-success-line bg-success-soft text-success-strong'
-        : 'border-line bg-surface-sunken text-ink';
+    tone === 'error' ? 'border-danger-line bg-danger-soft text-danger-strong' : tone === 'ok' ? 'border-success-line bg-success-soft text-success-strong' : 'border-line bg-surface-sunken text-ink';
   const Icon = tone === 'error' ? CircleAlert : tone === 'ok' ? CircleCheckBig : Info;
   return (
     <p data-testid={testId} role={tone === 'error' ? 'alert' : 'status'} className={`flex items-start gap-3 rounded-xl border px-4 py-3 text-lg font-medium ${cls}`}>

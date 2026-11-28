@@ -148,10 +148,20 @@ nút chân 50 ở y=734; 390×844 khớp BHP6 phần dưới đầu sheet). Ghi 
 
 Khung: BH13–BH19; BHP10–BHP13.
 
-- [ ] `Sheet` (`parts.tsx`): tablet hộp 420–440 bo 20, đổ bóng; điện thoại sheet bo 24 + tay nắm. "Bỏ thay đổi?" (Ở lại / Bỏ thay đổi đỏ), "Xóa đơn #mã?" (ô icon đỏ, 4 lý do đỏ nhạt 2×2, Không xóa).
-- [ ] `Toast.tsx`: viên tối bo 14 + icon (đã thu: dấu tích xanh lá, máy khác: info xám); in lỗi: đỏ đậm + nút trắng "In lại".
-- [ ] `PrinterStatus.tsx`: ô chi tiết 320 (điện thoại 358) bo 16, ô icon vàng, "Kết nối lại" nút viền.
-- [ ] Dải mất kết nối đỏ nhạt (tablet trên cột giữa + giỏ; điện thoại dưới header), header điện thoại đổi icon kết nối sang wifi-off đỏ.
+- [x] `Sheet` (`parts.tsx`): tablet hộp 420–440 bo 20, đổ bóng; điện thoại sheet bo 24 + tay nắm. "Bỏ thay đổi?" (Ở lại / Bỏ thay đổi đỏ), "Xóa đơn #mã?" (ô icon đỏ, 4 lý do đỏ nhạt 2×2, Không xóa).
+- [x] `Toast.tsx`: viên tối bo 14 + icon (đã thu: dấu tích xanh lá, máy khác: info xám); in lỗi: đỏ đậm + nút trắng "In lại".
+- [x] `PrinterStatus.tsx`: ô chi tiết 320 (điện thoại 358) bo 16, ô icon vàng, "Kết nối lại" nút viền.
+- [x] Dải mất kết nối đỏ nhạt (tablet trên cột giữa + giỏ; điện thoại dưới header), header điện thoại đổi icon kết nối sang wifi-off đỏ.
+
+Đã làm (so số đo ở 1280×800 và 390×844: BH13 / BH14 / BH15 / BH17 / BH18 / BH19 và BHP11 / BHP12 / BHP13 đúng từng px, toast in lỗi lệch 1–2px do độ rộng chữ).
+Badge DONE đã gắn cho BH13–BH19 (263:2…263:20); BHP10–BHP13 để ticket 9 (header điện thoại còn của ticket 8). Ghi chú:
+- `Sheet` thêm `size` (`sm` 420 / `md` 440 / mặc định `lg` 520 cho bảng chưa có khung: topping, chi tiền, ShipSheet) và `icon` (ô 44 cạnh tiêu đề,
+  dòng phụ khi đó 13 xám). Tiêu đề mọi bảng thành 20 (trước 22), nút ✕ thành `iconBtn` 40 ⇒ Chi tiền / topping đổi theo, ticket 9 xem lại bằng mắt.
+- Tiêu đề Xóa đơn tách "Chọn lý do" xuống dòng phụ: "Chọn lý do để ghi vào nhật ký".
+- Toast điện thoại sát trái, theo độ dài chữ (trước kéo hết ngang), top 66. Cột giỏ tablet 380 ở mọi cỡ ⇒ bỏ `lg:right-[390px]` của chỗ toast.
+- Tên máy in vẫn là tên thiết bị thật (Figma ghi thêm "· Bluetooth", không có dữ liệu loại kết nối).
+- Icon mất kết nối đổi `CloudOff` → `WifiOff` ở cả badge sidebar và header điện thoại; nút kết nối 40 nền đỏ nhạt của header điện thoại để ticket 8.
+- Cypress `c-sales`, `d-debt`, `i-print`, `n-expenses` qua (30/30).
 
 ## Ticket 8 — Điện thoại
 

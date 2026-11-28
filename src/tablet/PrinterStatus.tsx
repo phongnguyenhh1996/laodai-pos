@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Printer as PrinterIcon, RefreshCw } from 'lucide-react';
 import { usePrint } from '@/lib/print';
 import type { PrinterState } from '@/print/printer';
-import { iconBtn } from '@/app/kit';
+import { IconTile, STAFF_BTN, iconBtn } from '@/app/kit';
 import { Toast } from './Toast';
 
 const STATE_TEXT: Record<PrinterState, string> = {
@@ -21,7 +21,7 @@ const PRINT_ERROR_MS = 10_000;
 
 /**
  * Trạng thái máy in (SPEC 12.1, 12.7; Figma BH1 / BH18 / BHP12): nút icon 40px — tablet ở cuối hàng chip của dải đơn,
- * điện thoại trên header. Chưa sẵn sàng ⇒ nền vàng nhạt, viền vàng, chấm vàng góc. Bấm ⇒ ô chi tiết ngay dưới nút (trạng thái, tên máy, "Kết nối lại").
+ * điện thoại trên header. Chưa sẵn sàng ⇒ nền vàng nhạt, viền vàng, chấm vàng góc. Bấm ⇒ ô chi tiết (BH18 / BHP12): tablet ngay dưới nút, rộng 320; điện thoại dưới header, rộng gần trọn màn (trạng thái, tên máy, "Kết nối lại").
  * Máy không in được trực tiếp (PWA) ⇒ không hiện gì.
  */
 export function PrinterButton({ className = '' }: { className?: string }) {
@@ -55,24 +55,27 @@ export function PrinterButton({ className = '' }: { className?: string }) {
             data-testid="printer-detail"
             role="dialog"
             aria-label="Máy in"
-            className="absolute right-0 top-full z-30 mt-2 flex w-[320px] flex-col gap-3 rounded-2xl border border-line bg-surface p-4 shadow-raised"
+            className="fixed inset-x-4 top-16 z-30 flex flex-col gap-3 rounded-2xl border border-line bg-white p-4 shadow-[0_12px_32px_rgba(0,0,0,0.16)] md:absolute md:left-auto md:right-0 md:top-full md:mt-1.5 md:w-[320px]"
           >
             <div className="flex items-center gap-3">
-              <span aria-hidden className={`icon-tile h-10 w-10 rounded-full ${ok ? 'bg-surface-muted text-ink-muted' : 'bg-warning-soft text-warning-strong'}`}>
-                <PrinterIcon className="h-5 w-5" />
-              </span>
-              <span className="flex min-w-0 flex-col">
-                <span className="text-base font-semibold" data-testid="printer-detail-state">
+              <IconTile icon={PrinterIcon} className="h-10 w-10 rounded-xl" iconClass="h-5 w-5" tone={ok ? 'bg-[#f8f8f8] text-[#6d6d6d]' : 'bg-[#fef5e1] text-[#a16207]'} />
+              <span className="flex min-w-0 flex-col gap-0.5">
+                <span className="text-[15px] font-bold leading-[19px] text-[#111]" data-testid="printer-detail-state">
                   {STATE_TEXT[printer.state]}
                 </span>
-                {printer.device && <span className="truncate text-[13px] text-ink-subtle">{printer.device.name}</span>}
+                {printer.device && <span className="truncate text-xs leading-[15px] text-[#888]">{printer.device.name}</span>}
               </span>
             </div>
             {printer.state === 'disconnected' && (
               <>
-                <p className="text-sm text-ink-muted">Phiếu bếp sẽ chưa in được. Bật máy in rồi bấm kết nối lại.</p>
-                <button type="button" data-testid="printer-reconnect" className="btn btn-secondary min-h-[44px] w-full text-base" onClick={() => void service.printer.connect()}>
-                  <RefreshCw aria-hidden className="h-4 w-4" />
+                <p className="text-[13px] leading-[19px] text-[#6d6d6d]">Phiếu bếp sẽ chưa in được. Bật máy in rồi bấm kết nối lại.</p>
+                <button
+                  type="button"
+                  data-testid="printer-reconnect"
+                  className={`${STAFF_BTN.base} ${STAFF_BTN.secondary} min-h-[42px] w-full text-sm leading-[18px] [&_svg]:h-4 [&_svg]:w-4`}
+                  onClick={() => void service.printer.connect()}
+                >
+                  <RefreshCw aria-hidden />
                   Kết nối lại
                 </button>
               </>
@@ -106,7 +109,7 @@ export function PrintErrorToast({ canReprint }: { canReprint: (orderId: string) 
           <button
             type="button"
             data-testid="print-error-retry"
-            className="btn h-9 min-h-0 min-w-0 shrink-0 rounded-lg bg-surface px-3 text-sm font-semibold text-danger-strong"
+            className="inline-flex h-7 shrink-0 items-center rounded-[9px] bg-white px-3 text-[13px] font-bold leading-4 text-[#b42318] hover:bg-[#fdecec]"
             onClick={() => void service.printKitchen(f.orderId!, f.orderCode ?? '', 'staff')}
           >
             In lại

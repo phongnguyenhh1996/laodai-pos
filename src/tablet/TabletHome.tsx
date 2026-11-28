@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type MouseEvent, type ReactNode } from 'react';
 import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { CloudOff, HandCoins, KeyRound, Menu as MenuIcon, Power, RefreshCw, ShoppingBag, Store, UserRound, Wallet, X, type LucideIcon } from 'lucide-react';
+import { CloudOff, HandCoins, KeyRound, Menu as MenuIcon, Power, RefreshCw, ShoppingBag, Store, UserRound, Wallet, WifiOff, X, type LucideIcon } from 'lucide-react';
 import { startTablet, tabletStore } from '@/lib/pos';
 import { startPrinting } from '@/lib/print';
 import { ConnectionBadge } from '@/app/ConnectionBadge';
@@ -134,9 +134,14 @@ export function TabletHome({ activation }: { activation: Activation }) {
 
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
             {ctx && snap.conn === 'offline' && (
-              <p data-testid="offline-banner" role="alert" className="flex items-center gap-3 border-b border-danger-line bg-danger-soft px-4 py-2 text-base font-medium text-danger-strong md:px-6">
-                <CloudOff aria-hidden className="h-5 w-5 shrink-0" />
-                Mất kết nối máy chủ: đơn, thanh toán, đóng ca… sẽ không lưu được cho tới khi có mạng.
+              <p
+                data-testid="offline-banner"
+                role="alert"
+                className="flex items-center gap-2 border-b border-[#f5c2c2] bg-[#fdecec] px-4 py-[9px] text-[13px] font-semibold leading-4 text-[#b91c1c] md:px-5 md:py-2.5"
+              >
+                <WifiOff aria-hidden className="h-4 w-4 shrink-0" />
+                <span className="md:hidden">Mất kết nối: đơn, thanh toán… chưa lưu được.</span>
+                <span className="hidden md:inline">Mất kết nối máy chủ: đơn, thanh toán, đóng ca… sẽ không lưu được cho tới khi có mạng.</span>
               </p>
             )}
             <div className="min-h-0 flex-1">
