@@ -69,13 +69,20 @@ File laodai UI, trang Tablet: tiêu đề y=38400. Tablet BH1–BH19 (1280×800)
 
 Khung: BH1, BH5, BH9 (tablet); BHP1, BHP3, BHP5 (điện thoại).
 
-- [ ] Sidebar (`TabletHome.tsx`): logo 40 + tên quầy, thẻ "Ca đang mở" (avatar chữ cái), mục đang chọn nền cam, chân: ô "Chế độ chủ" có ô icon, badge "Đã kết nối" / "Mất kết nối".
-- [ ] `QueueStrip.tsx`: tiêu đề "Đơn đang mở (N đơn)" + segmented lọc + nút máy in bên phải (tablet); điện thoại chỉ segmented.
-- [ ] Thẻ đơn tablet 212: ô icon loại đơn tô theo nhóm (vàng chờ ra món / xanh dương chờ thanh toán), `#mã`, đồng hồ chờ màu theo `card.color`;
+- [x] Sidebar (`TabletHome.tsx`): logo 40 + tên quầy, thẻ "Ca đang mở" (avatar chữ cái), mục đang chọn nền cam, chân: ô "Chế độ chủ" có ô icon, badge "Đã kết nối" / "Mất kết nối".
+- [x] `QueueStrip.tsx`: tiêu đề "Đơn đang mở (N đơn)" + segmented lọc + nút máy in bên phải (tablet); điện thoại chỉ segmented.
+- [x] Thẻ đơn tablet 212: ô icon loại đơn tô theo nhóm (vàng chờ ra món / xanh dương chờ thanh toán), `#mã`, đồng hồ chờ màu theo `card.color`;
       dòng "N món • nhãn" (đơn ship: "N món" + badge ship); badge trạng thái + tổng `formatK`. Thẻ luôn trắng, đang chọn viền cam 2px.
-- [ ] Thẻ nhỏ điện thoại 150: chấm nhóm + mã + nhãn, đồng hồ + icon xe, tổng.
-- [ ] Dải trống: khung viền đứt + "Chưa có đơn đang mở".
-- [ ] `PrinterButton`: chưa sẵn sàng ⇒ nền vàng nhạt, viền vàng, chấm vàng góc.
+- [x] Thẻ nhỏ điện thoại 150: chấm nhóm + mã + nhãn, đồng hồ + icon xe, tổng.
+- [x] Dải trống: khung viền đứt + "Chưa có đơn đang mở".
+- [x] `PrinterButton`: chưa sẵn sàng ⇒ nền vàng nhạt, viền vàng, chấm vàng góc.
+
+Đã làm (so số đo ở 1280×800 và 390×844: sidebar, thẻ đơn, máy in đúng từng px; segmented hẹp hơn ~8px do độ rộng chữ). Ghi chú:
+- Cột giỏ tablet về 380 ở mọi cỡ (bỏ 390 ở `lg`) cho cột giữa đủ 660 như Figma; không thì tiêu đề "Đơn đang mở" bị cắt.
+- Đơn chờ thanh toán không tính giờ chờ (`waitColor` = `none`) ⇒ đồng hồ xám, không đỏ như B4X trong BH1 (giữ luật domain).
+- `Segmented` thêm `track` (màu rãnh): dải đơn `#ececec`, giỏ giữ `#efefef`.
+- Header điện thoại (logo, badge nhân viên, nút kết nối) để ticket 8; ở đây chỉ đổi nút máy in (dùng chung).
+- Chưa gắn badge DONE: BH1 / BHP1… còn thực đơn, giỏ của ticket sau; gắn ở ticket 9.
 
 ## Ticket 4 — Thực đơn
 

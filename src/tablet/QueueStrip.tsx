@@ -6,32 +6,26 @@ import { buildQueue, queueCounts, queueStrip, type QueueCard, type QueueFilter, 
 import { DINE_LABELS, type DineType, type Order } from '@/domain/types';
 import { useNow } from '@/app/useLive';
 import { useIsTablet } from '@/app/useMediaQuery';
+import { AreaTitle, Badge, Segmented, TONE, type Tone } from '@/app/kit';
 import { useTablet } from './parts';
 import { PrinterButton } from './PrinterStatus';
 import { ENTER_MS, EXIT_MS, canAnimate, playEnter, playExit, useFlip } from './useQueueMotion';
 
 const DEFAULT_WAIT = { wait_yellow_min: 5, wait_red_min: 10 };
 
-/** Thẻ đơn: đơn chờ lâu viền vàng / đỏ; thẻ đang chọn chỉ đổi màu viền sang cam (không thêm outline). */
-const CARD_STYLE: Record<WaitColor, string> = {
-  none: 'border-line',
-  normal: 'border-line',
-  yellow: 'border-warning-line ring-1 ring-inset ring-warning-line',
-  red: 'border-danger-line ring-1 ring-inset ring-danger-line',
-};
-const SELECTED_STYLE = 'border-brand bg-brand-soft';
+/** Màu đồng hồ chờ (Figma BH1): thẻ luôn trắng, chỉ đồng hồ đổi màu. Đơn chờ thanh toán không tính chờ (`none`) ⇒ xám. */
+const WAIT_TONE: Record<WaitColor, Tone> = { none: 'gray', normal: 'green', yellow: 'amber', red: 'red' };
 
-const WAIT_STYLE: Record<WaitColor, string> = {
-  none: 'bg-surface-sunken text-ink-muted',
-  normal: 'bg-success-soft text-success-strong',
-  yellow: 'bg-warning-soft text-warning-strong',
-  red: 'bg-danger-soft text-danger-strong',
+/** Nhóm của thẻ: chấm (điện thoại), màu ô icon + huy hiệu trạng thái (tablet). Chờ ra món vàng, chờ thanh toán xanh dương. */
+const GROUP_LOOK: Record<QueueCard['group'], { tone: Tone; dot: string; icon: LucideIcon; label: string }> = {
+  serve: { tone: 'amber', dot: 'bg-[#f59e0b]', icon: ChefHat, label: 'Chờ ra món' },
+  pay: { tone: 'blue', dot: 'bg-[#2563eb]', icon: Wallet, label: 'Chờ thanh toán' },
 };
 
 const CHIPS: ReadonlyArray<{ id: QueueFilter; label: string; dot?: string }> = [
   { id: 'all', label: 'Tất cả' },
-  { id: 'serve', label: 'Chờ ra món', dot: 'bg-warning' },
-  { id: 'pay', label: 'Chờ thanh toán', dot: 'bg-brand' },
+  { id: 'serve', label: 'Chờ ra món', dot: GROUP_LOOK.serve.dot },
+  { id: 'pay', label: 'Chờ thanh toán', dot: GROUP_LOOK.pay.dot },
 ];
 
 const DINE_ICON: Record<DineType, LucideIcon> = { dinein: UtensilsCrossed, takeaway: ShoppingBag, delivery: Bike };
@@ -61,7 +55,7 @@ function withLeaving(cards: QueueCard[], leaving: Leaving[]): Slot[] {
 }
 
 /**
- * Hàng đợi (mục 4.3) ở đầu màn Bán hàng: chip lọc Tất cả / Chờ ra món / Chờ thanh toán (kèm số đếm)
+ * Hàng đợi (mục 4.3, Figma BH1 / BHP1) ở đầu màn Bán hàng: tablet có tiêu đề "Đơn đang mở (N đơn)"; lọc dạng segmented Tất cả / Chờ ra món / Chờ thanh toán (kèm số đếm)
  * và một hàng thẻ đơn cuộn ngang. Bấm thẻ ⇒ mở đơn đó trong giỏ; bấm lại thẻ đang chọn hoặc vùng trống ⇒ bỏ chọn.
  */
 export function QueueStrip({
@@ -166,49 +160,49 @@ export function QueueStrip({
   /** Bấm vào thẻ / chip không tính là bấm vùng trống. */
   const stop = (e: MouseEvent) => e.stopPropagation();
 
+  const filters = (
+    <Segmented
+      label="Lọc đơn"
+      options={CHIPS.map((c) => ({ key: c.id, label: c.label, dot: c.dot, count: counts[c.id], testId: `queue-filter-${c.id}`, countTestId: `queue-count-${c.id}` }))}
+      value={filter}
+      onChange={(key, e) => {
+        stop(e);
+        setFilter(key);
+      }}
+      small={!isTablet}
+      track="bg-[#ececec]"
+      className="shrink-0"
+    />
+  );
+
   return (
-    <section data-testid="queue-screen" aria-label="Hàng đợi" onClick={onDeselect} className="flex min-w-0 shrink-0 flex-col gap-2 border-b border-line bg-surface py-2.5 md:gap-3 md:py-4">
-      <div className="flex items-center gap-2 px-3 md:gap-3 md:px-5">
-        <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto md:gap-2" role="group" aria-label="Lọc đơn">
-          {CHIPS.map((c) => {
-            const on = filter === c.id;
-            return (
-              <button
-                key={c.id}
-                type="button"
-                aria-pressed={on}
-                onClick={(e) => {
-                  stop(e);
-                  setFilter(c.id);
-                }}
-                data-testid={`queue-filter-${c.id}`}
-                className={`flex min-h-[34px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-[13px] font-medium md:min-h-[40px] md:px-4 md:text-[15px] ${
-                  on ? 'border-ink-muted bg-surface font-semibold text-ink ring-1 ring-inset ring-ink-muted' : 'border-line bg-surface text-ink-muted'
-                }`}
-              >
-                {c.dot && <span aria-hidden className={`dot h-2 w-2 ${c.dot}`} />}
-                {c.label}
-                <span className="num rounded-full bg-surface-sunken px-1.5 text-xs font-bold leading-5 text-ink" data-testid={`queue-count-${c.id}`}>
-                  {counts[c.id]}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-        {/* Tablet: trạng thái máy in ở cuối hàng chip (điện thoại: trên header). */}
-        {isTablet && <PrinterButton />}
-      </div>
+    <section data-testid="queue-screen" aria-label="Hàng đợi" onClick={onDeselect} className="flex min-w-0 shrink-0 flex-col gap-2.5 py-3 pl-4 md:gap-3 md:px-5 md:pb-1 md:pt-4">
+      {isTablet ? (
+        // Tablet (Figma BH1): tiêu đề + số đơn bên trái; lọc + máy in bên phải (điện thoại: máy in trên header).
+        <AreaTitle
+          title="Đơn đang mở"
+          count={`${counts.all} đơn`}
+          right={
+            <div className="flex shrink-0 items-center gap-2">
+              {filters}
+              <PrinterButton />
+            </div>
+          }
+        />
+      ) : (
+        <div className="flex overflow-x-auto">{filters}</div>
+      )}
 
       {slots.length === 0 ? (
         <div
           data-testid="queue-empty"
-          className="mx-3 flex h-[64px] items-center justify-center gap-2 rounded-xl border border-dashed border-line-strong text-[15px] text-ink-subtle md:mx-5 md:h-[104px] md:gap-2.5 md:rounded-2xl md:text-base"
+          className="mr-4 flex h-[60px] items-center justify-center gap-2.5 rounded-[14px] border border-dashed border-[#cfcfcf] bg-white text-sm leading-[18px] text-[#888] md:mr-0 md:h-[104px] md:text-[15px] md:leading-[19px]"
         >
-          <Inbox aria-hidden className="h-5 w-5" />
+          <Inbox aria-hidden className="h-[18px] w-[18px] md:h-[19px] md:w-[19px]" />
           Chưa có đơn đang mở
         </div>
       ) : (
-        <div ref={rowRef} className="flex gap-2 overflow-x-auto px-3 pb-0.5 md:gap-3 md:px-5" data-testid="queue-cards">
+        <div ref={rowRef} className="flex items-start gap-2 overflow-x-auto pb-0.5 pr-4 md:gap-3 md:pr-0" data-testid="queue-cards">
           {slots.map(({ card, leaving: exit }) => (
             <Card
               key={card.order.id}
@@ -260,6 +254,8 @@ function Card({
   useLayoutEffect(() => {
     if (entering && ref.current) playEnter(ref.current);
   }, [entering]);
+  const group = GROUP_LOOK[card.group];
+  const label = o.label || DINE_LABELS[o.dine_type];
   return (
     <button
       ref={ref}
@@ -275,8 +271,8 @@ function Card({
       aria-hidden={leaving ? true : undefined}
       aria-pressed={leaving ? undefined : selected}
       aria-label={`Đơn ${o.code}`}
-      className={`relative flex h-[64px] w-[140px] shrink-0 flex-col justify-between rounded-xl border px-2.5 py-2 text-left md:h-[104px] md:w-[216px] md:rounded-2xl md:p-3 ${
-        selected ? SELECTED_STYLE : `bg-surface ${CARD_STYLE[card.color]}`
+      className={`relative flex w-[150px] shrink-0 flex-col gap-[7px] rounded-xl bg-white px-2.5 py-[9px] text-left md:w-[212px] md:gap-2.5 md:rounded-[14px] md:p-3 ${
+        selected ? 'border-2 border-brand px-[9px] py-2 md:p-[11px]' : 'border border-line'
       } ${leaving ? 'pointer-events-none' : ''}`}
     >
       {leaving === 'paid' && (
@@ -287,40 +283,51 @@ function Card({
           <span className="hidden text-base font-bold md:inline">Đã thanh toán</span>
         </span>
       )}
-      <span className="flex w-full items-center gap-1.5 md:gap-2">
-        <span aria-hidden className={`dot h-2 w-2 shrink-0 md:hidden ${card.group === 'serve' ? 'bg-warning' : 'bg-brand'}`} />
-        <span className="min-w-0 flex-1 truncate text-[15px] font-bold md:text-base">
-          <span className="hidden md:inline">#</span>
-          <span className="font-mono tracking-wider" data-testid={tid('code')}>
-            {o.code}
+      {/* Dòng 1 — điện thoại: chấm nhóm + mã + nhãn; tablet: ô icon loại đơn (tô theo nhóm) + #mã + đồng hồ chờ. */}
+      <span className="flex w-full min-w-0 items-center gap-1.5 md:gap-2">
+        <span aria-hidden className={`h-[7px] w-[7px] shrink-0 rounded-full md:hidden ${group.dot}`} />
+        <span aria-hidden className={`hidden h-[30px] w-[30px] shrink-0 items-center justify-center rounded-lg md:flex ${TONE[group.tone]}`}>
+          <DineIcon className="h-4 w-4" />
+        </span>
+        <span className="flex min-w-0 flex-1 items-baseline gap-1.5 whitespace-nowrap">
+          <span className="shrink-0 text-sm font-bold leading-[18px] text-[#111] md:text-[15px] md:leading-[19px]">
+            <span className="hidden md:inline">#</span>
+            <span data-testid={tid('code')}>{o.code}</span>
           </span>
-          <span className="font-medium text-ink-muted md:font-semibold">
-            {' · '}
-            <span data-testid={o.label ? tid('label') : tid('dine')}>{o.label || DINE_LABELS[o.dine_type]}</span>
+          <span className="truncate text-[13px] leading-4 text-[#6d6d6d] md:hidden">
+            · <span data-testid={o.label ? tid('label') : tid('dine')}>{label}</span>
           </span>
         </span>
-        <span className={`badge num hidden shrink-0 rounded-md px-1.5 text-xs md:inline-flex ${WAIT_STYLE[card.color]}`}>
-          <Clock aria-hidden className="h-3 w-3" />
-          <span data-testid={tid('wait')}>{card.waitMinutes}′</span>
-        </span>
+        <Badge tone={WAIT_TONE[card.color]} icon={Clock} className="hidden md:inline-flex">
+          <span className="num" data-testid={tid('wait')}>
+            {card.waitMinutes}′
+          </span>
+        </Badge>
       </span>
-      <span className="hidden w-full items-center gap-1.5 text-[13px] text-ink-muted md:flex">
-        <DineIcon aria-hidden className="h-3.5 w-3.5 shrink-0" />
-        <span className="num shrink-0" data-testid={tid('qty')}>
-          {qty} món
+      {/* Dòng 2 (tablet): "N món • nhãn" (đơn ship: chỉ "N món") + huy hiệu ship. */}
+      <span className="hidden w-full min-w-0 items-center gap-2 md:flex">
+        <span className="min-w-0 flex-1 truncate text-[13px] leading-4 text-[#6d6d6d]">
+          <span className="num" data-testid={tid('qty')}>
+            {qty} món
+          </span>
+          {o.dine_type !== 'delivery' && ` • ${label}`}
+          {pointName && ` • ${pointName}`}
         </span>
-        {pointName && <span className="truncate">· {pointName}</span>}
-        <span className="flex-1" />
         <ShipBadge order={o} tid={tid} />
       </span>
+      {/* Dòng cuối — điện thoại: đồng hồ + icon xe; tablet: trạng thái. Tổng bên phải. */}
       <span className="flex w-full items-center gap-1 md:gap-2">
-        <span className={`badge num shrink-0 rounded px-1 text-[11px] md:hidden ${WAIT_STYLE[card.color]}`}>{card.waitMinutes}′</span>
+        <Badge tone={WAIT_TONE[card.color]} small className="num md:hidden">
+          {card.waitMinutes}′
+        </Badge>
         {(o.ship_mode === 'external' || o.ship_fee > 0) && (
-          <Bike aria-hidden className={`h-3.5 w-3.5 shrink-0 md:hidden ${o.ship_mode === 'external' ? 'text-danger-strong' : 'text-warning-strong'}`} />
+          <Bike aria-hidden className={`h-3.5 w-3.5 shrink-0 md:hidden ${o.ship_mode === 'external' ? 'text-[#b91c1c]' : 'text-[#a16207]'}`} />
         )}
-        <StatusBadge group={card.group} />
+        <Badge tone={group.tone} icon={group.icon} className="hidden md:inline-flex">
+          {group.label}
+        </Badge>
         <span className="flex-1" />
-        <b className="num text-sm font-bold md:text-[17px]" data-testid={tid('total')}>
+        <b className="num text-sm font-bold leading-[18px] text-[#111] md:text-base md:leading-5" data-testid={tid('total')}>
           {formatK(o.total)}
         </b>
       </span>
@@ -331,31 +338,17 @@ function Card({
 function ShipBadge({ order: o, tid }: { order: Order; tid: (k: string) => string | undefined }) {
   if (o.ship_mode === 'external') {
     return (
-      <span className="badge num shrink-0 rounded-md px-1.5 text-[11px] font-semibold bg-danger-soft text-danger-strong" data-testid={tid('ship-external')}>
+      <Badge tone="red" small testId={tid('ship-external')} className="num">
         {externalShipBadge(o.ship_payout)}
-      </span>
+      </Badge>
     );
   }
   if (o.ship_fee > 0) {
     return (
-      <span className="badge num shrink-0 rounded-md px-1.5 text-[11px] bg-warning-soft text-warning-strong" data-testid={tid('ship-fee')}>
+      <Badge tone="amber" small testId={tid('ship-fee')} className="num">
         {shipFeeLabel(o.ship_fee)} ship
-      </span>
+      </Badge>
     );
   }
   return null;
-}
-
-function StatusBadge({ group }: { group: QueueCard['group'] }) {
-  return group === 'serve' ? (
-    <span className="badge hidden shrink-0 rounded-md bg-warning-soft text-xs text-warning-strong md:inline-flex">
-      <ChefHat aria-hidden className="h-3.5 w-3.5" />
-      Chờ ra món
-    </span>
-  ) : (
-    <span className="badge hidden shrink-0 rounded-md bg-brand-soft text-xs text-brand-deep md:inline-flex">
-      <Wallet aria-hidden className="h-3.5 w-3.5" />
-      Chờ thanh toán
-    </span>
-  );
 }

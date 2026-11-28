@@ -44,7 +44,7 @@ export function SalesScreen() {
   return (
     <main
       data-testid="sales-screen"
-      className="relative grid h-full grid-cols-[minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)_auto] md:grid-cols-[minmax(0,1fr)_380px] md:grid-rows-[auto_minmax(0,1fr)] lg:grid-cols-[minmax(0,1fr)_390px]"
+      className="relative grid h-full grid-cols-[minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)_auto] md:grid-cols-[minmax(0,1fr)_380px] md:grid-rows-[auto_minmax(0,1fr)]"
     >
       <div className="row-start-1 min-w-0 md:col-start-1">
         <QueueStrip

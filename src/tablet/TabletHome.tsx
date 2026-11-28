@@ -66,13 +66,13 @@ export function TabletHome({ activation }: { activation: Activation }) {
       <ToastHost extra={<PrintErrorToast canReprint={(id) => !!orders?.some((o) => o.id === id)} />}>
         <div data-testid="tablet-home" className="flex h-full flex-col bg-canvas md:flex-row">
           <aside
-            className={`${onQueue || !ctx ? 'flex' : 'hidden'} ${fullScreen ? 'md:hidden' : 'md:flex'} shrink-0 items-center gap-2 border-b border-line bg-surface px-3 py-2 md:w-60 md:flex-col md:items-stretch md:gap-5 md:overflow-y-auto md:border-b-0 md:border-r md:px-4 md:pb-5 md:pt-6`}
+            className={`${onQueue || !ctx ? 'flex' : 'hidden'} ${fullScreen ? 'md:hidden' : 'md:flex'} shrink-0 items-center gap-2 border-b border-line bg-surface px-3 py-2 md:w-60 md:flex-col md:items-stretch md:gap-5 md:overflow-y-auto md:border-b-0 md:border-r md:px-4 md:pb-4 md:pt-5`}
           >
-            <div className="order-1 flex min-w-0 items-center gap-2 md:order-none md:gap-3 md:px-1">
-              <span aria-hidden className="icon-tile h-9 w-9 bg-brand text-white md:h-10 md:w-10">
+            <div className="order-1 flex min-w-0 items-center gap-2 md:order-none md:gap-2.5">
+              <span aria-hidden className="icon-tile h-9 w-9 bg-brand text-white md:h-10 md:w-10 md:rounded-xl">
                 <Store className="h-5 w-5 md:h-[22px] md:w-[22px]" />
               </span>
-              <h1 className="min-w-0 truncate text-lg font-bold md:text-[19px]" data-testid="tablet-name">
+              <h1 className="min-w-0 truncate text-lg font-bold md:text-[19px] md:leading-6 md:text-[#111]" data-testid="tablet-name">
                 {tabletName}
               </h1>
             </div>
@@ -80,19 +80,23 @@ export function TabletHome({ activation }: { activation: Activation }) {
             {shift && (
               <div
                 data-testid="shift-staff"
-                className="order-2 flex min-w-0 shrink items-center gap-1.5 rounded-full bg-brand-soft px-2.5 py-1 text-sm font-medium text-brand-deep md:order-none md:flex-col md:items-stretch md:gap-2 md:rounded-xl md:border md:border-line md:bg-surface md:p-3 md:text-ink"
+                className="order-2 flex min-w-0 shrink items-center gap-1.5 rounded-full bg-brand-soft px-2.5 py-1 text-sm font-medium text-brand-deep md:order-none md:flex-col md:items-stretch md:gap-2 md:rounded-[14px] md:border md:border-line md:bg-white md:p-3 md:text-[#111]"
               >
-                <span className="hidden text-xs font-normal text-ink-subtle md:block">Ca đang mở</span>
+                <span className="hidden text-xs font-normal leading-[15px] text-[#888] md:block">Ca đang mở</span>
                 <span className="flex min-w-0 items-center gap-1.5 md:gap-2.5">
-                  <span aria-hidden className="icon-tile rounded-full md:h-9 md:w-9 md:bg-brand-tint md:text-brand-deep">
-                    <UserRound className="h-4 w-4 md:h-[18px] md:w-[18px]" />
+                  <span aria-hidden className="icon-tile rounded-full md:hidden">
+                    <UserRound className="h-4 w-4" />
                   </span>
-                  <span className="flex min-w-0 flex-col">
-                    <span className="truncate md:text-[15px] md:font-semibold">
+                  {/* Tablet: avatar chữ cái đầu tên (Figma BH1). */}
+                  <span aria-hidden className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#ffeee7] text-[15px] font-bold text-[#c2380a] md:flex">
+                    {initial(shift.staff_name)}
+                  </span>
+                  <span className="flex min-w-0 flex-col md:gap-px">
+                    <span className="truncate md:text-[15px] md:font-bold md:leading-[19px]">
                       <span className="sr-only">Ca của </span>
                       {shift.staff_name}
                     </span>
-                    <span className="hidden truncate text-[13px] font-normal text-ink-subtle md:block">từ {hhmm(shift.opened_at)}</span>
+                    <span className="hidden truncate text-xs font-normal leading-[15px] text-[#888] md:block">từ {hhmm(shift.opened_at)}</span>
                   </span>
                 </span>
               </div>
@@ -105,18 +109,21 @@ export function TabletHome({ activation }: { activation: Activation }) {
             {!phoneMenu && (
               <GuardedLink
                 to="/owner"
-                className="btn btn-secondary order-4 min-h-[44px] min-w-[44px] shrink-0 px-2.5 md:order-none md:min-h-[48px] md:w-full md:justify-start md:gap-3 md:text-[15px] md:font-medium md:text-ink-muted"
+                className="btn btn-secondary order-4 min-h-[44px] min-w-[44px] shrink-0 px-2.5 md:order-none md:min-h-[50px] md:w-full md:justify-start md:gap-2.5 md:rounded-xl md:px-2.5 md:py-2 md:text-sm md:font-medium md:text-[#6d6d6d] md:shadow-none"
                 data-testid="open-owner-mode"
                 aria-label="Chế độ chủ"
               >
-                <KeyRound aria-hidden className="h-5 w-5" />
+                <KeyRound aria-hidden className="h-5 w-5 md:hidden" />
+                <span aria-hidden className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-[9px] bg-[#f1f1f1] text-[#6d6d6d] md:flex">
+                  <KeyRound className="h-4 w-4" />
+                </span>
                 <span className="hidden md:inline">Chế độ chủ</span>
               </GuardedLink>
             )}
 
-            <div className="order-3 ml-auto flex items-center gap-2 md:order-none md:ml-0 md:px-1">
+            <div className="order-3 ml-auto flex items-center gap-2 md:order-none md:-mt-2 md:ml-0">
               <ConnectionBadge state={snap.conn} />
-              <span className="hidden text-xs text-ink-subtle md:inline" data-testid="app-version" title="Phiên bản app">
+              <span className="hidden text-xs leading-[15px] text-[#888] md:inline" data-testid="app-version" title="Phiên bản app">
                 v{APP_VERSION.split('-')[0]}
               </span>
             </div>
@@ -151,6 +158,9 @@ export function TabletHome({ activation }: { activation: Activation }) {
     </LeaveGuardContext.Provider>
   );
 }
+
+/** Chữ cái đầu tên nhân viên (avatar sidebar tablet). */
+const initial = (name: string) => name.trim().charAt(0).toLocaleUpperCase('vi') || '?';
 
 /** Các mục menu bán hàng (sidebar tablet, bảng ☰ điện thoại). */
 const NAV: ReadonlyArray<{ to: string; icon: LucideIcon; label: string; testId: string; end?: boolean }> = [
@@ -190,7 +200,7 @@ function GuardedLink({ to, className, children, ...rest }: { to: string; classNa
 /** Menu chính trong sidebar tablet (dòng menu Makaryo: đang mở = nền cam, chữ trắng). */
 function SideNav() {
   return (
-    <nav aria-label="Menu bán hàng" className="flex flex-col gap-1.5">
+    <nav aria-label="Menu bán hàng" className="flex flex-col gap-1">
       {NAV.map((n) => (
         <NavItem key={n.to} {...n} />
       ))}
@@ -207,15 +217,21 @@ function NavItem({ to, end, icon: Icon, testId, label, onNavigate }: (typeof NAV
       data-testid={testId}
       onClick={onClick}
       className={({ isActive }) =>
-        `flex min-h-[56px] items-center gap-3 rounded-xl px-3 text-[17px] md:min-h-[52px] md:text-base ${
-          isActive ? 'bg-brand-strong font-semibold text-white shadow-xs hover:bg-brand-deep' : 'border border-line font-medium text-ink-muted hover:bg-surface-muted md:border-0'
+        `flex min-h-[56px] items-center gap-3 rounded-xl px-3 text-[17px] md:min-h-[44px] md:px-3.5 md:text-[15px] md:leading-[19px] ${
+          isActive
+            ? 'bg-brand-strong font-semibold text-white shadow-xs hover:bg-brand-deep md:bg-brand md:shadow-none md:hover:bg-brand-strong'
+            : 'border border-line font-medium text-ink-muted hover:bg-surface-muted md:border-0 md:text-[#6d6d6d] md:hover:bg-[#f8f8f8]'
         }`
       }
     >
       {({ isActive }) => (
         <>
-          <span aria-hidden className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full md:h-8 md:w-8 ${isActive ? 'bg-brand text-white' : 'bg-surface-muted text-ink-muted'}`}>
-            <Icon className="h-5 w-5 md:h-[18px] md:w-[18px]" strokeWidth={2.25} />
+          {/* Điện thoại (menu ☰): icon trong vòng tròn; tablet (sidebar, Figma BH1): icon trần 20. */}
+          <span
+            aria-hidden
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full md:h-5 md:w-5 md:bg-transparent ${isActive ? 'bg-brand text-white' : 'bg-surface-muted text-ink-muted md:text-[#9a9a9a]'}`}
+          >
+            <Icon className="h-5 w-5 md:stroke-2" strokeWidth={2.25} />
           </span>
           {label}
         </>

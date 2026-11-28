@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Printer as PrinterIcon, RefreshCw } from 'lucide-react';
 import { usePrint } from '@/lib/print';
 import type { PrinterState } from '@/print/printer';
+import { iconBtn } from '@/app/kit';
 import { Toast } from './Toast';
 
 const STATE_TEXT: Record<PrinterState, string> = {
@@ -19,8 +20,8 @@ const KIND_TEXT = { kitchen: 'phiếu bếp', bill: 'bill', test: 'phiếu in th
 const PRINT_ERROR_MS = 10_000;
 
 /**
- * Trạng thái máy in (SPEC 12.1, 12.7; Figma S18–S19 / P13): nút icon 44px — tablet ở cuối hàng chip của dải đơn,
- * điện thoại trên header. Chưa sẵn sàng ⇒ nút vàng + chấm. Bấm ⇒ ô chi tiết ngay dưới nút (trạng thái, tên máy, "Kết nối lại").
+ * Trạng thái máy in (SPEC 12.1, 12.7; Figma BH1 / BH18 / BHP12): nút icon 40px — tablet ở cuối hàng chip của dải đơn,
+ * điện thoại trên header. Chưa sẵn sàng ⇒ nền vàng nhạt, viền vàng, chấm vàng góc. Bấm ⇒ ô chi tiết ngay dưới nút (trạng thái, tên máy, "Kết nối lại").
  * Máy không in được trực tiếp (PWA) ⇒ không hiện gì.
  */
 export function PrinterButton({ className = '' }: { className?: string }) {
@@ -38,10 +39,14 @@ export function PrinterButton({ className = '' }: { className?: string }) {
         aria-expanded={open}
         title={STATE_TEXT[printer.state]}
         onClick={() => setOpen((o) => !o)}
-        className={`btn h-11 min-h-0 w-11 min-w-0 rounded-xl px-0 ${ok ? 'btn-secondary text-ink-muted' : 'border border-warning-line bg-warning-soft text-warning-strong'}`}
+        className={
+          ok
+            ? iconBtn('relative h-10 w-10')
+            : 'relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#f59e0b] bg-[#fef5e1] text-[#a16207] transition-colors duration-fast hover:bg-[#fdecc4]'
+        }
       >
-        <PrinterIcon aria-hidden className="h-5 w-5" />
-        {!ok && <span aria-hidden className="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full border-2 border-surface bg-warning" />}
+        <PrinterIcon aria-hidden className="h-[18px] w-[18px]" />
+        {!ok && <span aria-hidden className="absolute -right-[3px] -top-[3px] h-3.5 w-3.5 rounded-full border-2 border-white bg-[#f59e0b]" />}
       </button>
       {open && (
         <>

@@ -91,6 +91,7 @@ export function Segmented<K extends string>({
   label,
   stretch,
   small,
+  track = 'bg-[#efefef]',
   className = '',
 }: {
   options: ReadonlyArray<SegmentOption<K>>;
@@ -100,11 +101,13 @@ export function Segmented<K extends string>({
   label: string;
   stretch?: boolean;
   small?: boolean;
+  /** Màu nền rãnh (dải đơn: `bg-[#ececec]`). */
+  track?: string;
   className?: string;
 }) {
   const text = stretch ? (small ? 'text-[13px] leading-4' : 'text-sm leading-[18px]') : small ? 'text-xs leading-[15px]' : 'text-[13px] leading-4';
   return (
-    <div role="group" aria-label={label} className={`rounded-xl bg-[#efefef] p-1 ${stretch ? 'grid auto-cols-fr grid-flow-col gap-1' : 'inline-flex gap-0.5'} ${className}`}>
+    <div role="group" aria-label={label} className={`rounded-xl p-1 ${track} ${stretch ? 'grid auto-cols-fr grid-flow-col gap-1' : 'inline-flex gap-0.5'} ${className}`}>
       {options.map((o) => {
         const on = o.key === value;
         const Icon = o.icon;
