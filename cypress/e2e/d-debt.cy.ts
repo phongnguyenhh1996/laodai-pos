@@ -17,8 +17,7 @@ interface DbOrder {
 function sellOnDebt() {
   cy.get(tid('new-order')).click();
   cy.get(tid(`menu-combo-${SEED.combos.xoiGaTrung}`)).click();
-  cy.get(tid('order-pay')).click();
-  cy.get(tid('pay-method-debt')).click();
+  cy.get(tid('order-pay-debt')).click();
 }
 
 describe('D. Ghi nợ & thu nợ', () => {

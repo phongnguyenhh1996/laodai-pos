@@ -125,11 +125,11 @@ describe('C. Bán hàng', () => {
       .first()
       .should('have.attr', 'data-testid', 'order-label');
     cy.get('[data-testid*=price-input], [data-testid*=discount]').should('not.exist');
-    cy.get(tid('order-pay')).click();
-    // Màn thanh toán: ô nhập duy nhất là "khách đưa"
-    cy.get(`${tid('pay-screen')} input, ${tid('pay-screen')} textarea`).should('have.length', 1).first().should('have.attr', 'data-testid', 'cash-manual');
+    cy.get(tid('order-pay-cash')).click();
+    // Thanh toán trong giỏ: ô nhập duy nhất là "khách đưa"
+    cy.get(`${tid('cart-pay')} input, ${tid('cart-pay')} textarea`).should('have.length', 1).first().should('have.attr', 'data-testid', 'cash-manual');
     cy.get(tid('pay-method-transfer')).click();
-    cy.get(`${tid('pay-screen')} input`).should('not.exist');
+    cy.get(`${tid('cart-pay')} input`).should('not.exist');
     cy.get('[data-testid*=discount]').should('not.exist');
   });
 
@@ -188,7 +188,7 @@ describe('C. Bán hàng', () => {
     // Thanh toán đơn "hai" (số 2)
     cards().eq(1).find('[data-testid^=queue-open-]').click();
     cy.get(tid('order-code')).invoke('text').should('match', CODE);
-    cy.get(tid('order-pay')).click();
+    cy.get(tid('order-pay-cash')).click();
     // Nhập tay theo nghìn: gõ 1000 = 1.000.000đ; bấm nút tiền nhanh thì ô nhập tay xóa
     cy.get(tid('cash-manual')).type('1000').should('have.value', '1.000');
     cy.get(tid('cash-change')).should('have.text', '972.000');
@@ -217,8 +217,7 @@ describe('C. Bán hàng', () => {
     cards().first().invoke('attr', 'data-testid').then((t) => {
       const id = String(t).replace('queue-card-', '');
       cards().first().find(`[data-testid=queue-open-${id}]`).click();
-      cy.get(tid('order-pay')).click();
-      cy.get(tid('pay-method-transfer')).click();
+      cy.get(tid('order-pay-transfer')).click();
       cy.get(tid('pay-transfer-confirm')).click();
       cy.get(tid('queue-empty')).should('be.visible');
       cy.get(tid(`queue-card-${id}`)).should('not.exist');
@@ -229,7 +228,7 @@ describe('C. Bán hàng', () => {
         cy.location('pathname').should('eq', '/');
         cy.get(tid('queue-screen')).should('be.visible');
         cy.get(tid('order-screen')).should('not.exist');
-        cy.get(tid('pay-screen')).should('not.exist');
+        cy.get(tid('cart-pay')).should('not.exist');
       }
       // Không có link / nút nào dẫn tới lịch sử đơn
       cy.get('a[href*=history], a[href*=paid], [data-testid*=history]').should('not.exist');
@@ -356,11 +355,11 @@ describe('C. Bán hàng', () => {
     cy.get(tid('order-ship-mode-external')).click();
     cy.get(tid('order-ship-fee-title')).should('have.text', 'Phụ thu');
     cy.get(tid('order-payout-missing')).should('be.visible');
-    cy.get(tid('order-pay')).should('be.disabled');
+    cy.get(tid('order-pay-cash')).should('be.disabled');
     cy.get(tid('order-ship-fee-5000')).click();
     cy.get(tid('order-ship-payout-10000')).click();
     cy.get(tid('order-total')).should('have.text', '36.000'); // không cộng 10.000 trả shipper
-    cy.get(tid('order-pay')).should('not.be.disabled').click();
+    cy.get(tid('order-pay-cash')).should('not.be.disabled').click();
     cy.get(tid('pay-total')).should('have.text', '36.000');
     cy.get(tid('pay-ship-payout')).should('have.text', 'Trả shipper −10.000 (lấy từ két)');
     cy.get(tid('pay-method-transfer')).click();

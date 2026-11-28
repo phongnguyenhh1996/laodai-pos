@@ -192,9 +192,8 @@ describe('tạo đơn & thanh toán', () => {
     // Mở lại đơn: khách vẫn chọn; thanh toán ghi nợ ⇒ khách chọn sẵn.
     click(`queue-card-${o.id}`);
     expect(await screen.findByTestId('order-ship-summary')).toHaveTextContent('Cô Hoa');
-    click('order-pay');
-    await screen.findByTestId('pay-screen');
-    click('pay-method-debt');
+    click('order-pay-debt');
+    await screen.findByTestId('pay-debt');
     expect(tid('customer-chosen-label')).toHaveTextContent('Cô Hoa');
     click('pay-debt-confirm');
     await cartIsNew();
@@ -345,7 +344,7 @@ describe('tạo đơn & thanh toán', () => {
     expect(tid('order-ship-fee-title')).toHaveTextContent('Phụ thu');
     expect(screen.getAllByTestId(/^order-ship-payout-\d+$/).map((b) => b.textContent)).toEqual(['+5k', '+10k', '+15k', '+20k']);
     expect(tid('order-payout-missing')).toHaveTextContent('Chưa chọn tiền trả shipper');
-    for (const b of ['order-pay-exact', 'order-pay', 'order-serve', 'order-save']) expect(tid(b)).toBeDisabled();
+    for (const b of ['order-pay-exact', 'order-pay-cash', 'order-pay-transfer', 'order-pay-debt', 'order-serve', 'order-save']) expect(tid(b)).toBeDisabled();
 
     click('order-ship-fee-5000');
     click('order-ship-payout-10000');
@@ -358,8 +357,8 @@ describe('tạo đơn & thanh toán', () => {
     expect(tid('ship-sheet-summary')).toHaveTextContent('Shipper ngoài · phụ thu +5.000 · trả shipper 10.000 · tổng 20.000');
     click('ship-sheet-done');
 
-    click('order-pay');
-    await screen.findByTestId('pay-screen');
+    click('order-pay-cash');
+    await screen.findByTestId('cart-pay');
     const create = server.ops.find((op) => op.kind === 'create_order')!;
     expect(create.payload).toMatchObject({ order: { ship_mode: 'external', ship_payout: 10_000, ship_fee: 5_000, total: 20_000 } });
     expect(tid('pay-total')).toHaveTextContent('20.000');
@@ -367,7 +366,7 @@ describe('tạo đơn & thanh toán', () => {
     expect(tid('pay-ship-payout')).toHaveTextContent('Trả shipper −10.000 (lấy từ két)');
 
     click('pay-back');
-    expect(await screen.findByTestId('order-deselect')).toBeInTheDocument(); // về màn Bán hàng, đơn đó đang chọn
+    expect(await screen.findByTestId('order-deselect')).toBeInTheDocument(); // về giỏ, sửa tiếp đơn vừa lưu
     click('order-deselect');
     await cartIsNew();
     expect(tid(`queue-ship-external-${create.entity_id}`)).toHaveTextContent('Ship ngoài · trả 10k');
@@ -454,9 +453,9 @@ describe('tạo đơn & thanh toán', () => {
     // Màn đơn: chỉ một ô nhập là nhãn / số bàn
     expect(screen.getAllByRole('textbox').map((e) => e.dataset.testid)).toEqual(['order-label']);
     expect(document.querySelectorAll('input:not([data-testid=order-label])')).toHaveLength(0);
-    click('order-pay');
-    await screen.findByTestId('pay-screen');
-    // Màn thanh toán: chỉ có ô "khách đưa" (nhập tay), không có ô giá / giảm giá
+    click('order-pay-cash');
+    await screen.findByTestId('cart-pay');
+    // Thanh toán trong giỏ: chỉ có ô "khách đưa" (nhập tay), không có ô giá / giảm giá
     expect(screen.getAllByRole('textbox').map((e) => e.dataset.testid)).toEqual(['cash-manual']);
     expect(document.body.innerHTML).not.toMatch(/giảm giá|discount|chiết khấu/i);
   });
@@ -467,8 +466,8 @@ describe('tạo đơn & thanh toán', () => {
     expect(screen.queryByTestId(`menu-product-${COM_GA.id}`)).not.toBeInTheDocument(); // tab Xôi: không có món cơm
     click('point-tab-com');
     addProduct(COM_GA.id); // 35.000, không topping
-    click('order-pay');
-    await screen.findByTestId('pay-screen');
+    click('order-pay-cash');
+    await screen.findByTestId('cart-pay');
     expect(tid('pay-total')).toHaveTextContent('35.000');
     expect(screen.queryByTestId('cash-quick-20000')).not.toBeInTheDocument();
     expect(tid('cash-exact')).toBeInTheDocument();
@@ -490,12 +489,34 @@ describe('tạo đơn & thanh toán', () => {
     await startShift();
     await newOrder();
     fireEvent.click(screen.getByTestId(`menu-combo-${COMBO_XOI_FULL.id}`));
-    click('order-pay');
-    await screen.findByTestId('pay-screen');
-    click('pay-method-transfer');
+    click('order-pay-transfer');
+    await screen.findByTestId('pay-transfer');
     click('pay-transfer-confirm');
     expect(await screen.findByTestId('queue-flash')).toHaveTextContent('chuyển khoản');
     expect(server.ops.at(-1)!.payload).toMatchObject({ method: 'transfer', cash_given: null });
+  });
+
+  it('thanh toán trong giỏ: Ghi nợ là bảng đè lên giỏ, đóng ⇒ về hình thức trước đó / về giỏ; "Giỏ" ⇒ sửa tiếp đơn', async () => {
+    await startShift();
+    await newOrder();
+    fireEvent.click(screen.getByTestId(`menu-combo-${COMBO_XOI_FULL.id}`));
+    click('order-pay-cash');
+    await screen.findByTestId('pay-cash');
+    expect(server.kinds).toEqual(['open_shift', 'create_order']); // mở thanh toán ⇒ đơn đã lưu
+    expect(screen.queryByTestId('cart-lines')).not.toBeInTheDocument();
+    click('pay-method-debt');
+    expect(tid('pay-debt')).toBeInTheDocument();
+    click('pay-debt-close');
+    expect(tid('pay-method-cash')).toHaveAttribute('aria-selected', 'true');
+    expect(screen.queryByTestId('pay-debt')).not.toBeInTheDocument();
+    click('pay-back');
+    expect(tid('cart-lines')).toBeInTheDocument();
+    click('order-pay-debt');
+    await screen.findByTestId('pay-debt');
+    click('pay-debt-close');
+    expect(screen.queryByTestId('cart-pay')).not.toBeInTheDocument();
+    expect(tid('cart-lines')).toBeInTheDocument();
+    expect(server.kinds).toEqual(['open_shift', 'create_order']);
   });
 
   it('C16: thanh toán xong đơn biến mất; mở lại đường dẫn của đơn đó chỉ về đơn mới trên màn Bán hàng', async () => {
@@ -507,7 +528,7 @@ describe('tạo đơn & thanh toán', () => {
     const [o] = server.openOrders();
     fireEvent.click(await screen.findByTestId(`queue-card-${o.id}`));
     await screen.findByTestId('order-screen');
-    click('order-pay');
+    click('order-pay-cash');
     fireEvent.click(await screen.findByTestId('cash-exact'));
     click('pay-confirm');
     await screen.findByTestId('queue-empty');
@@ -519,7 +540,7 @@ describe('tạo đơn & thanh toán', () => {
       await waitFor(() => expect(window.location.pathname).toBe('/'));
       await waitFor(() => expect(window.location.search).toBe(''));
       await cartIsNew();
-      expect(screen.queryByTestId('pay-screen')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('cart-pay')).not.toBeInTheDocument();
     }
   });
 
@@ -880,9 +901,8 @@ describe('ghi nợ & thu nợ', () => {
   async function payByDebt() {
     await newOrder();
     fireEvent.click(screen.getByTestId(`menu-combo-${COMBO_XOI_FULL.id}`)); // 39.000
-    click('order-pay');
-    await screen.findByTestId('pay-screen');
-    click('pay-method-debt');
+    click('order-pay-debt');
+    await screen.findByTestId('pay-debt');
   }
 
   it('D17: gõ "dung" ⇒ gợi ý "Dũng (giáo viên)" (không phân biệt dấu); chọn ⇒ ghi nợ cho khách có sẵn', async () => {
@@ -1118,12 +1138,12 @@ describe('nhiều máy cùng hồ sơ tablet (realtime)', () => {
     b.store.stop();
   });
 
-  it('máy khác thanh toán đơn đang mở ở màn thanh toán ⇒ về hàng đợi, báo đã thanh toán ở máy khác; không thu lần hai', async () => {
+  it('máy khác thanh toán đơn đang thanh toán trong giỏ ⇒ về hàng đợi, báo đã thanh toán ở máy khác; không thu lần hai', async () => {
     await startShift();
     await newOrder();
     fireEvent.click(screen.getByTestId(`menu-combo-${COMBO_XOI_FULL.id}`));
-    click('order-pay');
-    await screen.findByTestId('pay-screen');
+    click('order-pay-cash');
+    await screen.findByTestId('cart-pay');
     const [o] = server.openOrders();
     const b = await otherDevice();
     await b.pos.payOrder(o.id, { method: 'transfer' });
@@ -1197,7 +1217,7 @@ describe('mất kết nối', () => {
 
     const [o] = server.openOrders();
     fireEvent.click(tid(`queue-card-${o.id}`));
-    click('order-pay');
+    click('order-pay-cash');
     fireEvent.click(await screen.findByTestId('cash-exact'));
     server.dropNextResponse = true;
     click('pay-confirm');

@@ -14,7 +14,6 @@ import { CloseShiftScreen } from './CloseShiftScreen';
 import { DebtScreen } from './DebtScreen';
 import { ExpenseScreen } from './ExpenseScreen';
 import { OpenShiftScreen } from './OpenShiftScreen';
-import { PayScreen } from './PayScreen';
 import { SalesScreen } from './SalesScreen';
 import { LeaveGuardContext, Sheet, TabletContext, useLeave, type LeaveGuard, type TabletCtx } from './parts';
 
@@ -265,10 +264,10 @@ function TabletRoutes({ hasShift }: { hasShift: boolean }) {
   return (
     <Routes>
       <Route path="/" element={hasShift ? <SalesScreen /> : <OpenShiftScreen />} />
-      {/* Đường dẫn cũ của màn đơn: gọi món nay nằm trong màn Bán hàng. */}
+      {/* Đường dẫn cũ của màn đơn / thanh toán: gọi món và thanh toán nay nằm trong màn Bán hàng. */}
       <Route path="/order/new" element={<Navigate to="/" replace />} />
       <Route path="/order/:orderId" element={<OldOrderRedirect />} />
-      <Route path="/order/:orderId/pay" element={needShift(<PayScreen />)} />
+      <Route path="/order/:orderId/pay" element={<OldOrderRedirect />} />
       <Route path="/debt" element={needShift(<DebtScreen />)} />
       <Route path="/expenses" element={needShift(<ExpenseScreen />)} />
       {/* Đóng ca tự xử lý lúc không còn ca (ngay sau khi đóng: chỉ hiện "Đã đóng ca"). */}

@@ -1,16 +1,8 @@
 import { useContext, useEffect, useRef, useState } from 'react';
-import { useLocation, useSearchParams } from 'react-router-dom';
-import type { Order } from '@/domain/types';
+import { useSearchParams } from 'react-router-dom';
 import { OrderEditor, type OrderDone } from './OrderEditor';
 import { LeaveGuardContext, Notice, type LeaveGuard } from './parts';
 import { QueueStrip } from './QueueStrip';
-
-/** Thông báo truyền qua state của điều hướng khi về màn Bán hàng (vd. từ màn thanh toán). */
-export interface SalesFlash {
-  flash?: string;
-  /** Đơn vừa thanh toán trên máy này: hiện lại thoáng qua ở chỗ cũ trong hàng đợi rồi biến mất. */
-  paid?: Order;
-}
 
 /** Thông báo một lần còn hiện bao lâu. */
 const FLASH_MS = 4000;
@@ -21,15 +13,13 @@ const FLASH_MS = 4000;
  * không chọn ⇒ giỏ là đơn mới trống.
  */
 export function SalesScreen() {
-  const location = useLocation();
   const [params, setParams] = useSearchParams();
   const selectedId = params.get('order');
-  const initial = location.state as SalesFlash | null;
-  const [flash, setFlash] = useState<string | null>(initial?.flash ?? null);
+  const [flash, setFlash] = useState<string | null>(null);
   /** Tăng mỗi lần giỏ về đơn mới trống: dựng lại giỏ (bản nháp mới, id đơn mới). */
   const [newSeq, setNewSeq] = useState(0);
   const [hiddenIds, setHiddenIds] = useState<ReadonlySet<string>>(new Set());
-  const paidId = useRef<string | null>(initial?.paid?.id ?? null);
+  const paidId = useRef<string | null>(null);
 
   // Luật rời đơn của giỏ đang mở; menu (sidebar / ☰) cũng gọi qua đây trước khi sang màn khác.
   const leaveRef = useRef<LeaveGuard | null>(null);
@@ -73,7 +63,6 @@ export function SalesScreen() {
           }}
           hiddenIds={hiddenIds}
           paidId={paidId}
-          initialPaid={initial?.paid}
         />
       </div>
       <OrderEditor
@@ -81,7 +70,11 @@ export function SalesScreen() {
         orderId={selectedId}
         leaveRef={leaveRef}
         onDone={onDone}
-        onClose={() => setSelected(null)}
+        onClose={() => {
+          // Đơn vừa lưu khi mở thanh toán trong giỏ chưa nằm trên URL ⇒ dựng lại giỏ để chắc chắn về đơn mới.
+          setSelected(null);
+          setNewSeq((n) => n + 1);
+        }}
         hideCard={(id) => setHiddenIds(id ? new Set([id]) : new Set())}
       />
       {flash && (

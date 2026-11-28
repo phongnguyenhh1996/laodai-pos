@@ -97,14 +97,20 @@ Dựng từ route tạm `/__preview/sales?s=…` (`src/dev/SalesPreview.tsx`, x�
 
 Ghi chú khi làm: `QueueScreen.tsx` → `QueueStrip.tsx` (dải đơn), `OrderScreen.tsx` → `OrderEditor.tsx` (thực đơn + giỏ, dựng lại khi đổi đơn đang chọn),
 màn mới `SalesScreen.tsx`; route preview tạm `/__preview/sales` đã xóa. Điện thoại đã có nút ☰ cơ bản (thanh đáy cũ không còn chỗ vì giỏ ở đáy);
-ticket 4 hoàn thiện phần điện thoại. `PrintBar` tạm nằm dưới dải đơn tới ticket 4. Nút "Thanh toán…" vẫn mở `/order/:id/pay` tới ticket 3.
+ticket 4 hoàn thiện phần điện thoại. `PrintBar` tạm nằm dưới dải đơn tới ticket 4. Nút "Thanh toán…" vẫn mở `/order/:id/pay` tới ticket 3 (đã xong).
 Test component đã sửa cho màn mới và thêm test bỏ chọn / "Bỏ thay đổi?"; Cypress để ticket 6.
 
 ## Ticket 3 — Thanh toán trong giỏ
 
-- [ ] Tách phần TM / CK / Ghi nợ của `PayScreen` thành component dùng trong giỏ; Ghi nợ là sheet.
-- [ ] Hàng TM · CK · Ghi nợ thay nút "Thanh toán…"; "Thu đủ tiền mặt" giữ nguyên.
-- [ ] Bỏ route + màn `PayScreen`.
+- [x] Tách phần TM / CK / Ghi nợ của `PayScreen` thành component dùng trong giỏ; Ghi nợ là sheet.
+- [x] Hàng TM · CK · Ghi nợ thay nút "Thanh toán…"; "Thu đủ tiền mặt" giữ nguyên.
+- [x] Bỏ route + màn `PayScreen`.
+
+Ghi chú khi làm: `src/tablet/CartPay.tsx` (`CartPay` = nút "‹ Giỏ" + "Cần thu" + hàng TM · CK · Ghi nợ + phần TM / CK; `DebtSheet` đè lên cột giỏ).
+Bấm TM / CK / Ghi nợ trong giỏ ⇒ lưu đơn trước (đơn mới ⇒ tạo đơn) rồi mở phần thanh toán; "‹ Giỏ" ⇒ sửa tiếp đơn đó.
+Đóng sheet Ghi nợ ⇒ về hình thức đang mở trước đó, hoặc về giỏ nếu mở thẳng từ giỏ. `/order/:id/pay` chuyển hướng như `/order/:id`.
+Bỏ state điều hướng `SalesFlash` / `initialPaid` (không còn màn nào điều hướng về kèm thông báo).
+Cypress: đã đổi test id (`order-pay-cash|transfer|debt`, `cart-pay`); kiểm tra bố cục nút trên điện thoại (C, dòng "Ba nút dưới cùng nằm trên một hàng") để ticket 6.
 
 ## Ticket 4 — Toast, máy in, menu điện thoại
 

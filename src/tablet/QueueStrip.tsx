@@ -69,7 +69,6 @@ export function QueueStrip({
   onDeselect,
   hiddenIds,
   paidId,
-  initialPaid,
 }: {
   selectedId: string | null;
   onSelect: (id: string) => void;
@@ -78,8 +77,6 @@ export function QueueStrip({
   hiddenIds: ReadonlySet<string>;
   /** Đơn vừa thanh toán trên máy này: thẻ rời hàng đợi với dấu tích "Đã thanh toán". */
   paidId: { current: string | null };
-  /** Đơn đã thanh toán trước khi vào màn (từ màn thanh toán): hiện lại thoáng qua ở chỗ cũ rồi biến mất. */
-  initialPaid?: Order;
 }) {
   const { catalog, orders } = useTablet();
   const now = useNow(1000);
@@ -88,14 +85,7 @@ export function QueueStrip({
   const queue = buildQueue(visible, now, catalog?.config ?? DEFAULT_WAIT);
   const counts = queueCounts(queue);
 
-  const [leaving, setLeaving] = useState<Leaving[]>(() => {
-    const paid = initialPaid;
-    if (!paid || !canAnimate() || orders.some((o) => o.id === paid.id)) return [];
-    const status = paid.status === 'open' ? 'open' : 'served';
-    const index = orders.filter((o) => o.status === status && o.created_at < paid.created_at).length;
-    const card: QueueCard = { order: paid, group: status === 'open' ? 'serve' : 'pay', position: 0, waitMinutes: 0, color: 'none' };
-    return [{ card, index, kind: 'paid', until: Date.now() + EXIT_MS.paid }];
-  });
+  const [leaving, setLeaving] = useState<Leaving[]>([]);
   // Đơn mới vào hàng đợi (tạo trên máy này hoặc máy khác) ⇒ hiệu ứng xuất hiện.
   const [entering, setEntering] = useState<Map<string, number>>(new Map());
 

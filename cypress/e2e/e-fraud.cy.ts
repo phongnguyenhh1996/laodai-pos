@@ -22,8 +22,7 @@ function sellAsTransfer(combo: keyof typeof SEED.combos, point?: keyof typeof SE
   cy.get(tid('new-order')).click();
   if (point) cy.get(tid(`point-tab-${SEED.points[point]}`)).click();
   cy.get(tid(`menu-combo-${SEED.combos[combo]}`)).click();
-  cy.get(tid('order-pay')).click();
-  cy.get(tid('pay-method-transfer')).click();
+  cy.get(tid('order-pay-transfer')).click();
   cy.get(tid('pay-transfer-confirm')).click();
   cy.get(tid('queue-flash')).should('be.visible');
 }

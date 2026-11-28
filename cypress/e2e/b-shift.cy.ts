@@ -145,7 +145,7 @@ describe('B. Ca', () => {
     cy.openShift('Mai');
     cy.get('[data-testid^=queue-card-]').should('have.length', 1).first().should('contain.text', 'chuyển ca');
     cy.get('[data-testid^=queue-open-]').first().click();
-    cy.get(tid('order-pay')).click();
+    cy.get(tid('order-pay-cash')).click();
     cy.get(tid('cash-quick-50000')).click();
     cy.get(tid('pay-confirm')).click();
     cy.get(tid('queue-empty')).should('be.visible');
